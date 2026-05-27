@@ -89,9 +89,9 @@ function getUserContext(email) {
         const id = row.ID_ClientesConfiabilidad;
         context.clientNames[id]  = row.RazonSocial || `Cliente ${id}`;
         context.clientTypes[id]  = row.TipodeCliente || 'Externo';
-        context.clientData[id]   = {
-          nit: row.NIT,
-          razonSocial: row.RazonSocial,
+        context.clientData[id]   = { 
+          nit: row.NIT, 
+          razonSocial: row.RazonSocial, 
           tipo: row.TipodeCliente,
           forcedMyRequests: row.ForcedMyRequests === 'SI' || row.ForcedMyRequests === true
         };
@@ -170,12 +170,12 @@ function getRequests(email, { period = 'today', clientId = null } = {}) {
 
   // 1. Vista principal (Optimization & Mapping fix)
   const sqlColumns = `
-    ID_SolicitudesConfiabilidad, NSolicitud, FechaSolicitud, Identificacion,
-    NombreCompleto, Cargo, EstadoActual, EstadoActualEP,
-    Fecha_Programacion_Visita AS ProgramacionVisita,
-    Fecha_Programacion_Poligrafia AS ProgramacionPoligrafia,
-    Fecha_Entrega_ECP AS FechaEntregaECP,
-    Fecha_Entrega_EP AS FechaEntregaEP,
+    ID_SolicitudesConfiabilidad, NSolicitud, FechaSolicitud, Identificacion, 
+    NombreCompleto, Cargo, EstadoActual, EstadoActualEP, 
+    Fecha_Programacion_Visita AS ProgramacionVisita, 
+    Fecha_Programacion_Poligrafia AS ProgramacionPoligrafia, 
+    Fecha_Entrega_ECP AS FechaEntregaECP, 
+    Fecha_Entrega_EP AS FechaEntregaEP, 
     ID_Cliente, usuarioActualizacion
   `;
   const sqlView = `SELECT ${sqlColumns} FROM \`${tableView}\` ${buildWhere()} ORDER BY FechaSolicitud DESC LIMIT 500`;
@@ -607,7 +607,7 @@ function registerTempDocument(email, { requestId, docName, fileName }) {
 function updateClientConfig(email, { clientId, forcedMyRequests }) {
   const context = getUserContext(email);
   if (!context.isAdmin) throw new Error("Solo administradores pueden realizar esta acción.");
-
+  
   const bq = new BigQueryClient();
   const projectId = BQ_CREDENTIALS.project_id;
   const sql = `UPDATE \`${projectId}.${DATASET_ID}.${TABLES.CLIENT_CONF}\` SET ForcedMyRequests = @val WHERE ID_ClientesConfiabilidad = @id`;
