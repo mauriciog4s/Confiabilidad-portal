@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Confiabilidad</title>
+    <link rel="icon" href="https://www.g4s.com/favicon.ico" type="image/x-icon" />
+    <link rel="shortcut icon" href="https://www.g4s.com/favicon.ico" type="image/x-icon" />
+    
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: { colors: { appBlue: '#0033A0', appRed: '#D32F2F', appGray: '#F5F5F5' } }
+        }
+      }
+    </script>
+    <style type="text/tailwindcss">
+      /* --- FIX CRITICO: FORZAR PANTALLA COMPLETA --- */
+      /* Esto soluciona el problema del "cuadrito" blanco en el cliente */
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%; /* Obliga a ocupar todo el alto disponible */
+        overflow: hidden; /* Evita doble scrollbar del iframe */
+        background-color: #f3f4f6;
+      }
+      
+      #root {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* Scrollbars personalizadas */
+      ::-webkit-scrollbar { width: 8px; }
+      ::-webkit-scrollbar-track { background: #f1f1f1; }
+      ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+      
+      body { font-family: 'Roboto', sans-serif; }
+      
+      .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+      .animate-scale-in { animation: scaleIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+      
+      @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes scaleIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+      
+      .spin-slow { animation: spin 2s linear infinite; }
+      @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+      /* Toast Style */
+      .toast {
+        @apply fixed bottom-4 right-4 bg-white border border-gray-200 shadow-lg rounded-lg p-4 z-50 animate-fade-in flex items-center gap-3 max-w-[90vw];
+      }
+
+      /* Toggle Custom Styles */
+      .toggle-group {
+        @apply flex rounded-lg overflow-hidden border border-gray-200 bg-gray-100 p-1 gap-1 h-10 w-full max-w-[200px];
+      }
+      .toggle-btn {
+        @apply flex-1 text-xs font-bold rounded-md transition-all duration-200 flex items-center justify-center;
+      }
+      .toggle-btn:hover {
+        @apply bg-gray-200;
+      }
+      .toggle-btn-inactive {
+        @apply text-gray-400;
+      }
+      .toggle-btn-no {
+        @apply bg-white text-gray-700 shadow-sm border border-gray-200; 
+      }
+      .toggle-btn-si {
+        @apply bg-[#e60023] text-white shadow-md transform scale-105;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useState, useEffect, useMemo, useRef, useCallback } = React;
+
+      // PROXY CONFIG
+      const PROXY_URL = "https://script.google.com/a/macros/co.g4s.com/s/AKfycbxQB6XNAaKr8gXmzUNBsu4lLwjc9NwK_XjHSJmw37HVRNvBHDM5sQOIg6NLcXXs0Im4/exec";
+      const PROXY_TOKEN = "G4S-ACCESS-KEY-2025";
+
+      // --- ERROR BOUNDARY ---
+      class ErrorBoundary extends React.Component {
+        constructor(props) {
+          super(props);
+          this.state = { hasError: false, error: null };
+        }
+        static getDerivedStateFromError(error) { return { hasError: true, error }; }
+        componentDidCatch(error, errorInfo) { console.error("Error capturado:", error, errorInfo); }
+        render() {
+          if (this.state.hasError) {
+            return (
+              <div className="flex h-full items-center justify-center bg-gray-50 p-4 min-h-[50vh]">
+                <div className="bg-white p-6 rounded-lg shadow-xl text-center border border-red-100 max-w-sm">
+                  <div className="text-red-500 mb-2 font-bold text-lg">Algo salió mal</div>
+                  <p className="text-gray-500 text-sm mb-4">Ocurrió un error inesperado en esta sección.</p>
+                  <button onClick={() => window.location.reload()} className="bg-red-600 text-white px-4 py-2 rounded text-sm font-bold">Recargar</button>
+                </div>
+              </div>
+            );
+          }
+          return this.props.children;
+        }
+      }
+
+      // --- VALIDATION HELPERS ---
+      const isValidEmail = (email) => {
+          if (!email || email.trim() === '') return true; // Opcional
+          const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          return re.test(String(email).trim().toLowerCase());
+      };
+
+      const isValidPhone = (phone) => {
+          if (!phone || String(phone).trim() === '') return true; // Opcional
+          const re = /^\d{7,13}$/;
+          return re.test(String(phone).trim());
+      };
+
+      // --- DATE FORMATTER COLOMBIA ---
+      const formatDateCO = (dateInput, includeTime = true) => {
+          if (!dateInput) return '';
+          const val = (dateInput && typeof dateInput === 'object' && dateInput.value) ? dateInput.value : dateInput;
+          try {
+              const d = new Date(val);
+              if (isNaN(d.getTime())) return val;
+              const options = { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' };
+              if (includeTime) { options.hour = '2-digit'; options.minute = '2-digit'; options.hour12 = false; }
+              return new Intl.DateTimeFormat('es-CO', options).format(d);
+          } catch (e) { return val; }
+      };
+
+      // --- COMUNICACIÓN CON EL SERVIDOR ---
+      const runServer = (endpoint, payload = {}) => {
+        return new Promise((resolve, reject) => {
+          if (typeof google === 'undefined' || !google.script) {
+             // Mock para desarrollo local
+             setTimeout(() => resolve({ success: true, message: 'Mock Data' }), 500);
+             return;
+          }
+          google.script.run
+            .withSuccessHandler((res) => {
+                if (res && res.error) reject(new Error(res.message));
+                else resolve(res);
+            })
+            .withFailureHandler((err) => reject(err))
+            .apiHandler({ endpoint, payload });
+        });
+      };
+
+      // --- HELPER DE UPLOAD PROXY ---
+      const uploadFileViaProxy = (file, aliasName) => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => {
+                const base64 = reader.result.toString().replace(/^data:(.*,)?/, '');
+                const iframeName = 'upload_target_' + new Date().getTime() + Math.random();
+                const iframe = document.createElement('iframe');
+                iframe.name = iframeName;
+                iframe.style.display = 'none';
+                document.body.appendChild(iframe);
+                const form = document.createElement('form');
+                form.target = iframeName;
+                form.action = PROXY_URL;
+                form.method = 'POST';
+                form.style.display = 'none';
+                const datos = { token: PROXY_TOKEN, filename: aliasName, mimetype: file.type, base64: base64 };
+                for (const key in datos) {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = key;
+                    input.value = datos[key];
+                    form.appendChild(input);
+                }
+                document.body.appendChild(form);
+                iframe.onload = function() {
+                    setTimeout(() => {
+                        if(document.body.contains(form)) document.body.removeChild(form);
+                        if(document.body.contains(iframe)) document.body.removeChild(iframe);
+                    }, 2000);
+                    resolve(true);
+                };
+                form.submit();
+            };
+            reader.onerror = error => reject(error);
+        });
+      };
+
+      // --- ICONOS ---
+      const Icon = ({ name, size = 20, className = "" }) => {
+        const icons = {
+          Home: <><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></>,
+          ClipboardList: <><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M15 2H9a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1Z"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></>,
+          MessageCircleWarning: <><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/><path d="M12 8v4"/><path d="M12 16h.01"/></>,
+          FileSignature: <><path d="M20 19.5v.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8.5L20 7.5V11"/><path d="M18 5.675V9H14.675L18 5.675Z"/><path d="M18 11l-2.293 2.293a1 1 0 0 0 0 1.414l1.586 1.586a1 1 0 0 0 1.414 0L21 14"/><path d="M12 15l-3 3 .707 2.293 2.293-2.293 3-3"/></>,
+          History: <><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 12"/><path d="M3 3v9h9"/><path d="M12 7v5l4 2"/></>,
+          FileText: <><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></>,
+          ChevronRight: <path d="m9 18 6-6-6-6"/>,
+          User: <><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>,
+          Settings: <><path d="M12.22 2h-.44a2 2 0 0 1-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.09a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.09a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.09a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></>,
+          ShieldCheck: <><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></>,
+          LogIn: <><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" x2="3" y1="12" y2="12"/></>,
+          Search: <><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></>,
+          Lock: <><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></>,
+          RefreshCw: <><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></>,
+          Info: <><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="8"/><line x1="12" x2="12.01" y2="16"/></>,
+          CheckCircle: <><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></>,
+          Clock: <><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>,
+          CloudLightning: <><path d="M19 16.9A5 5 0 0 0 18 7h-1.26a8 8 0 1 0-11.62 9"/><polyline points="13 11 9 17 15 17 11 23"/></>,
+          Download: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></>,
+          AlertTriangle: <><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></>,
+          Upload: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></>,
+          Check: <polyline points="20 6 9 17 4 12"/>,
+          Trash: <><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></>,
+          Menu: <><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></>, 
+          X: <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>
+        };
+        return <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{icons[name] || <circle cx="12" cy="12" r="10"/>}</svg>;
+      };
+
+      // --- UTILS ---
+      const Toast = ({ message, onClose }) => {
+        useEffect(() => { const t = setTimeout(onClose, 3000); return () => clearTimeout(t); }, [onClose]);
+        return (
+            <div className="toast">
+                <Icon name="Info" className="text-blue-400" /> 
+                <span>{message}</span>
+            </div>
+        );
+      };
+
+      const getStatusBadgeColor = (status) => {
+          if (!status) return 'bg-gray-100 text-gray-600 border border-gray-200';
+          const s = status.toString().toLowerCase();
+          if (s.includes('confiable')) return 'bg-green-100 text-green-700 border border-green-200';
+          if (s.includes('proceso') || s.includes('en proceso')) return 'bg-blue-100 text-blue-700 border border-blue-200';
+          if (s.includes('cancelado') || s.includes('no confiable')) return 'bg-red-100 text-red-700 border border-red-200';
+          if (s.includes('pendiente')) return 'bg-orange-100 text-orange-700 border border-orange-200';
+          return 'bg-yellow-100 text-yellow-700 border border-yellow-200';
+      };
+
+      // --- COMPONENTE TOGGLE SWITCH ---
+      const ToggleSwitch = ({ value, onChange, label, subLabel }) => {
+        return (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start mb-6 border-b border-gray-100 pb-4 last:border-0">
+                <div className="flex flex-col justify-center h-10">
+                    <div className="text-sm font-bold text-gray-700">{label} <span className="text-red-500">*</span></div>
+                    {subLabel && <div className="text-xs text-gray-400 leading-tight mt-1">{subLabel}</div>}
+                </div>
+                <div className="flex justify-end">
+                    <div className="toggle-group">
+                        <button type="button" onClick={() => onChange(false)} className={`toggle-btn ${value === false ? 'toggle-btn-no' : 'toggle-btn-inactive'}`}>NO</button>
+                        <button type="button" onClick={() => onChange(true)} className={`toggle-btn ${value === true ? 'toggle-btn-si' : 'toggle-btn-inactive'}`}>SI</button>
+                    </div>
+                </div>
+            </div>
+        );
+      };
+      
+      // --- COMPONENTE ALERT MODAL ---
+      const AlertModal = ({ show, title, message, items, onClose, type = 'error' }) => {
+        if (!show) return null;
+        const colors = {
+            error: { bg: 'bg-red-100', icon: 'text-red-500', btn: 'bg-red-600 hover:bg-red-700', list: 'bg-red-50 border-red-100 text-red-800' },
+            warning: { bg: 'bg-yellow-100', icon: 'text-yellow-500', btn: 'bg-yellow-600 hover:bg-yellow-700', list: 'bg-yellow-50 border-yellow-100 text-yellow-800' }
+        };
+        const theme = colors[type] || colors.error;
+        return (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm animate-fade-in">
+                <div className="bg-white p-8 rounded-3xl shadow-2xl text-center max-w-sm w-full border border-gray-100 transform animate-scale-in">
+                    <div className={`w-20 h-20 ${theme.bg} rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm`}>
+                        <Icon name="AlertTriangle" size={40} className={theme.icon} />
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-800 mb-2">{title}</h2>
+                    {items && items.length > 0 ? (
+                        <div className={`text-left ${theme.list} p-4 rounded-xl border mb-6 max-h-60 overflow-y-auto`}>
+                            <p className="font-bold text-xs mb-2 uppercase">Detalles:</p>
+                            <ul className="list-disc list-inside text-sm space-y-1">
+                                {items.map((item, idx) => (<li key={idx}>{item}</li>))}
+                            </ul>
+                        </div>
+                    ) : ( <p className="text-gray-500 mb-6 text-sm">{message}</p> )}
+                    <button onClick={onClose} className={`w-full ${theme.btn} text-white font-bold py-3 px-6 rounded-xl shadow-lg transition transform active:scale-95`}>Entendido, revisar</button>
+                </div>
+            </div>
+        );
+      };
+
+      // --- VISTAS ---
+      const LoginView = ({ onSuccess, isCheckingCache }) => {
+            const [localLoading, setLocalLoading] = useState(false);
+            const isLoading = localLoading || isCheckingCache;
+            const login = async () => {
+                setLocalLoading(true);
+                try { await onSuccess(null); } catch (e) { console.error(e); setLocalLoading(false); } 
+            };
+            return (
+                <div className="flex flex-col h-screen bg-gray-100">
+                    <div className="bg-appRed h-2 w-full"></div>
+                    <div className="flex-1 flex items-center justify-center p-4">
+                        <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full text-center">
+                            <div className="flex justify-center mb-6">
+                               <img src="https://www.g4s.com/es-co/-/media/g4s/global/images/logos/g4s---an-allied-universal-company-logo/g4s_one-company_logo_180x136.ashx" alt="G4S Logo" className="h-20 w-auto object-contain" />
+                            </div>
+                            <h1 className="text-2xl font-bold text-gray-800 mb-2">Confiabilidad</h1>
+                            <p className="text-gray-500 mb-8 text-sm">Plataforma de Gestión</p>
+                            {isLoading ? (
+                                <div className="py-6"><div className="w-10 h-10 border-4 border-appRed border-t-transparent rounded-full animate-spin mx-auto mb-3"></div><p className="text-xs text-gray-400">Autenticando...</p></div>
+                            ) : (
+                                <div className="space-y-3">
+                                    <button onClick={login} className="w-full bg-appBlue hover:bg-blue-800 text-white font-bold py-3 px-4 rounded flex items-center justify-center gap-2 transition shadow-sm"><Icon name="User" size={18} /> Ingresar con Google</button>
+                                </div>
+                            )}
+                            <div className="mt-8 text-[10px] text-gray-400">© 2025 G4S Secure Solutions.</div>
+                        </div>
+                    </div>
+                </div>
+            );
+      };
+
+      const Sidebar = ({ currentView, setView, onLogout, userContext, syncStatus, lastSync, isOpen, toggleSidebar }) => {
+        const menuItems = [
+          { id: 'home', icon: 'Home', title: 'Inicio' },
+          { id: 'create', icon: 'ClipboardList', title: 'Nueva Solicitud' },
+          { id: 'bulk', icon: 'MessageCircleWarning', title: 'Carga Masiva' },
+          { id: 'history', icon: 'History', title: 'Histórico' },
+        ];
+        
+        const handleNav = (id) => {
+            setView(id);
+            if(window.innerWidth < 768 && toggleSidebar) toggleSidebar(false);
+        };
+
+        const sidebarClasses = `
+          fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-gray-200 flex flex-col shadow-lg transform transition-transform duration-300 ease-in-out
+          ${isOpen ? 'translate-x-0' : '-translate-x-full'} 
+          md:translate-x-0
+        `;
+
+        return (
+          <>
+             {isOpen && <div className="fixed inset-0 bg-black/50 z-30 md:hidden" onClick={() => toggleSidebar(false)}></div>}
+             <div className={sidebarClasses}>
+                <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+                   <div className="flex items-center gap-3 cursor-pointer" onClick={() => handleNav('home')}>
+                      <img src="https://www.g4s.com/es-co/-/media/g4s/global/images/logos/g4s---an-allied-universal-company-logo/g4s_one-company_logo_180x136.ashx" alt="G4S Logo" className="h-8 w-auto object-contain" />
+                      <span className="font-bold text-gray-800 text-lg">Confiabilidad</span>
+                   </div>
+                   <button onClick={() => toggleSidebar(false)} className="md:hidden text-gray-500"><Icon name="X" size={24}/></button>
+                </div>
+                <div className="flex-1 overflow-y-auto py-4">
+                  {menuItems.map((item) => (
+                    <div key={item.id} onClick={() => handleNav(item.id)} className={`px-6 py-3 cursor-pointer transition-colors border-l-4 ${currentView === item.id ? 'bg-red-50 border-appRed' : 'border-transparent hover:bg-gray-50'}`}>
+                      <div className="flex items-center gap-3">
+                        <Icon name={item.icon} className={`${currentView === item.id ? 'text-appRed' : 'text-gray-400'}`} size={20} />
+                        <div className={`font-medium text-sm ${currentView === item.id ? 'text-appRed font-bold' : 'text-gray-600'}`}>{item.title}</div>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="my-2 border-t border-gray-100"></div>
+                  <div onClick={() => handleNav('config')} className={`px-6 py-3 cursor-pointer transition-colors border-l-4 ${currentView === 'config' ? 'bg-blue-50 border-appBlue' : 'border-transparent hover:bg-gray-50'}`}>
+                    <div className="flex items-start gap-3">
+                      <Icon name="Settings" className={`${currentView === 'config' ? 'text-appBlue' : 'text-gray-400'}`} size={20} />
+                      <div className={`font-medium text-sm ${currentView === 'config' ? 'text-appBlue font-bold' : 'text-gray-600'}`}>Configuración</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-4 border-t bg-gray-50">
+                   <div className="flex flex-col gap-2 mb-3">
+                     <div className="flex items-center gap-2">
+                        <div className="p-2 rounded-full bg-gray-200 min-w-[32px]"><Icon name="User" size={16} className="text-gray-600" /></div>
+                        <div className="overflow-hidden flex-1">
+                            <div className="text-[10px] uppercase font-bold text-gray-500">Usuario</div>
+                            <div className="text-xs font-bold text-gray-800 truncate w-full" title={userContext?.email}>{userContext?.email || '...'}</div>
+                        </div>
+                     </div>
+                     <div className="flex justify-between items-center bg-white border border-gray-200 rounded px-2 py-1">
+                        <div className="sync-indicator text-gray-500 text-[10px] font-bold flex items-center gap-1">
+                           <Icon name="CloudLightning" size={10} /> {syncStatus !== 'idle' ? 'Sync...' : 'Al día'}
+                        </div>
+                        {lastSync && <span className="text-[9px] text-gray-400">{new Date(Number(lastSync)).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>}
+                     </div>
+                   </div>
+                   <button onClick={onLogout} className="w-full py-2 px-3 bg-white border border-gray-300 rounded text-xs font-bold text-gray-700 hover:bg-gray-100 transition flex items-center justify-center gap-2">
+                     <Icon name="LogIn" size={14} className="rotate-180"/> Salir
+                   </button>
+                </div>
+             </div>
+          </>
+        );
+      };
+
+      const HomeDashboard = ({ userContext, requests, setView, syncStatus }) => {
+        const stats = useMemo(() => {
+            const total = requests.length;
+            const pending = requests.filter(r => r.EstadoActual?.toLowerCase().includes('proceso') || r.EstadoActual?.toLowerCase().includes('pendiente')).length;
+            const completed = requests.filter(r => r.EstadoActual?.toLowerCase().includes('confiable')).length;
+            return { total, pending, completed };
+        }, [requests]);
+        return (
+          <div className="p-8 max-w-6xl mx-auto animate-fade-in pb-20">
+            <div className="mb-8">
+                <div className="flex items-center gap-3">
+                    <h1 className="text-3xl font-bold text-gray-800 truncate">Hola, {userContext.email.split('@')[0]}</h1>
+                    {syncStatus !== 'idle' && (
+                        <div className="flex items-center gap-2 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
+                            <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                            <span className="text-xs font-bold text-blue-600">Sincronizando...</span>
+                        </div>
+                    )}
+                </div>
+                <p className="text-gray-500">Bienvenido al portal de Confiabilidad G4S.</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+                <div onClick={() => setView('history')} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 cursor-pointer hover:shadow-md transition transform hover:-translate-y-1">
+                    <div className="flex justify-between items-start mb-4"><div className="p-3 bg-blue-50 text-blue-600 rounded-lg"><Icon name="FileText" size={24} /></div><span className="text-xs font-bold text-gray-400 uppercase">Total</span></div>
+                    <div className="text-3xl font-bold text-gray-800">{stats.total}</div>
+                    <div className="text-sm text-gray-500">Solicitudes registradas</div>
+                </div>
+                <div onClick={() => setView('history')} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 cursor-pointer hover:shadow-md transition transform hover:-translate-y-1">
+                    <div className="flex justify-between items-start mb-4"><div className="p-3 bg-yellow-50 text-yellow-600 rounded-lg"><Icon name="Clock" size={24} /></div><span className="text-xs font-bold text-gray-400 uppercase">En Proceso</span></div>
+                    <div className="text-3xl font-bold text-gray-800">{stats.pending}</div>
+                    <div className="text-sm text-gray-500">Estudios activos</div>
+                </div>
+                <div onClick={() => setView('history')} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 cursor-pointer hover:shadow-md transition transform hover:-translate-y-1">
+                    <div className="flex justify-between items-start mb-4"><div className="p-3 bg-green-50 text-green-600 rounded-lg"><Icon name="CheckCircle" size={24} /></div><span className="text-xs font-bold text-gray-400 uppercase">Completados</span></div>
+                    <div className="text-3xl font-bold text-gray-800">{stats.completed}</div>
+                    <div className="text-sm text-gray-500">Estudios finalizados</div>
+                </div>
+            </div>
+            <h2 className="text-xl font-bold text-gray-800 mb-4">¿Qué deseas hacer hoy?</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <button onClick={() => setView('create')} className="flex items-center gap-4 p-6 bg-gradient-to-r from-appRed to-red-700 text-white rounded-xl shadow hover:shadow-lg transition text-left active:scale-95">
+                    <div className="bg-white/20 p-3 rounded-full"><Icon name="ClipboardList" size={32} /></div>
+                    <div><div className="text-lg font-bold">Nueva Solicitud</div><div className="text-white/80 text-sm">Registrar un estudio.</div></div>
+                </button>
+                <button onClick={() => setView('bulk')} className="flex items-center gap-4 p-6 bg-white border border-gray-200 text-gray-700 rounded-xl shadow-sm hover:bg-gray-50 transition text-left active:scale-95">
+                    <div className="bg-blue-50 text-blue-600 p-3 rounded-full"><Icon name="Download" size={32} /></div>
+                    <div><div className="text-lg font-bold">Carga Masiva</div><div className="text-gray-500 text-sm">Subir desde Excel.</div></div>
+                </button>
+            </div>
+          </div>
+        );
+      };
+
+      const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, refreshing, userContext }) => {
+        const [filter, setFilter] = useState('Todo');
+        const [search, setSearch] = useState('');
+        const [page, setPage] = useState(1);
+        const [dateRange, setDateRange] = useState({ start: '', end: '' });
+        const [clientFilter, setClientFilter] = useState('');
+        const requests = useMemo(() => (initialData && Array.isArray(initialData.data)) ? initialData.data : [], [initialData]);
+        const statusTabs = useMemo(() => {
+            const counts = { 'Todo': requests.length };
+            const statuses = new Set();
+            requests.forEach(r => {
+                const s = r.EstadoActual || 'Sin Estado';
+                statuses.add(s);
+                counts[s] = (counts[s] || 0) + 1;
+            });
+            return ['Todo', ...Array.from(statuses).sort()].map(s => ({ name: s, count: counts[s] || 0 }));
+        }, [requests]);
+        const filteredRequests = useMemo(() => {
+            let result = requests;
+            if (filter !== 'Todo') result = result.filter(req => (req.EstadoActual || 'Sin Estado') === filter);
+            if (search) {
+                const q = search.toLowerCase();
+                const textSearch = (req) => (String(req.NSolicitud || req.ID_SolicitudesConfiabilidad)+req.Identificacion+req.NombreCompleto).toLowerCase().includes(q);
+                result = result.filter(textSearch);
+            }
+            if (dateRange.start) {
+                const start = new Date(dateRange.start);
+                result = result.filter(req => { const d = new Date(req.FechaSolicitud?.value || req.FechaSolicitud); return d >= start; });
+            }
+            if (dateRange.end) {
+                const end = new Date(dateRange.end);
+                end.setHours(23, 59, 59);
+                result = result.filter(req => { const d = new Date(req.FechaSolicitud?.value || req.FechaSolicitud); return d <= end; });
+            }
+            if (clientFilter) result = result.filter(req => String(req.ID_Cliente) === String(clientFilter));
+            return result;
+        }, [requests, filter, search, dateRange, clientFilter]);
+        const handleExport = () => {
+            if (!filteredRequests || filteredRequests.length === 0) return alert("No hay datos para exportar.");
+            const exportData = filteredRequests.filter(req => { const status = (req.EstadoActual || '').trim(); return status !== 'Creada' && status !== 'Ingresada'; });
+            if (exportData.length === 0) return alert("No hay registros válidos para exportar (se excluyen Creadas e Ingresadas).");
+            const headers = Object.keys(exportData[0]);
+            const csvContent = [
+                headers.join(','),
+                ...exportData.map(row => headers.map(fieldName => { let val = row[fieldName] ? String(row[fieldName]).replace(/"/g, '""') : ''; return `"${val}"`; }).join(','))
+            ].join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            if (link.download !== undefined) {
+                const url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", `historico_solicitudes_${new Date().toISOString().slice(0,10)}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        };
+        useEffect(() => { setPage(1); }, [filter, search, dateRange, clientFilter]); 
+        const paginatedData = filteredRequests.slice((page - 1) * 50, page * 50);
+        const totalPages = Math.ceil(filteredRequests.length / 50);
+        return (
+          <div className="p-6 h-full flex flex-col animate-fade-in relative">
+            <div className="flex flex-col gap-2 mb-4 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                <div className="flex justify-between items-center mb-2">
+                    <h3 className="font-bold text-gray-700 text-sm">Filtros de Búsqueda</h3>
+                    <div className="flex items-center gap-2">
+                        <button onClick={handleExport} className="px-3 py-1.5 text-green-600 hover:text-green-800 transition border rounded bg-green-50 flex items-center gap-2 text-xs font-bold" title="Exportar a CSV"><Icon name="Download" size={14} /> Exportar</button>
+                        <button onClick={onRefresh} disabled={refreshing} className="px-3 py-1.5 text-blue-600 hover:text-blue-800 transition border rounded bg-blue-50 flex items-center gap-2 text-xs font-bold" title="Actualizar Datos"><Icon name="RefreshCw" size={14} className={refreshing ? "animate-spin" : ""} /> Actualizar</button>
+                    </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <div className="relative">
+                        <div className="absolute left-2 top-2.5 text-gray-400"><Icon name="Search" size={14}/></div>
+                        <input type="text" className="w-full pl-8 pr-3 py-2 border rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-appBlue" placeholder="Buscar por ID, Cédula, Nombre..." value={search} onChange={e=>setSearch(e.target.value)}/>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-gray-500 whitespace-nowrap">Fecha:</span>
+                        <input type="date" value={dateRange.start} onChange={e => setDateRange({...dateRange, start: e.target.value})} className="w-full border rounded-md p-1.5 text-xs focus:ring-1 focus:ring-appBlue"/>
+                        <span className="text-xs text-gray-400">-</span>
+                        <input type="date" value={dateRange.end} onChange={e => setDateRange({...dateRange, end: e.target.value})} className="w-full border rounded-md p-1.5 text-xs focus:ring-1 focus:ring-appBlue"/>
+                    </div>
+                    <div>
+                        <select value={clientFilter} onChange={e => setClientFilter(e.target.value)} className="w-full border rounded-md p-2 text-xs focus:ring-1 focus:ring-appBlue bg-white">
+                            <option value="">Todos los Clientes</option>
+                            {userContext && userContext.allowedClientIds && userContext.allowedClientIds.map(id => (<option key={id} value={id}>{userContext.clientNames[id] || id}</option>))}
+                        </select>
+                    </div>
+                    <div className="flex items-center justify-end"><span className="text-xs font-bold text-gray-500">Resultados: {filteredRequests.length}</span></div>
+                </div>
+            </div>
+            {refreshing && (
+                <div className="flex items-center justify-center p-2 mb-2 bg-blue-50 border border-blue-100 rounded-lg animate-fade-in">
+                    <Icon name="RefreshCw" size={14} className="animate-spin text-blue-600 mr-2"/>
+                    <span className="text-xs font-bold text-blue-600">Sincronizando nuevos registros...</span>
+                </div>
+            )}
+            <div className="flex gap-2 mb-2 overflow-x-auto pb-2">
+                {statusTabs.map(tab => (
+                    <button key={tab.name} onClick={() => setFilter(tab.name)} className={`px-3 py-1 rounded-full text-xs font-bold transition whitespace-nowrap flex items-center gap-2 border ${filter === tab.name ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}>
+                        {tab.name} <span className={`px-1.5 rounded-full text-[10px] ${filter === tab.name ? 'bg-gray-600 text-white' : 'bg-gray-100 text-gray-500'}`}>{tab.count}</span>
+                    </button>
+                ))}
+            </div>
+            <div className="bg-white rounded-lg shadow-sm border overflow-hidden flex-1 flex flex-col">
+               <div className="grid grid-cols-12 gap-2 p-3 border-b bg-gray-50 text-[10px] font-bold text-gray-400 uppercase tracking-tight">
+                   <div className="col-span-1">N° Sol</div>
+                   <div className="col-span-2">F. Solicitud</div>
+                   <div className="col-span-1">Cédula</div>
+                   <div className="col-span-2">Nombre / Cargo</div>
+                   <div className="col-span-1 text-center">Estado</div>
+                   <div className="col-span-1 text-center">Est. EP</div>
+                   <div className="col-span-1 text-center">P. Vis</div>
+                   <div className="col-span-1 text-center">P. Pol</div>
+                   <div className="col-span-1 text-center">E. ECP</div>
+                   <div className="col-span-1 text-center">E. EP</div>
+               </div>
+               <div className="overflow-y-auto flex-1 relative">
+                 {paginatedData.length === 0 ? (
+                    <div className="p-10 text-center flex flex-col items-center justify-center h-full">
+                        {refreshing ? (<><Icon name="RefreshCw" size={32} className="animate-spin text-blue-500 mb-2"/><span className="text-gray-400 text-sm">Cargando registros...</span></>) : (<span className="text-gray-400 italic">No hay registros coincidentes.</span>)}
+                    </div>
+                 ) : 
+                   paginatedData.map((req, i) => (
+                     <div key={i} onClick={() => { setSelectedRequest(req); setView('detail'); }} className="grid grid-cols-12 gap-2 p-3 border-b hover:bg-gray-50 cursor-pointer text-[10px] items-center transition-colors group">
+                       <div className="col-span-1 font-bold text-blue-600 truncate" title={req.NSolicitud || req.ID_SolicitudesConfiabilidad}>{req.NSolicitud || req.ID_SolicitudesConfiabilidad}</div>
+                       <div className="col-span-2 text-gray-500">{formatDateCO(req.FechaSolicitud?.value || req.FechaSolicitud)}</div>
+                       <div className="col-span-1 font-mono truncate" title={req.Identificacion}>{req.Identificacion}</div>
+                       <div className="col-span-2 flex flex-col"><span className="truncate font-medium text-gray-700" title={req.NombreCompleto}>{req.NombreCompleto}</span>{req.Cargo && <span className="text-[9px] text-gray-400 uppercase truncate">{req.Cargo}</span>}</div>
+                       <div className="col-span-1 text-center flex items-center justify-center"><span className={`inline-flex items-center justify-center w-[80px] h-[22px] rounded text-[9px] font-bold uppercase tracking-wider ${getStatusBadgeColor(req.EstadoActual)}`}>{req.EstadoActual}</span></div>
+                       <div className="col-span-1 text-center flex items-center justify-center">{req.EstadoActualEP ? <span className={`inline-flex items-center justify-center w-[80px] h-[22px] rounded text-[9px] font-bold uppercase tracking-wider bg-purple-100 text-purple-700 border border-purple-200 truncate`}>{req.EstadoActualEP}</span> : <span className="text-gray-300">-</span>}</div>
+                       <div className="col-span-1 text-center text-gray-500 truncate" title={req.ProgramacionVisita ? formatDateCO(req.ProgramacionVisita, false) : ''}>{formatDateCO(req.ProgramacionVisita, false) || '-'}</div>
+                       <div className="col-span-1 text-center text-gray-500 truncate" title={req.ProgramacionPoligrafia ? formatDateCO(req.ProgramacionPoligrafia, false) : ''}>{formatDateCO(req.ProgramacionPoligrafia, false) || '-'}</div>
+                       <div className="col-span-1 text-center text-gray-500 truncate" title={req.FechaEntregaECP ? formatDateCO(req.FechaEntregaECP, false) : ''}>{formatDateCO(req.FechaEntregaECP, false) || '-'}</div>
+                       <div className="col-span-1 text-center text-gray-500 truncate" title={req.FechaEntregaEP ? formatDateCO(req.FechaEntregaEP, false) : ''}>{formatDateCO(req.FechaEntregaEP, false) || '-'}</div>
+                     </div>
+                 ))}
+               </div>
+               {totalPages > 1 && <div className="p-2 border-t flex justify-between bg-gray-50 items-center"><button onClick={()=>setPage(p=>Math.max(1, p-1))} disabled={page===1} className="text-xs px-3 py-1 bg-white border rounded hover:bg-gray-100 disabled:opacity-50">Anterior</button><span className="text-xs font-bold text-gray-600">Pág {page} de {totalPages}</span><button onClick={()=>setPage(p=>Math.min(totalPages, p+1))} disabled={page>=totalPages} className="text-xs px-3 py-1 bg-white border rounded hover:bg-gray-100 disabled:opacity-50">Siguiente</button></div>}
+            </div>
+          </div>
+        );
+      };
+
+      const RequestDetail = ({ requestId, onBack, preloadedData, secondaryData }) => {
+        const detailData = useMemo(() => {
+            if (!secondaryData) return null;
+            const filterById = (list) => (list || []).filter(item => String(item.ID_SolicitudesConfiabilidad) === String(requestId));
+            return {
+                header: preloadedData,
+                services: filterById(secondaryData.conServiciosAplicar),
+                history: filterById(secondaryData.conEstadosSolicitud),
+                docs: filterById(secondaryData.conDocumentosSolicitud),
+                autFirmada: filterById(secondaryData.conAutFirmada),
+                datacredito: filterById(secondaryData.conConsultaDatacredito),
+                notas: filterById(secondaryData.conNotasSolicitudes),
+                poligrafia: filterById(secondaryData.conInformePoligrafia),
+                masivas: filterById(secondaryData.conSolicitudesMasivas),
+                novedades: filterById(secondaryData.conNovedades),
+                historicoServ: filterById(secondaryData.conHistoricoEstServ),
+                historicoEstSolicitud: filterById(secondaryData.conHistoricoEstSolicitud)
+            };
+        }, [requestId, preloadedData, secondaryData]);
+        const [fileStates, setFileStates] = useState({});
+        const updateFileStatus = (fileName, status, message = "") => { setFileStates(prev => ({ ...prev, [fileName]: { status, message } })); };
+        const handleDownload = (input) => {
+            let path = null;
+            if (typeof input === 'string') path = input;
+            else if (typeof input === 'object' && input !== null) path = input.Documento || input.URL || input.Archivo || input.NombreArchivo;
+            if(!path) return alert("Datos de documento inválidos o sin ruta.");
+            const parts = path.split(/[/\\]/);
+            const filename = parts[parts.length - 1];
+            if(!filename) return alert("No se pudo obtener el nombre del archivo.");
+            updateFileStatus(filename, 'loading', 'Iniciando descarga...');
+            const urlFinal = `${PROXY_URL}?filename=${encodeURIComponent(filename)}&token=${PROXY_TOKEN}`;
+            const iframe = document.createElement('iframe');
+            iframe.style.display = "none";
+            iframe.src = urlFinal;
+            document.body.appendChild(iframe);
+            setTimeout(() => {
+                updateFileStatus(filename, 'success', 'Descarga realizada');
+                setTimeout(() => { if(document.body.contains(iframe)) { document.body.removeChild(iframe); } }, 60000);
+            }, 4000);
+        };
+        if (!detailData) return <div className="p-10 text-center text-gray-500"><div className="animate-spin inline-block w-6 h-6 border-2 border-blue-600 rounded-full border-t-transparent mb-2"></div><br/>Cargando detalles...</div>;
+        const Card = ({ title, children, count }) => (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-4 overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 font-bold text-gray-700 text-sm uppercase flex justify-between"><span>{title}</span>{count !== undefined && <span className="bg-gray-100 text-gray-600 px-2 rounded-full text-xs flex items-center">{count}</span>}</div><div className="p-0">{children}</div>
+          </div>
+        );
+        const DetailField = ({ label, value }) => (
+            <div className="border-b border-gray-50 pb-2 last:border-0">
+                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wide break-words">{label}</div>
+                <div className="text-sm text-gray-700 break-words font-medium">{value || 'N/A'}</div>
+            </div>
+        );
+        const GenericList = ({ items, labelKey, dateKey }) => (
+            items.length > 0 ? (
+                <ul className="divide-y divide-gray-100">
+                    {items.map((item, i) => (
+                        <li key={i} className="p-3 text-sm hover:bg-gray-50"><div className="font-medium text-gray-700">{item[labelKey] || JSON.stringify(item)}</div>{dateKey && item[dateKey] && <div className="text-xs text-gray-400">{item[dateKey]}</div>}</li>
+                    ))}
+                </ul>
+            ) : <div className="p-4 text-center text-xs text-gray-400 italic">No hay registros.</div>
+        );
+        return (
+          <div className="p-6 max-w-7xl mx-auto animate-fade-in">
+            <button onClick={onBack} className="mb-4 text-gray-500 hover:text-gray-800 flex items-center gap-1 text-sm"><Icon name="ChevronRight" className="rotate-180" size={16}/> Volver</button>
+            <div className="grid grid-cols-12 gap-6">
+              <div className="col-span-12 md:col-span-8 space-y-4">
+                <Card title="Información Detallada">
+                  <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <DetailField label="Cliente" value={detailData.header.Cliente || detailData.header.RazonSocial} />
+                    <DetailField label="NIT" value={detailData.header.NIT} />
+                    <div className="col-span-1 md:col-span-2 mt-2 border-b border-gray-200 pb-1"><h4 className="text-xs font-bold text-blue-600 uppercase">Fechas Clave</h4></div>
+                    <DetailField label="Programación Visita" value={formatDateCO(detailData.header.ProgramacionVisita)} />
+                    <DetailField label="Programación Poligrafía" value={formatDateCO(detailData.header.ProgramacionPoligrafia)} />
+                    <DetailField label="Fecha Entrega ECP" value={formatDateCO(detailData.header.FechaEntregaECP)} />
+                    <DetailField label="Fecha Entrega EP" value={formatDateCO(detailData.header.FechaEntregaEP)} />
+                    {detailData.header.ArchivoInforme && (
+                        (() => {
+                            const path = detailData.header.ArchivoInforme;
+                            const fileName = path.split(/[/\\]/).pop();
+                            const fileState = fileStates[fileName] || {};
+                            const isLoading = fileState.status === 'loading';
+                            return (
+                                <>
+                                <div className="col-span-1 md:col-span-2 mt-2 border-b border-gray-200 pb-1 pt-2"><h4 className="text-xs font-bold text-green-600 uppercase flex items-center gap-2"><Icon name="FileText" size={14}/> Informe Final</h4></div>
+                                <div className="col-span-1 md:col-span-2 flex items-center justify-between bg-green-50 p-3 rounded border border-green-100">
+                                     <div className="flex-1 mr-2 overflow-hidden">
+                                        <div className="text-xs text-green-800 font-bold truncate">{fileName}</div>
+                                        {fileState.message && <div className={`text-[10px] font-bold mt-0.5 ${fileState.status === 'success' ? 'text-green-600' : 'text-blue-500'}`}>{fileState.message}</div>}
+                                     </div>
+                                     <button onClick={() => handleDownload(path)} disabled={isLoading} className={`flex items-center gap-2 bg-white text-green-600 px-3 py-1.5 rounded shadow-sm text-xs font-bold hover:bg-green-600 hover:text-white transition ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                        {isLoading ? <Icon name="RefreshCw" size={14} className="animate-spin"/> : <Icon name="Download" size={14}/>}{isLoading ? 'Descargando...' : 'Descargar'}
+                                     </button>
+                                </div>
+                                </>
+                            );
+                        })()
+                    )}
+                    <div className="col-span-1 md:col-span-2 mt-2 border-b border-gray-200 pb-1"><h4 className="text-xs font-bold text-appRed uppercase">Información Del Evaluado</h4></div>
+                    <DetailField label="Nombre Completo" value={detailData.header.NombreCompleto} />
+                    <DetailField label="Tipo De Identificación" value={detailData.header.TipoIdentificacion} />
+                    <DetailField label="Identificación" value={detailData.header.Identificacion} />
+                    <DetailField label="Cargo" value={detailData.header.Cargo} />
+                    <DetailField label="Ciudad" value={detailData.header.Ciudad} />
+                    <DetailField label="Dirección De Residencia" value={detailData.header.Direccion} />
+                    <DetailField label="Barrio" value={detailData.header.Barrio} />
+                    <div className="col-span-1 md:col-span-2"><DetailField label="Notas Adicionales" value={detailData.header.Notas} /></div>
+                  </div>
+                </Card>
+                <Card title="Novedades" count={detailData.notas.length}><GenericList items={detailData.notas} labelKey="Nota" dateKey="FechaActualizacion" /></Card>
+                <Card title="Histórico de Estados" count={detailData.historicoEstSolicitud.length}><GenericList items={detailData.historicoEstSolicitud} labelKey="EstadoSol" dateKey="FechaActualziacion" /></Card>
+                <Card title="Informe Poligrafía" count={detailData.poligrafia.length}>
+                    {detailData.poligrafia.length > 0 ? (
+                        <div className="divide-y divide-gray-100">
+                            {detailData.poligrafia.map((item, i) => {
+                                const path = item.InformeEstudioPoligrafia || '';
+                                const fileName = path.split(/[/\\]/).pop();
+                                const fileState = fileStates[fileName] || {};
+                                const isLoading = fileState.status === 'loading';
+                                return (
+                                    <div key={i} className="p-4 hover:bg-gray-50 text-sm transition-colors">
+                                            <div className="flex justify-between items-start mb-3">
+                                                <div><div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Analista</div><div className="font-bold text-gray-700">{item.AnalistaPoligrafo || 'N/A'}</div></div>
+                                                <div className="text-right"><div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Actualización</div><div className="text-xs text-gray-500 font-medium">{item.FechaActualización || item.FechaActualizacion || ''}</div></div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs mb-4 text-gray-600 bg-white p-3 rounded border border-gray-100">
+                                                <div className="col-span-2 md:col-span-1"><span className="font-bold text-gray-800">Concepto:</span> {item.ConceptoEP}</div>
+                                                <div className="col-span-2 md:col-span-1"><span className="font-bold text-gray-800">Nivel Riesgo:</span> <span className="bg-gray-100 px-1.5 rounded text-gray-700">{item.NivelRiesgo}</span></div>
+                                                <div className="col-span-2 md:col-span-1"><span className="font-bold text-gray-800">Admisiones:</span> {item.Admisiones}</div>
+                                                <div className="col-span-2 md:col-span-1"><span className="font-bold text-gray-800">Elaborado Por:</span> {item.ElaboradoPor}</div>
+                                            </div>
+                                            {item.InformeEstudioPoligrafia && (
+                                                <div className="flex items-center justify-between bg-blue-50 p-2.5 rounded border border-blue-100">
+                                                    <div className="flex items-center gap-3 overflow-hidden flex-1">
+                                                        <div className="bg-white p-1.5 rounded-full text-blue-600 shadow-sm"><Icon name="FileText" size={16}/></div>
+                                                        <div className="flex-1 overflow-hidden">
+                                                            <div className="text-xs font-bold text-blue-900 truncate">Informe Estudio Poligrafía</div>
+                                                            {fileState.message ? (<div className={`text-[9px] font-bold mt-0.5 animate-fade-in ${fileState.status === 'success' ? 'text-green-600' : fileState.status === 'error' ? 'text-red-600' : 'text-blue-500'}`}>{fileState.message}</div>) : (<div className="text-[9px] text-blue-400 truncate opacity-70">{fileName}</div>)}
+                                                        </div>
+                                                    </div>
+                                                    <button onClick={() => handleDownload(item.InformeEstudioPoligrafia)} className={`ml-2 p-2 rounded-lg transition-all ${isLoading ? 'bg-white/50 text-blue-300 cursor-not-allowed' : 'bg-white text-blue-600 hover:text-blue-800 shadow-sm hover:shadow hover:bg-blue-600 hover:text-white'}`} title="Descargar Informe" disabled={isLoading}>{isLoading ? <span className="animate-spin block"><Icon name="RefreshCw" size={16}/></span> : <Icon name="Download" size={16}/>}</button>
+                                                </div>
+                                            )}
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    ) : <div className="p-6 text-center text-xs text-gray-400 italic bg-gray-50 m-4 rounded border border-dashed border-gray-200">No hay informes de poligrafía registrados.</div>}
+                </Card>
+                <Card title="Consulta Datacrédito" count={detailData.datacredito.length}>
+                    {detailData.datacredito.length > 0 ? (
+                        <ul className="divide-y divide-gray-100">
+                            {detailData.datacredito.map((item, i) => {
+                                const path = item.Archivo || '';
+                                const fileName = path.split(/[/\\]/).pop();
+                                const fileState = fileStates[fileName] || {};
+                                const isLoading = fileState.status === 'loading';
+                                return (
+                                <li key={i} className="px-4 py-2 flex items-center justify-between hover:bg-gray-50">
+                                    <div className="flex items-center gap-2 overflow-hidden flex-1">
+                                        <div className="text-blue-600 min-w-[16px]"><Icon name="Search" size={16}/></div>
+                                        <div className="flex-1 overflow-hidden">
+                                            <div className="text-gray-700 text-sm font-medium truncate">Consulta</div>
+                                            <div className="text-[10px] text-gray-400">{item.FechaActualizacion || item.FechaConsulta || ''}</div>
+                                            {fileState.message && (<div className={`text-[10px] font-bold mt-0.5 ${fileState.status === 'success' ? 'text-green-600' : fileState.status === 'error' ? 'text-red-600' : 'text-blue-500'}`}>{fileState.message}</div>)}
+                                        </div>
+                                    </div>
+                                    {item.Archivo && (<button onClick={() => handleDownload(item.Archivo)} className={`ml-2 p-2 rounded transition ${isLoading ? 'bg-blue-50 text-blue-400 cursor-not-allowed' : 'text-blue-600 hover:text-blue-800 hover:bg-blue-50'}`} title="Descargar Consulta" disabled={isLoading}>{isLoading ? <span className="animate-spin block"><Icon name="RefreshCw" size={16}/></span> : <Icon name="Download" size={16}/>}</button>)}
+                                </li>
+                            )})}
+                        </ul>
+                    ) : <div className="p-4 text-center text-xs text-gray-400 italic">No hay registros.</div>}
+                </Card>
+              </div>
+              <div className="col-span-12 md:col-span-4 space-y-4">
+                <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 text-center">
+                  <div className="text-gray-400 text-xs font-bold mb-1">ESTADO ACTUAL</div>
+                  <div className={`text-2xl font-black mb-2 uppercase ${getStatusBadgeColor(detailData.header.EstadoActual).split(' ')[1]}`}>{detailData.header.EstadoActual}</div>
+                  <div className="text-gray-500 text-xs bg-gray-100 inline-block px-2 py-1 rounded">ID: {detailData.header.NSolicitud || detailData.header.ID_SolicitudesConfiabilidad}</div>
+                  {detailData.header.EstadoActualEP && (
+                      <div className="mt-2 pt-2 border-t border-gray-100">
+                          <div className="text-xs text-gray-400 font-bold mb-1">ESTADO EP</div>
+                          <span className={`inline-flex items-center justify-center w-[80px] h-[22px] rounded text-[9px] font-bold uppercase tracking-wider bg-purple-100 text-purple-700 border border-purple-200 truncate`}>{detailData.header.EstadoActualEP}</span>
+                      </div>
+                  )}
+                </div>
+                <Card title="Servicios Aplicados" count={detailData.services.length}>
+                  {detailData.services.length > 0 ? (
+                    <ul className="divide-y divide-gray-100">
+                        {detailData.services.map((s,i) => (
+                            <li key={i} className="px-4 py-3 border-b border-gray-50 last:border-0 hover:bg-gray-50">
+                                <div className="flex justify-between items-center mb-1"><span className="font-bold text-sm text-gray-700">{s.TipoServicio || s.Servicio || s.ServicioAplicar}</span><span className={`text-[10px] px-2 py-0.5 rounded font-bold ${s.EstadoActual === 'Finalizado' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{s.EstadoActual || s.Estado}</span></div>
+                                <div className="text-[10px] text-gray-400 flex items-center gap-1"><Icon name="Clock" size={10}/> {s.FechaActualizacion || s.Fecha || 'Pendiente'}</div>
+                            </li>
+                        ))}
+                    </ul>
+                  ) : <div className="p-4 text-center text-xs text-gray-400 italic">No hay servicios registrados.</div>}
+                </Card>
+                <Card title="Autorizaciones Firmadas" count={detailData.autFirmada.length}>
+                    {detailData.autFirmada.length > 0 ? (
+                        <ul className="divide-y divide-gray-100">
+                            {detailData.autFirmada.map((doc, i) => {
+                                const path = doc.Archivo || doc.NombreArchivo || ''; 
+                                const fileName = path.split(/[/\\]/).pop();
+                                const fileState = fileStates[fileName] || {};
+                                const isLoading = fileState.status === 'loading';
+                                return (
+                                <li key={i} className="px-4 py-3 border-b border-gray-50 last:border-0 hover:bg-gray-50 flex items-center justify-between">
+                                    <div className="flex items-center gap-2 overflow-hidden flex-1">
+                                        <div className="text-blue-500 min-w-[16px]"><Icon name="FileSignature" size={16}/></div>
+                                        <div className="flex-1 overflow-hidden">
+                                            <div className="text-sm font-medium text-gray-700 truncate" title={doc.NombreArchivo || 'Autorización'}>{doc.NombreArchivo || doc.Archivo || 'Documento Firmado'}</div>
+                                            <div className="text-[10px] text-gray-400">{doc.FechaActualizacion || doc.Fecha || ''}</div>
+                                            {fileState.message && (<div className={`text-[10px] font-bold mt-0.5 ${fileState.status === 'success' ? 'text-green-600' : fileState.status === 'error' ? 'text-red-600' : 'text-blue-500'}`}>{fileState.message}</div>)}
+                                        </div>
+                                    </div>
+                                    {path && (<button onClick={() => handleDownload(path)} className={`ml-2 p-2 rounded transition ${isLoading ? 'bg-blue-50 text-blue-400 cursor-not-allowed' : 'text-blue-600 hover:text-blue-800 hover:bg-blue-50'}`} title="Descargar Autorización" disabled={isLoading}>{isLoading ? <span className="animate-spin block"><Icon name="RefreshCw" size={16}/></span> : <Icon name="Download" size={16}/>}</button>)}
+                                </li>
+                            )})}
+                        </ul>
+                    ) : <div className="p-4 text-center text-xs text-gray-400 italic">No hay autorizaciones.</div>}
+                </Card>
+                <Card title="Documentos" count={detailData.docs.length}>
+                    {detailData.docs.length > 0 ? (
+                        <ul className="divide-y divide-gray-100">
+                            {detailData.docs.map((doc, i) => {
+                                const path = doc.Documento || doc.URL || doc.Archivo || '';
+                                const fileName = path.split(/[/\\]/).pop();
+                                const fileState = fileStates[fileName] || {};
+                                const isLoading = fileState.status === 'loading';
+                                return (
+                                <li key={i} className="px-4 py-2 flex items-center justify-between hover:bg-gray-50">
+                                    <div className="flex items-center gap-2 overflow-hidden flex-1">
+                                        <div className="text-red-500 min-w-[16px]"><Icon name="FileText" size={16}/></div>
+                                        <div className="flex-1 overflow-hidden">
+                                            <div className="text-gray-700 text-sm font-medium truncate" title={doc.NombreDocumento || doc.Nombre}>{doc.NombreDocumento || doc.Nombre || 'Documento'}</div>
+                                            <div className="text-[10px] text-gray-400">{doc.FechaActualizacion || doc.FechaCarga || ''}</div>
+                                            {fileState.message && (<div className={`text-[10px] font-bold mt-0.5 ${fileState.status === 'success' ? 'text-green-600' : fileState.status === 'error' ? 'text-red-600' : 'text-blue-500'}`}>{fileState.message}</div>)}
+                                        </div>
+                                    </div>
+                                    <button onClick={() => handleDownload(doc)} className={`ml-2 p-2 rounded transition ${isLoading ? 'bg-blue-50 text-blue-400 cursor-not-allowed' : 'text-blue-600 hover:text-blue-800 hover:bg-blue-50'}`} title="Descargar Documento" disabled={isLoading}>{isLoading ? <span className="animate-spin block"><Icon name="RefreshCw" size={16}/></span> : <Icon name="Download" size={16}/>}</button>
+                                </li>
+                            )})}
+                        </ul>
+                    ) : <div className="p-4 text-center text-xs text-gray-400 italic">No hay documentos.</div>}
+                </Card>
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      const CreateRequest = ({ userContext, setView, onReload, secondaryData }) => {
+        const [step, setStep] = useState(1);
+        const [uploading, setUploading] = useState(false);
+        const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
+        const [showSuccess, setShowSuccess] = useState(false); 
+        const [showValidationAlert, setShowValidationAlert] = useState(false); 
+        const [missingFields, setMissingFields] = useState([]);
+        const [createdId, setCreatedId] = useState('');
+        const [showPersonalRefWarning, setShowPersonalRefWarning] = useState(false);
+        useEffect(() => { if (showPersonalRefWarning) { const timer = setTimeout(() => setShowPersonalRefWarning(false), 3000); return () => clearTimeout(timer); } }, [showPersonalRefWarning]);
+        const [attachments, setAttachments] = useState([]);
+        const [currentFile, setCurrentFile] = useState(null);
+        const [currentDocName, setCurrentDocName] = useState('');
+        const [formData, setFormData] = useState({
+            fechaSolicitud: new Date().toLocaleString(),
+            clientId: '', nombre: '', nit: '', razonSocial: '', tipoIdentificacion: '', identificacion: '', fechaExpedicion: '', cargo: '', correo: '', celular: '', ciudad: '', barrio: '', direccion: '', tipoTrabajador: 'Nuevo', centroCostos: '',
+            visitaDomiciliaria: false, modalidadVisita: '', consultaAntecedentes: false, referenciacion: false, referenciaAcademica: null, referenciaLaboral: null, referenciaPersonal: null,
+            estudiosPoligrafia: false, tipoPoligrafia: '', ciudadPoligrafia: '', consultaDatacredito: false, comparativoOEA: false, notas: '',
+            clienteProyectoInterno: '', linea: '', lineaNegocio: '', clienteClientesSecundarios: '', nitClienteSecundario: '', convenioClienteSecundario: '', tipoCostoClienteSecundario: '', centroCostosExterno: ''
+        });
+        const ciudadesList = useMemo(() => secondaryData && secondaryData.conCiudades ? secondaryData.conCiudades : [], [secondaryData]);
+        const ciudadesPoligrafiaList = useMemo(() => secondaryData && secondaryData.conPoligrafias ? secondaryData.conPoligrafias : [], [secondaryData]);
+        const clienteProyectoList = useMemo(() => secondaryData && secondaryData.ClienteProyecto ? secondaryData.ClienteProyecto : [], [secondaryData]);
+        const lineaCCList = useMemo(() => secondaryData && secondaryData.LineaCC ? secondaryData.LineaCC : [], [secondaryData]);
+        const secondaryClientsRaw = useMemo(() => secondaryData && secondaryData.conClientesSecundarios ? secondaryData.conClientesSecundarios : [], [secondaryData]);
+        const availableSecondaryClients = useMemo(() => { if (!formData.clientId) return []; return secondaryClientsRaw.filter(item => String(item.ClientePrincipal) === String(formData.clientId)).map(item => item.ClienteSecundarioNombre); }, [formData.clientId, secondaryClientsRaw]);
+        const clientType = useMemo(() => (formData.clientId && userContext && userContext.clientTypes) ? userContext.clientTypes[formData.clientId] : '', [formData.clientId, userContext]);
+        const isInternal = useMemo(() => clientType === 'Interno', [clientType]);
+        const uniqueLineas = useMemo(() => !lineaCCList.length ? [] : [...new Set(lineaCCList.map(item => item.Linea))].sort(), [lineaCCList]);
+        const availableLNs = useMemo(() => (!formData.linea || !lineaCCList.length) ? [] : [...new Set(lineaCCList.filter(item => item.Linea === formData.linea).map(item => item.LN_Nombre))].sort(), [formData.linea, lineaCCList]);
+        const availableCCs = useMemo(() => (!formData.linea || !formData.lineaNegocio || !lineaCCList.length) ? [] : [...new Set(lineaCCList.filter(item => item.Linea === formData.linea && item.LN_Nombre === formData.lineaNegocio).map(item => item.CC_Nombre))].sort(), [formData.linea, formData.lineaNegocio, lineaCCList]);
+
+        const handleChange = (e) => {
+            const { name, value } = e.target;
+            if (name === 'clientId') {
+                const clientData = userContext.clientData && userContext.clientData[value];
+                setFormData(prev => ({ ...prev, [name]: value, nit: clientData ? clientData.nit : '', razonSocial: clientData ? clientData.razonSocial : '' }));
+            } else if (name === 'linea') { setFormData(prev => ({ ...prev, [name]: value, lineaNegocio: '', centroCostos: '' }));
+            } else if (name === 'lineaNegocio') { setFormData(prev => ({ ...prev, [name]: value, centroCostos: '' }));
+            } else { setFormData(prev => ({ ...prev, [name]: value })); }
+        };
+        const handleIdentificacionChange = (e) => { const { value } = e.target; const sanitizedValue = value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase(); if (sanitizedValue.length <= 15) setFormData(prev => ({ ...prev, identificacion: sanitizedValue })); };
+        const handleToggle = (name, val) => {
+            if (name === 'referenciaPersonal' && val === true && formData.visitaDomiciliaria) { setShowPersonalRefWarning(true); return; }
+            setFormData(prev => { const newState = { ...prev, [name]: val }; if (name === 'visitaDomiciliaria' && val === true) { newState.referenciaPersonal = false; } return newState; });
+        };
+        const handleFileSelect = (e) => { if (e.target.files && e.target.files[0]) setCurrentFile(e.target.files[0]); };
+        const addAttachment = () => { if (!currentFile) return alert("Seleccione un archivo."); if (!currentDocName.trim()) return alert("Ingrese un nombre para el documento."); setAttachments([...attachments, { id: Date.now(), file: currentFile, name: currentDocName }]); setCurrentFile(null); setCurrentDocName(''); document.getElementById('fileInput').value = ""; };
+        const removeAttachment = (id) => { setAttachments(attachments.filter(a => a.id !== id)); };
+        const resetForm = () => {
+            setFormData({ fechaSolicitud: new Date().toLocaleString(), clientId: '', nombre: '', nit: '', razonSocial: '', tipoIdentificacion: '', identificacion: '', fechaExpedicion: '', cargo: '', correo: '', celular: '', ciudad: '', barrio: '', direccion: '', tipoTrabajador: 'Nuevo', centroCostos: '', visitaDomiciliaria: false, modalidadVisita: '', consultaAntecedentes: false, referenciacion: false, referenciaAcademica: null, referenciaLaboral: null, referenciaPersonal: null, estudiosPoligrafia: false, tipoPoligrafia: '', ciudadPoligrafia: '', consultaDatacredito: false, comparativoOEA: false, notas: '', clienteProyectoInterno: '', linea: '', lineaNegocio: '', clienteClientesSecundarios: '', nitClienteSecundario: '', convenioClienteSecundario: '', tipoCostoClienteSecundario: '', centroCostosExterno: '' });
+            setAttachments([]); setStep(1); setShowSuccess(false);
+        };
+        const handleSubmit = async () => {
+            const missing = [];
+            if (!formData.clientId) missing.push("ID Cliente"); if (!formData.nombre) missing.push("Nombre Completo"); if (!formData.tipoIdentificacion) missing.push("Tipo de Identificación");
+            if (!formData.identificacion) { missing.push("Número de Identificación"); } else if (formData.identificacion.length < 5 || formData.identificacion.length > 15) { missing.push("Identificación debe tener entre 5 y 15 caracteres"); }
+            if (!formData.cargo) missing.push("Cargo"); if (!formData.celular) missing.push("Celular"); if (!formData.ciudad) missing.push("Ciudad"); if (!formData.direccion) missing.push("Dirección"); if (!formData.tipoTrabajador) missing.push("Tipo Trabajador");
+            if (formData.correo && !isValidEmail(formData.correo)) missing.push("Formato de Correo inválido"); if (formData.celular && !isValidPhone(formData.celular)) missing.push("Formato de Celular inválido (solo números, máx 13)");
+            if (isInternal) { if (!formData.linea) missing.push("Línea"); if (!formData.lineaNegocio) missing.push("Línea de Negocio"); if (!formData.centroCostos) missing.push("Centro de Costos"); if (formData.consultaAntecedentes && attachments.length === 0) { missing.push("Documento de Soporte (Obligatorio para Antecedentes)"); } }
+            if (formData.visitaDomiciliaria && !formData.modalidadVisita) missing.push("Modalidad Visita (Obligatorio para Visita Domiciliaria)");
+            if (formData.referenciacion) { if (formData.referenciaAcademica === null) missing.push("Referencia Académica (Debe seleccionar SI o NO)"); if (formData.referenciaLaboral === null) missing.push("Referencia Laboral (Debe seleccionar SI o NO)"); if (formData.referenciaPersonal === null) missing.push("Referencia Personal (Debe seleccionar SI o NO)"); }
+            if (formData.estudiosPoligrafia) { if (!formData.tipoPoligrafia) missing.push("Tipo de Poligrafía"); if (!formData.ciudadPoligrafia) missing.push("Ciudad Poligrafía"); }
+            const hasAtLeastOneService = formData.visitaDomiciliaria || formData.consultaAntecedentes || formData.referenciacion || formData.estudiosPoligrafia || formData.consultaDatacredito || formData.comparativoOEA;
+            if (!hasAtLeastOneService) missing.push("Debe seleccionar al menos un servicio a aplicar");
+            if (missing.length > 0) { setMissingFields(missing); setShowValidationAlert(true); return; }
+            setUploading(true); setUploadProgress({ current: 0, total: attachments.length });
+            const payloadToSend = { ...formData, visitaDomiciliaria: formData.visitaDomiciliaria ? 'SI' : 'NO', consultaAntecedentes: formData.consultaAntecedentes ? 'SI' : 'NO', referenciacion: formData.referenciacion ? 'SI' : 'NO', referenciaAcademica: formData.referenciaAcademica === true ? 'SI' : 'NO', referenciaLaboral: formData.referenciaLaboral === true ? 'SI' : 'NO', referenciaPersonal: formData.referenciaPersonal === true ? 'SI' : 'NO', estudiosPoligrafia: formData.estudiosPoligrafia ? 'SI' : 'NO', consultaDatacredito: formData.consultaDatacredito ? 'SI' : 'NO', comparativoOEA: formData.comparativoOEA ? 'SI' : 'NO' };
+            try {
+                const response = await runServer('createRequest', payloadToSend);
+                if (!response.success) throw new Error(response.message || "Error al crear solicitud.");
+                const newRequestId = response.requestId;
+                let processed = 0;
+                for (const att of attachments) {
+                    const aliasName = `${newRequestId}_${att.file.name}`;
+                    await uploadFileViaProxy(att.file, aliasName);
+                    await runServer('registerTempDocument', { requestId: newRequestId, docName: att.name, fileName: aliasName });
+                    processed++; setUploadProgress(prev => ({ ...prev, current: processed }));
+                }
+                finishProcess(newRequestId);
+            } catch (error) { console.error(error); alert("Error procesando solicitud: " + error.message); setUploading(false); }
+        };
+        const finishProcess = (id) => { setUploading(false); setCreatedId(id); if (onReload) onReload(); setShowSuccess(true); };
+        if (showSuccess) return <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/30 backdrop-blur-sm animate-fade-in"><div className="bg-white p-8 rounded-3xl shadow-2xl text-center max-w-sm w-full border border-gray-100 transform animate-scale-in"><div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm"><Icon name="CheckCircle" size={40} className="text-green-600" /></div><h2 className="text-2xl font-bold text-gray-800 mb-2">¡Solicitud Creada!</h2><div className="text-sm text-gray-500 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100 text-left"><div className="grid grid-cols-2 gap-y-2"><span className="font-bold text-gray-400 text-xs uppercase">ID Solicitud:</span><span className="text-right font-mono font-bold text-appBlue">{createdId}</span><span className="font-bold text-gray-400 text-xs uppercase">Evaluado:</span><span className="text-right font-medium text-gray-700 truncate">{formData.nombre}</span></div></div><div className="space-y-3"><button onClick={resetForm} className="w-full bg-gray-900 hover:bg-black text-white font-bold py-3 px-6 rounded-xl shadow-lg transition transform active:scale-95 flex items-center justify-center gap-2"><Icon name="ClipboardList" size={18}/> Crear Otra Solicitud</button><button onClick={() => setView('history')} className="w-full bg-white border border-gray-200 text-gray-600 font-bold py-3 px-6 rounded-xl hover:bg-gray-50 hover:text-appBlue transition flex items-center justify-center gap-2"><Icon name="History" size={18}/> Ir al Historial</button></div></div></div>;
+        
+        return (
+          <div className="p-4 md:p-8 max-w-4xl mx-auto animate-fade-in relative">
+            <div className="flex items-center justify-center mb-8"><div className="flex items-center"><div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${step === 1 ? 'bg-[#e60023] text-white' : 'bg-gray-400 text-white'}`}>1</div><span className={`ml-2 text-sm font-medium ${step === 1 ? 'text-gray-800' : 'text-gray-400'}`}>Información Del Evaluado</span></div><div className="w-12 h-px bg-gray-300 mx-4"></div><div className="flex items-center"><div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${step === 2 ? 'bg-[#e60023] text-white' : 'bg-gray-400 text-white'}`}>2</div><span className={`ml-2 text-sm font-medium ${step === 2 ? 'text-gray-800' : 'text-gray-400'}`}>Servicios A Aplicar</span></div></div>
+            <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100">
+              {step === 1 && (
+                <div className="animate-fade-in">
+                  <h3 className="text-xl font-medium text-gray-800 mb-6">Información Del Evaluado</h3>
+                  <div className="grid grid-cols-1 gap-y-5">
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center"><label className="md:col-span-3 text-sm text-gray-600 font-medium">FechaSolicitud</label><div className="md:col-span-9 relative"><input type="text" readOnly value={formData.fechaSolicitud} className="w-full border border-gray-300 rounded-md p-2 text-sm bg-gray-50 text-gray-500" /><div className="absolute right-3 top-2.5 text-gray-400"><Icon name="Clock" size={16}/></div></div></div>
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center"><label className="md:col-span-3 text-sm text-gray-600 font-medium">ID_Cliente<span className="text-red-500">*</span></label><div className="md:col-span-9"><select name="clientId" value={formData.clientId} onChange={handleChange} className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-1 focus:ring-appBlue outline-none"><option value="">Seleccione...</option>{userContext && userContext.allowedClientIds && userContext.allowedClientIds.map(id => (<option key={id} value={id}>{userContext.clientNames && userContext.clientNames[id] ? userContext.clientNames[id] : id}</option>))}</select>{clientType && (<div className="mt-1 text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded inline-block">Tipo: <span className="text-appBlue">{clientType}</span></div>)}</div></div>
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center"><label className="md:col-span-3 text-sm text-gray-600 font-medium">NIT</label><div className="md:col-span-9"><input type="text" name="nit" value={formData.nit} readOnly className="w-full border border-gray-300 rounded-md p-2 text-sm bg-gray-50 text-gray-700 outline-none" /></div></div>
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center"><label className="md:col-span-3 text-sm text-gray-600 font-medium">RazonSocial</label><div className="md:col-span-9"><input type="text" name="razonSocial" value={formData.razonSocial} readOnly className="w-full border border-gray-300 rounded-md p-2 text-sm bg-gray-50 text-gray-700 outline-none" /></div></div>
+                    {isInternal && (
+                        <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg space-y-4 animate-fade-in">
+                            <h4 className="text-sm font-bold text-blue-800 uppercase mb-2 border-b border-blue-200 pb-1">Datos Proyecto Interno</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center"><label className="md:col-span-3 text-sm text-gray-600 font-medium">ClienteProyecto</label><div className="md:col-span-9"><select name="clienteProyectoInterno" value={formData.clienteProyectoInterno} onChange={handleChange} className="w-full border border-blue-300 rounded-md p-2 text-sm focus:ring-1 focus:ring-appBlue outline-none"><option value="">Seleccione...</option>{clienteProyectoList.map((cp, idx) => (<option key={idx} value={cp.Descripcion}>{cp.Descripcion}</option>))}</select></div></div>
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center"><label className="md:col-span-3 text-sm text-gray-600 font-medium">Linea <span className="text-red-500">*</span></label><div className="md:col-span-9"><select name="linea" value={formData.linea} onChange={handleChange} className="w-full border border-blue-300 rounded-md p-2 text-sm focus:ring-1 focus:ring-appBlue outline-none"><option value="">Seleccione...</option>{uniqueLineas.map((l, idx) => (<option key={idx} value={l}>{l}</option>))}</select></div></div>
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center"><label className="md:col-span-3 text-sm text-gray-600 font-medium">LineaNegocio <span className="text-red-500">*</span></label><div className="md:col-span-9"><select name="lineaNegocio" value={formData.lineaNegocio} onChange={handleChange} disabled={!formData.linea} className="w-full border border-blue-300 rounded-md p-2 text-sm focus:ring-1 focus:ring-appBlue outline-none disabled:bg-gray-100 disabled:text-gray-400"><option value="">Seleccione...</option>{availableLNs.map((ln, idx) => (<option key={idx} value={ln}>{ln}</option>))}</select></div></div>
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center"><label className="md:col-span-3 text-sm text-gray-600 font-medium">CentroCostos <span className="text-red-500">*</span></label><div className="md:col-span-9"><select name="centroCostos" value={formData.centroCostos} onChange={handleChange} disabled={!formData.lineaNegocio} className="w-full border border-blue-300 rounded-md p-2 text-sm focus:ring-1 focus:ring-appBlue outline-none disabled:bg-gray-100 disabled:text-gray-400"><option value="">Seleccione...</option>{availableCCs.map((cc, idx) => (<option key={idx} value={cc}>{cc}</option>))}</select></div></div>
+                        </div>
+                    )}
+                    {!isInternal && formData.clientId && (
+                        <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg space-y-4 animate-fade-in">
+                            <h4 className="text-sm font-bold text-blue-800 uppercase mb-2 border-b border-blue-200 pb-1">Datos Cliente Externo</h4>
+                            {availableSecondaryClients.length > 0 ? (
+                                <>
+                                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center"><label className="md:col-span-3 text-sm text-gray-600 font-medium">ClienteClientesSecundarios</label><div className="md:col-span-9"><select name="clienteClientesSecundarios" value={formData.clienteClientesSecundarios} onChange={handleChange} className="w-full border border-blue-300 rounded-md p-2 text-sm focus:ring-1 focus:ring-appBlue outline-none"><option value="">Seleccione...</option>{availableSecondaryClients.map((client, idx) => (<option key={idx} value={client}>{client}</option>))}</select></div></div>
+                                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center"><label className="md:col-span-3 text-sm text-gray-600 font-medium">NITClienteSecundario</label><div className="md:col-span-9"><input type="text" name="nitClienteSecundario" value={formData.nitClienteSecundario} onChange={handleChange} className="w-full border border-blue-300 rounded-md p-2 text-sm focus:ring-1 focus:ring-appBlue outline-none" /></div></div>
+                                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center"><label className="md:col-span-3 text-sm text-gray-600 font-medium">ConvenioClienteSecundario</label><div className="md:col-span-9"><input type="text" name="convenioClienteSecundario" value={formData.convenioClienteSecundario} onChange={handleChange} className="w-full border border-blue-300 rounded-md p-2 text-sm focus:ring-1 focus:ring-appBlue outline-none" /></div></div>
+                                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center"><label className="md:col-span-3 text-sm text-gray-600 font-medium">TipoCostoClienteSecundario</label><div className="md:col-span-9"><input type="text" name="tipoCostoClienteSecundario" value={formData.tipoCostoClienteSecundario} onChange={handleChange} className="w-full border border-blue-300 rounded-md p-2 text-sm focus:ring-1 focus:ring-appBlue outline-none" /></div></div>
+                                </>
+                            ) : null}
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center"><label className="md:col-span-3 text-sm text-gray-600 font-medium">CentroCostosExterno</label><div className="md:col-span-9"><input type="text" name="centroCostosExterno" value={formData.centroCostosExterno} onChange={handleChange} className="w-full border border-blue-300 rounded-md p-2 text-sm focus:ring-1 focus:ring-appBlue outline-none" /></div></div>
+                        </div>
+                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center"><label className="md:col-span-3 text-sm text-gray-600 font-medium">NombreCompleto<span className="text-red-500">*</span></label><div className="md:col-span-9"><input type="text" name="nombre" value={formData.nombre} onChange={handleChange} className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-1 focus:ring-appBlue outline-none" /></div></div>
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center"><label className="md:col-span-3 text-sm text-gray-600 font-medium">TipoIdentificacion<span className="text-red-500">*</span></label><div className="md:col-span-9"><select name="tipoIdentificacion" value={formData.tipoIdentificacion} onChange={handleChange} className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-1 focus:ring-appBlue outline-none"><option value="">Seleccione...</option><option value="Cédula de Ciudadanía">Cédula de Ciudadanía</option><option value="Tarjeta de Identidad">Tarjeta de Identidad</option><option value="Cédula de Extranjería">Cédula de Extranjería</option><option value="Pasaporte">Pasaporte</option><option value="Permiso Especial">Permiso Especial</option><option value="Permiso Permanente de Trabajo">Permiso Permanente de Trabajo</option><option value="PEP">PEP</option><option value="Otro">Otro</option></select></div></div>
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center"><label className="md:col-span-3 text-sm text-gray-600 font-medium">Identificacion<span className="text-red-500">*</span></label><div className="md:col-span-9"><input type="text" name="identificacion" value={formData.identificacion} onChange={handleIdentificacionChange} className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-1 focus:ring-appBlue outline-none" /><p className="text-xs text-gray-400 mt-1">Solo letras y números, sin espacios ni caracteres especiales. Entre 5 y 15 caracteres.</p></div></div>
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center"><label className="md:col-span-3 text-sm text-gray-600 font-medium">FechaExpedicion</label><div className="md:col-span-9"><input type="date" name="fechaExpedicion" value={formData.fechaExpedicion} onChange={handleChange} className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-1 focus:ring-appBlue outline-none" /></div></div>
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center"><label className="md:col-span-3 text-sm text-gray-600 font-medium">Cargo<span className="text-red-500">*</span></label><div className="md:col-span-9"><input type="text" name="cargo" value={formData.cargo} onChange={handleChange} className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-1 focus:ring-appBlue outline-none" /></div></div>
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center"><label className="md:col-span-3 text-sm text-gray-600 font-medium">Correo</label><div className="md:col-span-9"><input type="email" name="correo" value={formData.correo} onChange={handleChange} className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-1 focus:ring-appBlue outline-none" /></div></div>
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center"><label className="md:col-span-3 text-sm text-gray-600 font-medium">Celular<span className="text-red-500">*</span></label><div className="md:col-span-9"><input type="number" name="celular" value={formData.celular} onChange={handleChange} className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-1 focus:ring-appBlue outline-none" /></div></div>
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center"><label className="md:col-span-3 text-sm text-gray-600 font-medium">Ciudad<span className="text-red-500">*</span></label><div className="md:col-span-9"><select name="ciudad" value={formData.ciudad} onChange={handleChange} className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-1 focus:ring-appBlue outline-none"><option value="">Seleccione...</option>{ciudadesList.length > 0 ? (ciudadesList.map((c, idx) => (<option key={idx} value={c.Ciudades}>{c.Ciudades}</option>))) : (<><option value="Bogotá">Bogotá</option><option value="Medellín">Medellín</option><option value="Cali">Cali</option><option value="Barranquilla">Barranquilla</option><option value="Otra">Otra</option></>)}</select></div></div>
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center"><label className="md:col-span-3 text-sm text-gray-600 font-medium">Barrio</label><div className="md:col-span-9"><input type="text" name="barrio" value={formData.barrio} onChange={handleChange} className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-1 focus:ring-appBlue outline-none" /></div></div>
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center"><label className="md:col-span-3 text-sm text-gray-600 font-medium">Direccion<span className="text-red-500">*</span></label><div className="md:col-span-9"><input type="text" name="direccion" value={formData.direccion} onChange={handleChange} className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-1 focus:ring-appBlue outline-none" /></div></div>
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center"><label className="md:col-span-3 text-sm text-gray-600 font-medium">TipoTrabajador<span className="text-red-500">*</span></label><div className="md:col-span-9"><div className="flex rounded-md border border-gray-300 overflow-hidden">{['Nuevo', 'Actual', 'Reinversión'].map(t => (<button type="button" key={t} onClick={() => setFormData({...formData, tipoTrabajador: t})} className={`flex-1 py-2 text-sm font-medium transition-colors border-r last:border-r-0 border-gray-300 ${formData.tipoTrabajador === t ? 'bg-gray-100 text-gray-800' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>{t}</button>))}</div></div></div>
+                    {!isInternal && !formData.clientId && (
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center"><label className="md:col-span-3 text-sm text-gray-600 font-medium">CentroCostos</label><div className="md:col-span-9"><input type="text" name="centroCostos" value={formData.centroCostos} onChange={handleChange} className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-1 focus:ring-appBlue outline-none" /></div></div>
+                    )}
+                  </div>
+                  <div className="flex justify-end mt-10 gap-3"><button type="button" onClick={() => setView('history')} className="px-6 py-2 rounded text-sm font-bold text-gray-600 hover:bg-gray-100 transition">Cancelar</button><button type="button" onClick={() => setStep(2)} className="text-red-600 font-bold text-sm hover:text-red-800 transition">Siguiente</button></div>
+                </div>
+              )}
+              {step === 2 && (
+                <div className="animate-fade-in">
+                   <h3 className="text-xl font-medium text-gray-800 mb-6">Servicios A Aplicar</h3>
+                   <div className="space-y-4">
+                       <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                           <ToggleSwitch label="VisitaDomiciliaria" value={formData.visitaDomiciliaria} onChange={(v) => handleToggle('visitaDomiciliaria', v)} />
+                           {formData.visitaDomiciliaria && (
+                               <div className="mt-4 pt-4 border-t border-gray-200 grid grid-cols-1 md:grid-cols-12 gap-4 items-center animate-fade-in"><label className="md:col-span-4 text-sm font-medium text-gray-600">ModalidadVisita <span className="text-red-500">*</span></label><div className="md:col-span-8 flex gap-2">{['Presencial', 'Virtual', 'Autogestionada'].map(m => (<button key={m} type="button" onClick={() => setFormData({...formData, modalidadVisita: m})} className={`px-4 py-1.5 text-xs rounded-full border transition-all ${formData.modalidadVisita === m ? 'bg-gray-800 text-white border-gray-800 font-bold' : 'bg-white text-gray-500 border-gray-300 hover:border-gray-400'}`}>{m}</button>))}</div></div>
+                           )}
+                       </div>
+                       <div className="bg-gray-50 rounded-lg p-4 border border-gray-200"><ToggleSwitch label="ConsultaAntecedentes" value={formData.consultaAntecedentes} onChange={(v) => handleToggle('consultaAntecedentes', v)} /></div>
+                       <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                           <ToggleSwitch label="Referenciacion" value={formData.referenciacion} onChange={(v) => handleToggle('referenciacion', v)} />
+                           {formData.referenciacion && (
+                               <div className="mt-4 pt-4 border-t border-gray-200 space-y-4 animate-fade-in pl-4"><ToggleSwitch label="ReferenciaAcademica" value={formData.referenciaAcademica} onChange={(v) => handleToggle('referenciaAcademica', v)} /><ToggleSwitch label="ReferenciaLaboral" value={formData.referenciaLaboral} onChange={(v) => handleToggle('referenciaLaboral', v)} /><div className="relative"><ToggleSwitch label="ReferenciaPersonal" value={formData.referenciaPersonal} onChange={(v) => handleToggle('referenciaPersonal', v)} />{showPersonalRefWarning && (<div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-max bg-yellow-100 text-yellow-800 text-xs font-bold px-3 py-1 rounded shadow-lg border border-yellow-200 animate-fade-in">No se puede seleccionar Referencia Personal si la Visita Domiciliaria está activa.</div>)}</div></div>
+                           )}
+                       </div>
+                       <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                           <ToggleSwitch label="EstudiosPoligrafia" value={formData.estudiosPoligrafia} onChange={(v) => handleToggle('estudiosPoligrafia', v)} />
+                           {formData.estudiosPoligrafia && (
+                               <div className="mt-4 pt-4 border-t border-gray-200 space-y-4 animate-fade-in">
+                                   <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center"><label className="md:col-span-4 text-sm font-medium text-gray-600">TipoPoligrafia <span className="text-red-500">*</span></label><div className="md:col-span-8"><select name="tipoPoligrafia" value={formData.tipoPoligrafia} onChange={handleChange} className="w-full border border-gray-300 rounded p-2 text-sm bg-white focus:ring-1 focus:ring-appBlue outline-none"><option value="">Seleccione...</option><option value="Preempleo">Preempleo</option><option value="Rutina">Rutina</option><option value="Especifica">Especifica</option><option value="Verifeye Preempleo">Verifeye Preempleo</option><option value="Verifeye Rutina">Verifeye Rutina</option><option value="Verifeye Especifica">Verifeye Especifica</option><option value="VSA Preempleo">VSA Preempleo</option><option value="VSA Rutina">VSA Rutina</option><option value="VSA Especifica">VSA Especifica</option></select></div></div>
+                                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center"><label className="md:col-span-4 text-sm font-medium text-gray-600">CiudadP <span className="text-red-500">*</span></label><div className="md:col-span-8"><select name="ciudadPoligrafia" value={formData.ciudadPoligrafia} onChange={handleChange} className="w-full border border-gray-300 rounded p-2 text-sm bg-white focus:ring-1 focus:ring-appBlue outline-none"><option value="">Seleccione...</option>{ciudadesPoligrafiaList.length > 0 ? (ciudadesPoligrafiaList.map((c, idx) => (<option key={idx} value={c.Ciudad}>{c.Ciudad}</option>))) : (<><option value="Bogotá">Bogotá</option><option value="Medellín">Medellín</option><option value="Cali">Cali</option></>)}</select></div></div>
+                               </div>
+                           )}
+                       </div>
+                       <div className="bg-gray-50 rounded-lg p-4 border border-gray-200"><ToggleSwitch label="ConsultaDatacredito" value={formData.consultaDatacredito} onChange={(v) => handleToggle('consultaDatacredito', v)} /></div>
+                       <div className="bg-gray-50 rounded-lg p-4 border border-gray-200"><ToggleSwitch label="ComparativoOEA" value={formData.comparativoOEA} onChange={(v) => handleToggle('comparativoOEA', v)} /></div>
+                   </div>
+                   <div className="mt-8 bg-white p-6 rounded-lg border border-dashed border-gray-300">
+                        <h4 className="text-sm font-bold text-gray-700 mb-4">Adjuntar Documentos</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-4 items-end"><div className="md:col-span-5"><label className="text-xs font-bold text-gray-500">Nombre Documento</label><input type="text" value={currentDocName} onChange={(e) => setCurrentDocName(e.target.value)} className="w-full border border-gray-300 rounded p-2 text-sm" placeholder="Ej: Cédula, Diploma..." /></div><div className="md:col-span-5"><label className="text-xs font-bold text-gray-500">Archivo</label><input id="fileInput" type="file" onChange={handleFileSelect} className="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" /></div><div className="md:col-span-2"><button onClick={addAttachment} type="button" className="w-full bg-blue-600 text-white rounded p-2 text-xs font-bold hover:bg-blue-700">Agregar</button></div></div>
+                        {attachments.length > 0 ? (<ul className="space-y-2 mt-4 bg-gray-50 p-4 rounded-lg">{attachments.map((att) => (<li key={att.id} className="flex justify-between items-center bg-white p-2 rounded border border-gray-200 shadow-sm"><div className="flex items-center gap-2 overflow-hidden"><div className="bg-gray-100 p-1.5 rounded text-gray-500"><Icon name="FileText" size={14}/></div><div className="truncate"><div className="text-xs font-bold text-gray-700">{att.name}</div><div className="text-[10px] text-gray-400">{att.file.name}</div></div></div><button onClick={() => removeAttachment(att.id)} className="text-red-500 hover:bg-red-50 p-1.5 rounded transition"><Icon name="Trash" size={14}/></button></li>))}</ul>) : <div className="text-center text-xs text-gray-400 italic py-2">No hay documentos adjuntos.</div>}
+                   </div>
+                   <div className="mt-6"><label className="block text-sm text-gray-700 font-bold mb-2">Notas Adicionales</label><textarea name="notas" maxLength={3000} value={formData.notas} onChange={handleChange} className="w-full border border-gray-300 rounded-lg p-3 text-sm h-24 outline-none focus:ring-1 focus:ring-appBlue resize-none" placeholder="Escriba aquí cualquier observación relevante..."></textarea><div className="text-right text-xs text-gray-400 mt-1">{formData.notas.length} / 3000</div></div>
+                   <div className="flex justify-between mt-8 pt-6 border-t border-gray-100"><button type="button" onClick={() => setStep(1)} className="text-gray-600 font-bold text-sm hover:text-black px-4 py-2">Previo</button><div className="flex gap-4"><button type="button" onClick={() => setView('history')} className="text-gray-500 font-bold text-sm hover:text-black px-4 py-2">Cancelar</button><button type="button" onClick={handleSubmit} disabled={uploading} className="bg-appRed text-white font-bold text-sm px-8 py-2 rounded shadow hover:bg-red-700 disabled:opacity-50 transition-transform transform active:scale-95">{uploading ? `Guardando... (${uploadProgress.current}/${uploadProgress.total})` : 'Guardar'}</button></div></div>
+                </div>
+              )}
+            </div>
+            <AlertModal show={showValidationAlert} title="Faltan Datos" items={missingFields} onClose={() => setShowValidationAlert(false)} />
+          </div>
+        );
+      };
+
+      const BulkUpload = ({ userContext, setView, onReload }) => {
+        const [clients, setClients] = useState([]);
+        const [selectedClient, setSelectedClient] = useState('');
+        const [downloading, setDownloading] = useState(false);
+        const [uploading, setUploading] = useState(false);
+        const [iframeSrc, setIframeSrc] = useState(null);
+        const [file, setFile] = useState(null);
+        const [uploadResult, setUploadResult] = useState(null); 
+        const [validationErrors, setValidationErrors] = useState([]); 
+        const [showValidationAlert, setShowValidationAlert] = useState(false);
+        useEffect(() => {
+            if (userContext && userContext.allowedClientIds && userContext.allowedClientIds.length > 0) {
+                setClients(userContext.allowedClientIds);
+                if (!selectedClient) { setSelectedClient(userContext.allowedClientIds[0]); }
+            }
+        }, [userContext]);
+        const handleDownloadTemplate = async () => {
+            if (!selectedClient) { alert("Por favor seleccione un cliente primero."); return; }
+            setDownloading(true);
+            try {
+                const response = await runServer('getTemplateName', { clientId: selectedClient });
+                if (!response.success) throw new Error(response.message || "Error al obtener plantilla.");
+                const filename = response.filename;
+                const urlFinal = `${PROXY_URL}?filename=${encodeURIComponent(filename)}&token=${PROXY_TOKEN}`;
+                const iframe = document.createElement('iframe');
+                iframe.style.display = "none";
+                iframe.src = urlFinal;
+                document.body.appendChild(iframe);
+                setTimeout(() => { setDownloading(false); setTimeout(() => { if(document.body.contains(iframe)) { document.body.removeChild(iframe); } }, 60000); }, 4000);
+            } catch (e) { console.error(e); alert("Error: " + e.message); setDownloading(false); }
+        };
+        const handleFileChange = (e) => { if (e.target.files && e.target.files[0]) { setFile(e.target.files[0]); setValidationErrors([]); setShowValidationAlert(false); } };
+        const handleUpload = async () => {
+            if (!selectedClient) return alert("Seleccione un cliente."); if (!file) return alert("Seleccione un archivo CSV para cargar.");
+            setUploading(true);
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const csvContent = e.target.result;
+                    const base64Content = csvContent.split(',')[1];
+                    const decodedText = atob(base64Content); 
+                    const rows = decodedText.split(/\r\n|\n|\r/);
+                    if (rows.length < 2) throw new Error("El archivo está vacío o no tiene datos.");
+                    const delimiter = rows[0].includes(';') ? ';' : ',';
+                    const headers = rows[0].split(delimiter).map(h => h.trim().replace(/^"|"$/g, '').toUpperCase()); 
+                    const correoIndex = headers.findIndex(h => h.includes("CORREO") || h.includes("EMAIL"));
+                    const celularIndex = headers.findIndex(h => h.includes("CELULAR") || h.includes("MOVIL") || h.includes("TELEFONO"));
+                    const errors = [];
+                    for (let i = 1; i < rows.length; i++) {
+                        const line = rows[i].trim(); if (!line) continue; 
+                        const cols = line.split(delimiter); const rowNum = i + 1;
+                        if (correoIndex !== -1 && cols[correoIndex]) { const val = cols[correoIndex].trim().replace(/^"|"$/g, ''); if (val && !isValidEmail(val)) { errors.push(`Fila ${rowNum}: Correo inválido (${val})`); } }
+                        if (celularIndex !== -1 && cols[celularIndex]) { const val = cols[celularIndex].trim().replace(/^"|"$/g, ''); if (val && !isValidPhone(val)) { errors.push(`Fila ${rowNum}: Celular inválido (${val})`); } }
+                    }
+                    if (errors.length > 0) { setValidationErrors(errors); setShowValidationAlert(true); setUploading(false); return; }
+                    const response = await runServer('processBulkUpload', { csvContent: base64Content, clientId: selectedClient });
+                    if (response.success) { setUploadResult(response); if (onReload) onReload(); } else { throw new Error(response.message); }
+                } catch (err) { console.error(err); alert("Error en carga masiva: " + err.message); } finally { setUploading(false); }
+            };
+            reader.readAsDataURL(file);
+        };
+        const resetUpload = () => { setFile(null); setUploadResult(null); setValidationErrors([]); setShowValidationAlert(false); };
+        if (uploadResult) return <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/30 backdrop-blur-sm animate-fade-in"><div className="bg-white p-8 rounded-3xl shadow-2xl text-center max-w-sm w-full border border-gray-100 transform animate-scale-in"><div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm"><Icon name="CheckCircle" size={40} className="text-green-600" /></div><h2 className="text-2xl font-bold text-gray-800 mb-2">¡Carga Finalizada!</h2><div className="text-sm text-gray-500 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100 text-left"><div className="grid grid-cols-2 gap-y-2"><span className="font-bold text-gray-400 text-xs uppercase">Registros Éxitosos:</span><span className="text-right font-mono font-bold text-green-600">{uploadResult.loaded}</span><span className="font-bold text-gray-400 text-xs uppercase">Errores:</span><span className={`text-right font-mono font-bold ${uploadResult.failed > 0 ? 'text-red-500' : 'text-gray-400'}`}>{uploadResult.failed}</span></div></div><p className="text-xs text-gray-400 mb-6 px-4">La base de datos se ha actualizado. Los nuevos registros aparecerán en el historial.</p><div className="space-y-3"><button onClick={resetUpload} className="w-full bg-gray-900 hover:bg-black text-white font-bold py-3 px-6 rounded-xl shadow-lg transition transform active:scale-95 flex items-center justify-center gap-2"><Icon name="Upload" size={18}/> Subir Otro Archivo</button><button onClick={() => setView('history')} className="w-full bg-white border border-gray-200 text-gray-600 font-bold py-3 px-6 rounded-xl hover:bg-gray-50 hover:text-appBlue transition flex items-center justify-center gap-2"><Icon name="History" size={18}/> Ir al Historial</button></div></div></div>;
+        return (
+          <div className="p-8 max-w-4xl mx-auto animate-fade-in">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">Carga Masiva</h2>
+            <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-200 text-center">
+               <div className="mb-8 max-w-xs mx-auto text-left"><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Cliente</label><select value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)} className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-1 focus:ring-appBlue outline-none"><option value="">Seleccione...</option>{clients.map(id => (<option key={id} value={id}>{userContext.clientNames && userContext.clientNames[id] ? userContext.clientNames[id] : id}</option>))}</select></div>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                   <div className="border-r border-gray-100 pr-4"><div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4"><Icon name="Download" size={32}/></div><h3 className="text-lg font-bold text-gray-700">Paso 1: Descargar Plantilla</h3><p className="text-sm text-gray-500 mb-4">Obtenga el formato correcto (Excel/CSV) para este cliente.</p><button onClick={handleDownloadTemplate} disabled={downloading || !selectedClient} className="text-blue-600 font-bold hover:underline text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mx-auto">{downloading ? <Icon name="RefreshCw" size={16} className="animate-spin"/> : <Icon name="Download" size={16}/>}{downloading ? "Buscando..." : "Descargar Plantilla"}</button></div>
+                   <div className="pl-4"><div className="w-16 h-16 bg-green-50 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4"><Icon name="Upload" size={32}/></div><h3 className="text-lg font-bold text-gray-700 mb-2">Paso 2: Subir Datos</h3><p className="text-sm text-gray-500 mb-4">Suba el archivo diligenciado (Formato CSV).</p><div className="border-2 border-dashed border-gray-300 rounded-lg p-4 hover:bg-gray-50 cursor-pointer transition relative mb-4"><input type="file" accept=".csv" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" /><div className="text-gray-400 text-xs truncate">{file ? <span className="text-green-600 font-bold">{file.name}</span> : "Arrastre o clic aquí"}</div></div><button onClick={handleUpload} disabled={uploading || !file} className="bg-appRed text-white px-6 py-2 rounded shadow hover:bg-red-700 font-bold text-sm disabled:opacity-50 transition w-full">{uploading ? <span className="flex items-center justify-center gap-2"><Icon name="RefreshCw" size={16} className="animate-spin"/> Procesando...</span> : "Procesar Archivo"}</button></div>
+               </div>
+            </div>
+            {iframeSrc && <iframe src={iframeSrc} style={{display:'none'}} />}
+            <AlertModal show={showValidationAlert} title="Errores en Plantilla" message="Se encontraron errores de formato en el archivo. La carga ha sido rechazada." items={validationErrors} onClose={() => setShowValidationAlert(false)} />
+          </div>
+        );
+      };
+
+      const ConfigurationView = ({ userContext, onForceSync, syncStatus, lastSync, onRefreshClients }) => {
+        return (
+          <div className="p-8 max-w-4xl mx-auto animate-fade-in">
+            <div className="flex justify-between items-center mb-6"><h2 className="text-2xl font-bold text-gray-800">Configuración</h2><button onClick={onForceSync} disabled={syncStatus !== 'idle'} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 transition flex items-center gap-2 disabled:opacity-50 shadow-sm"><Icon name="RefreshCw" size={16} className={syncStatus !== 'idle' ? "animate-spin" : ""} /> {syncStatus === 'requests' ? 'Cargando Solicitudes...' : syncStatus === 'secondary' ? 'Cargando Tablas Anexas...' : 'Forzar Sincronización'}</button></div>
+            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 mb-6">
+                <h3 className="font-bold text-gray-700 mb-4">Estado de Datos</h3>
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded border border-gray-100"><div className="flex items-center gap-3"><div className={`p-2 rounded-full ${syncStatus === 'requests' ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'}`}>{syncStatus === 'requests' ? <Icon name="RefreshCw" size={18} className="animate-spin"/> : <Icon name="CheckCircle" size={18}/>}</div><div><div className="font-bold text-gray-700 text-sm">Tabla Principal (Solicitudes)</div><div className="text-xs text-gray-500">Base principal de registros.</div></div></div><span className="text-xs font-bold text-gray-400">{lastSync ? 'Actualizado' : 'Pendiente'}</span></div>
+                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded border border-gray-100"><div className="flex items-center gap-3"><div className={`p-2 rounded-full ${syncStatus === 'secondary' ? 'bg-yellow-100 text-yellow-600' : 'bg-green-100 text-green-600'}`}>{syncStatus === 'secondary' ? <Icon name="RefreshCw" size={18} className="animate-spin"/> : <Icon name="CloudLightning" size={18}/>}</div><div><div className="font-bold text-gray-700 text-sm">Tablas Anexas (Detalles)</div><div className="text-xs text-gray-500">Documentos, Servicios, Historial, etc.</div></div></div><span className="text-xs font-bold text-gray-400">{syncStatus === 'secondary' ? 'Descargando...' : 'Sincronizado'}</span></div>
+                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded border border-gray-100"><div className="flex items-center gap-3"><div className="p-2 rounded-full bg-gray-100 text-gray-600"><Icon name="User" size={18}/></div><div><div className="font-bold text-gray-700 text-sm">Clientes Asignados</div><div className="text-xs text-gray-500">Actualiza tu lista de clientes sin recargar.</div></div></div><button onClick={onRefreshClients} className="px-3 py-1.5 bg-white border rounded text-xs font-bold text-gray-600 hover:bg-gray-100 transition">Actualizar</button></div>
+                </div>
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                 <div className="flex items-center gap-4 mb-6"><div className="h-16 w-16 bg-blue-100 rounded-full flex items-center justify-center text-blue-600"><Icon name="User" size={32} /></div><div><div className="text-xs uppercase font-bold text-gray-500">Cuenta Activa</div><div className="text-lg font-bold text-gray-800">{userContext.email}</div><div className="inline-flex items-center gap-1 bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs font-bold mt-1"><Icon name="ShieldCheck" size={12} /> {userContext.role}</div></div></div>
+            </div>
+          </div>
+        );
+      };
+      
+      const App = () => {
+        const [userCtx, setUserCtx] = useState(null);
+        const [initError, setInitError] = useState(null);
+        const [sidebarOpen, setSidebarOpen] = useState(false);
+        const [initialData, setInitialData] = useState(() => { try { const item = localStorage.getItem('cache_requests'); return item ? JSON.parse(item) : { data: [], total: 0 }; } catch (e) { console.error("Error reading cache_requests", e); return { data: [], total: 0 }; } });
+        const [secondaryData, setSecondaryData] = useState(() => { try { const item = localStorage.getItem('cache_secondary'); return item ? JSON.parse(item) : { conServiciosAplicar: [], conDocumentosSolicitud: [], conHistoricoEstSolicitud: [], conCiudades: [], conPoligrafias: [], conClientesSecundarios: [] }; } catch (e) { console.error("Error reading cache_secondary", e); return null; } });
+        const [view, setView] = useState('loading'); 
+        const [selectedRequest, setSelectedRequest] = useState(null);
+        const [syncStatus, setSyncStatus] = useState('idle');
+        const [lastSync, setLastSync] = useState(null);
+        const [toast, setToast] = useState(null);
+        const [isCheckingCache, setIsCheckingCache] = useState(false); 
+        const refreshData = async (manual = false) => {
+            if (syncStatus !== 'idle') return;
+            try {
+                setSyncStatus('requests'); const reqs = await runServer('getRequests', {}); setInitialData(reqs); try { localStorage.setItem('cache_requests', JSON.stringify(reqs)); } catch(e) { console.warn("Cache full (Requests)"); }
+                setSyncStatus('secondary'); const details = await runServer('getSecondaryData', {}); setSecondaryData(details); try { localStorage.setItem('cache_secondary', JSON.stringify(details)); } catch(e) { console.warn("Storage Quota Exceeded for Secondary Data. Working in RAM mode."); if(manual) setToast("Aviso: Memoria llena. Los datos funcionan pero no se guardarán offline."); }
+                setLastSync(Date.now());
+            } catch (e) { console.error(e); setToast("Error Sincronización: " + e.message); } finally { setSyncStatus('idle'); }
+        };
+        const handleRefreshClients = async () => { setToast("Actualizando clientes..."); try { const updatedCtx = await runServer('refreshUserContext', {}); setUserCtx(updatedCtx); setToast("¡Clientes actualizados con éxito!"); } catch (e) { console.error("Error refrescando clientes:", e); setToast("Error al actualizar: " + e.message); } };
+        const handleLoginAttempt = async (email) => {
+            try { const ctx = await runServer('getUserContext', {}); setUserCtx(ctx); if(ctx.isValidUser) { setView('home'); refreshData(false); } else { setView('unauthorized'); } } catch (e) { setInitError(e.message); } finally { setIsCheckingCache(false); }
+        };
+        const handleLogout = () => { setUserCtx(null); setInitError(null); setIsCheckingCache(false); setView('loading'); };
+        useEffect(() => { handleLoginAttempt(null); }, []);
+        if (initError && !userCtx) return <div className="flex h-screen items-center justify-center flex-col gap-4 bg-gray-50 text-red-700 animate-fade-in"><Icon name="AlertTriangle" size={48} className="text-red-600" /><div className="text-center"><h1 className="text-2xl font-bold mb-2">Error de Conexión</h1><p className="text-sm bg-white p-4 rounded border border-red-200 shadow-sm max-w-md mx-auto">{initError}</p></div><button onClick={() => window.location.reload()} className="px-6 py-2 bg-gray-800 text-white rounded-lg hover:bg-black transition shadow">Reintentar</button></div>;
+        if (!userCtx) return <LoginView onSuccess={() => handleLoginAttempt(null)} isCheckingCache={isCheckingCache} />;
+        if (view === 'unauthorized') return <div className="flex h-screen items-center justify-center bg-gray-100 text-center p-8"><div className="bg-white p-8 rounded-lg shadow-lg max-w-md"><Icon name="ShieldCheck" size={48} className="mx-auto text-red-600 mb-4" /><h1 className="text-xl font-bold text-gray-800 mb-2">Acceso Restringido</h1><p className="text-gray-500 text-sm mb-4">Su usuario <strong>{userCtx.email}</strong> no tiene permisos registrados.</p><button onClick={() => window.location.reload()} className="text-blue-600 font-bold text-sm hover:underline">Volver a intentar</button></div></div>;
+        return (
+          <div className="flex h-screen bg-gray-100 text-gray-800 animate-fade-in overflow-hidden">
+            <div className="md:hidden fixed top-0 left-0 right-0 h-14 bg-white border-b border-gray-200 z-20 flex items-center px-4 justify-between shadow-sm"><button onClick={() => setSidebarOpen(true)} className="p-2 -ml-2 text-gray-600"><Icon name="Menu" size={24}/></button><span className="font-bold text-gray-800">Confiabilidad</span><div className="w-8"></div></div>
+            <Sidebar currentView={view} setView={setView} onLogout={handleLogout} userContext={userCtx} syncStatus={syncStatus} lastSync={lastSync} isOpen={sidebarOpen} toggleSidebar={setSidebarOpen} />
+            <div className="flex-1 md:ml-64 w-full h-full overflow-y-auto pt-14 md:pt-0">
+              <ErrorBoundary>
+                  {view === 'home' ? <HomeDashboard userContext={userCtx} requests={initialData?.data || []} setView={setView} syncStatus={syncStatus} /> :
+                  view === 'detail' && selectedRequest ? <RequestDetail requestId={selectedRequest.ID_SolicitudesConfiabilidad || selectedRequest.NSolicitud} preloadedData={selectedRequest} secondaryData={secondaryData} onBack={() => setView('history')} /> : 
+                  view === 'create' ? <CreateRequest userContext={userCtx} setView={setView} onReload={() => refreshData(false)} secondaryData={secondaryData} /> : 
+                  view === 'bulk' ? <BulkUpload userContext={userCtx} setView={setView} onReload={() => refreshData(true)} /> : 
+                  view === 'config' ? <ConfigurationView userContext={userCtx} onForceSync={() => refreshData(true)} syncStatus={syncStatus} lastSync={lastSync} onRefreshClients={handleRefreshClients} /> :
+                  <RequestList setView={setView} setSelectedRequest={setSelectedRequest} initialData={initialData} onRefresh={() => refreshData(true)} refreshing={syncStatus !== 'idle'} userContext={userCtx} />}
+              </ErrorBoundary>
+            </div>
+            {toast && <Toast message={toast} onClose={() => setToast(null)} />}
+          </div>
+        );
+      };
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<App />);
+    </script>
+  </body>
+</html>
