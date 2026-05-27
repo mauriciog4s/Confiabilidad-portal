@@ -1,0 +1,642 @@
+/**
+ * ============================================================================
+ * ARCHIVO: Code.gs
+ * PROPÓSITO: Lógica del servidor. Las variables (BQ_CREDENTIALS, TABLES, etc.)
+ * se leen de Config.gs — NO se deben redeclarar aquí.
+ * ============================================================================
+ */
+
+// ─── INCLUDE HELPER (para HtmlService templates) ──────────────────────────
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+// ─── PUNTO DE ENTRADA WEB ────────────────────────────────────────────────
+function doGet(e) {
+  return HtmlService.createTemplateFromFile('Index')
+    .evaluate()
+    .setTitle('Confiabilidad')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+// ─── ROUTER DE API ───────────────────────────────────────────────────────
+function apiHandler(request) {
+  const userEmail = Session.getActiveUser().getEmail();
+  const { endpoint, payload } = request;
+  console.log(`🔒 [API] Endpoint: ${endpoint} | Usuario: ${userEmail}`);
+  try {
+    switch (endpoint) {
+      case 'getUserContext':    return getUserContext(userEmail);
+      case 'refreshUserContext':return getUserContext(userEmail);
+      case 'getRequests':       return getRequests(userEmail, payload || {});
+      case 'getMasterData':     return getMasterData(userEmail);
+      case 'createRequest':     return createRequest(userEmail, payload);
+      case 'getRequestDetail':  return getRequestDetail(userEmail, payload);
+      case 'getTemplateName':   return getTemplateName(userEmail, payload);
+      case 'processBulkUpload': return processBulkUpload(userEmail, payload);
+      case 'registerTempDocument': return registerTempDocument(userEmail, payload);
+      default: throw new Error(`Endpoint desconocido: ${endpoint}`);
+    }
+  } catch (err) {
+    console.error(`❌ ERROR en ${endpoint}: ${err.message}\nStack: ${err.stack}`);
+    return { error: true, message: err.message };
+  }
+}
+
+// ─── CONTEXTO DE USUARIO ────────────────────────────────────────────────
+function getUserContext(email) {
+  const bq = new BigQueryClient();
+  const projectId = BQ_CREDENTIALS.project_id;
+
+  let context = {
+    email: email,
+    role: 'Cliente',
+    allowedClientIds: [],
+    clientNames: {},
+    clientTypes: {},
+    clientData: {},
+    isValidUser: false,
+    isAdmin: false
+  };
+
+  const sqlUser = `SELECT Rol_Asignado FROM \`${projectId}.${DATASET_ID}.${TABLES.USERS}\` WHERE Email = @email LIMIT 1`;
+  const userResult = bq.query(sqlUser, { email });
+
+  if (userResult.length === 0) return context;
+
+  context.isValidUser = true;
+  if (String(userResult[0].Rol_Asignado).trim().toLowerCase() === 'administrador') {
+    context.role = 'Administrador';
+    context.isAdmin = true;
+  }
+
+  const sqlRel = `SELECT ID_ClientesConfiabilidad FROM \`${projectId}.${DATASET_ID}.${TABLES.REL_CLIENTS}\` WHERE Correo = @email`;
+  const relResult = bq.query(sqlRel, { email });
+  context.allowedClientIds = relResult.map(r => r.ID_ClientesConfiabilidad);
+
+  if (context.allowedClientIds.length > 0) {
+    const idsFormatted = context.allowedClientIds.map(id => `'${id}'`).join(',');
+    const sqlDetails = `
+      SELECT ID_ClientesConfiabilidad, RazonSocial, TipodeCliente, NIT
+      FROM \`${projectId}.${DATASET_ID}.${TABLES.CLIENT_CONF}\`
+      WHERE ID_ClientesConfiabilidad IN (${idsFormatted})
+    `;
+    try {
+      const details = bq.query(sqlDetails);
+      details.forEach(row => {
+        const id = row.ID_ClientesConfiabilidad;
+        context.clientNames[id]  = row.RazonSocial || `Cliente ${id}`;
+        context.clientTypes[id]  = row.TipodeCliente || 'Externo';
+        context.clientData[id]   = { nit: row.NIT, razonSocial: row.RazonSocial, tipo: row.TipodeCliente };
+      });
+    } catch (e) {
+      console.warn("Error cargando detalles de clientes:", e.message);
+      context.allowedClientIds.forEach(id => { if (!context.clientNames[id]) context.clientNames[id] = `Cliente ${id}`; });
+    }
+  }
+  return context;
+}
+
+// ─── OBTENER SOLICITUDES (con filtro de período) ─────────────────────────
+// period: 'today' | 'week' | 'month' | 'year' | 'all'
+function getRequests(email, { period = 'today' } = {}) {
+  const context = getUserContext(email);
+  if (!context.isValidUser) throw new Error("Acceso Denegado.");
+
+  const bq = new BigQueryClient();
+  const projectId = BQ_CREDENTIALS.project_id;
+  const tableView  = `${projectId}.${DATASET_ID}.${TABLES.READ_VIEW}`;
+  const tableTemp  = `${projectId}.${DATASET_ID}.${TABLES.WRITE_TABLE}`;
+
+  // Filtro de fecha
+  const dateFilters = {
+    'today': `DATE(SAFE_CAST(FechaSolicitud AS TIMESTAMP), 'America/Bogota') = CURRENT_DATE('America/Bogota')`,
+    'week':  `SAFE_CAST(FechaSolicitud AS TIMESTAMP) >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)`,
+    'month': `SAFE_CAST(FechaSolicitud AS TIMESTAMP) >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)`,
+    'year':  `SAFE_CAST(FechaSolicitud AS TIMESTAMP) >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 365 DAY)`,
+    'all':   null
+  };
+  const dateClause = dateFilters[period] || dateFilters['today'];
+
+  let clientParams = {};
+  let clientClause = '';
+  if (!context.isAdmin) {
+    if (context.allowedClientIds.length === 0) return { data: [], total: 0 };
+    const paramKeys = context.allowedClientIds.map((_, i) => `id${i}`);
+    clientClause = `ID_Cliente IN (${paramKeys.map(k => `@${k}`).join(', ')})`;
+    context.allowedClientIds.forEach((val, i) => { clientParams[`id${i}`] = val; });
+  }
+
+  // Construir WHERE
+  const buildWhere = (extra = '') => {
+    const parts = [];
+    if (clientClause) parts.push(clientClause);
+    if (dateClause)   parts.push(dateClause);
+    if (extra)        parts.push(extra);
+    return parts.length > 0 ? `WHERE ${parts.join(' AND ')}` : '';
+  };
+
+  // 1. Vista principal
+  const sqlView = `SELECT * FROM \`${tableView}\` ${buildWhere()} ORDER BY FechaSolicitud DESC LIMIT 500`;
+  let rowsView = [];
+  try {
+    rowsView = bq.query(sqlView, clientParams);
+    rowsView.forEach(row => {
+      row.ProgramacionVisita     = row.Fecha_Programacion_Visita  || null;
+      row.ProgramacionPoligrafia = row.Fecha_Programacion_Poligrafia || null;
+      row.FechaEntregaECP        = row.Fecha_Entrega_ECP          || null;
+      row.FechaEntregaEP         = row.Fecha_Entrega_EP           || null;
+    });
+  } catch (e) {
+    console.warn("Error leyendo vista principal:", e.message);
+    throw new Error("Error cargando solicitudes: " + e.message);
+  }
+
+  // 2. Temporales (recién creadas)
+  const sqlTemp = `SELECT * FROM \`${tableTemp}\` ${buildWhere("EstadoActual = 'Creada'")} ORDER BY FechaSolicitud DESC LIMIT 100`;
+  let rowsTemp = [];
+  try {
+    rowsTemp = bq.query(sqlTemp, clientParams);
+    rowsTemp.forEach(row => {
+      if (row.ID_Cliente && context.clientData && context.clientData[row.ID_Cliente]) {
+        const cd = context.clientData[row.ID_Cliente];
+        if (!row.RazonSocial) row.RazonSocial = cd.razonSocial;
+        if (!row.NIT)         row.NIT = cd.nit;
+        if (!row.Cliente)     row.Cliente = cd.razonSocial;
+      }
+    });
+  } catch (e) {
+    console.warn("Error leyendo temporales:", e.message);
+  }
+
+  // 3. Deduplicar (vista tiene prioridad)
+  const allRows = [...rowsView, ...rowsTemp];
+  const uniqueRows = [];
+  const seenIds = new Set();
+  allRows.forEach(row => {
+    const id = row.ID_SolicitudesConfiabilidad;
+    if (!seenIds.has(id)) { seenIds.add(id); uniqueRows.push(row); }
+  });
+  uniqueRows.sort((a, b) => {
+    const dA = new Date((a.FechaSolicitud?.value || a.FechaSolicitud) || 0);
+    const dB = new Date((b.FechaSolicitud?.value || b.FechaSolicitud) || 0);
+    return dB - dA;
+  });
+
+  return { data: uniqueRows, total: uniqueRows.length, period };
+}
+
+// ─── DATOS MAESTROS (solo tablas de referencia para formularios) ─────────
+function getMasterData(email) {
+  const context = getUserContext(email);
+  if (!context.isValidUser) throw new Error("Acceso Denegado.");
+
+  const bq = new BigQueryClient();
+  const projectId = BQ_CREDENTIALS.project_id;
+  const ds = DATASET_ID;
+  const result = {};
+
+  const queries = {
+    conCiudades:           `SELECT Ciudades FROM \`${projectId}.${ds}.conCiudades\` ORDER BY Ciudades ASC`,
+    conPoligrafias:        `SELECT DISTINCT Ciudad FROM \`${projectId}.${ds}.conPoligrafias\` WHERE Ciudad IS NOT NULL ORDER BY Ciudad ASC`,
+    ClienteProyecto:       `SELECT Descripcion FROM \`${projectId}.${ds}.conClienteProyecto\` ORDER BY Descripcion ASC`,
+    LineaCC:               `SELECT Linea, LN_Nombre, CC_Nombre FROM \`${projectId}.${ds}.conLineaCC\``,
+    conClientesSecundarios:`SELECT ClientePrincipal, ClienteSecundarioNombre FROM \`${projectId}.${ds}.conClientesSecundarios\``
+  };
+
+  Object.entries(queries).forEach(([key, sql]) => {
+    try { result[key] = bq.query(sql); }
+    catch (e) { console.warn(`[getMasterData] Error en ${key}: ${e.message}`); result[key] = []; }
+  });
+
+  return result;
+}
+
+// ─── DETALLE COMPLETO DE UNA SOLICITUD (carga bajo demanda) ─────────────
+function getRequestDetail(email, { id }) {
+  const context = getUserContext(email);
+  if (!context.isValidUser) throw new Error("Acceso Denegado");
+
+  const bq = new BigQueryClient();
+  const projectId = BQ_CREDENTIALS.project_id;
+
+  // Buscar en vista principal, luego en temporal
+  let headerRes = [];
+  try {
+    const sql = `SELECT * FROM \`${projectId}.${DATASET_ID}.${TABLES.READ_VIEW}\` WHERE ID_SolicitudesConfiabilidad = @id LIMIT 1`;
+    headerRes = bq.query(sql, { id });
+  } catch (e) { console.warn("Vista no encontró ID, buscando en temporal..."); }
+
+  if (headerRes.length === 0) {
+    try {
+      const sqlT = `SELECT * FROM \`${projectId}.${DATASET_ID}.${TABLES.WRITE_TABLE}\` WHERE ID_SolicitudesConfiabilidad = @id LIMIT 1`;
+      headerRes = bq.query(sqlT, { id });
+    } catch (e) { console.warn("Temporal tampoco encontró ID."); }
+  }
+
+  if (headerRes.length === 0) throw new Error("Solicitud no encontrada.");
+  if (!context.isAdmin && !context.allowedClientIds.includes(headerRes[0].ID_Cliente)) throw new Error("No tiene permisos.");
+
+  const header = headerRes[0];
+  header.ProgramacionVisita     = header.Fecha_Programacion_Visita    || null;
+  header.ProgramacionPoligrafia = header.Fecha_Programacion_Poligrafia || null;
+  header.FechaEntregaECP        = header.Fecha_Entrega_ECP            || null;
+  header.FechaEntregaEP         = header.Fecha_Entrega_EP             || null;
+
+  const getChildren = (tableName) => {
+    try {
+      const sql = `SELECT * FROM \`${projectId}.${DATASET_ID}.${tableName}\` WHERE ID_SolicitudesConfiabilidad = @id`;
+      return bq.query(sql, { id });
+    } catch (e) { console.warn(`[getRequestDetail] Error en ${tableName}: ${e.message}`); return []; }
+  };
+
+  return {
+    header,
+    services:             getChildren('conServiciosAplicar'),
+    history:              getChildren('conEstadosSolicitud'),
+    documents:            getChildren('conDocumentosSolicitud'),
+    autFirmada:           getChildren('conAutFirmada'),
+    datacredito:          getChildren('conConsultaDatacredito'),
+    notas:                getChildren('conNotasSolicitudes'),
+    poligrafia:           getChildren('conInformePoligrafia'),
+    masivas:              getChildren('conSolicitudesMasivas'),
+    novedades:            getChildren('conNovedades'),
+    historicoServ:        getChildren('conHistoricoEstServ'),
+    historicoEstSolicitud:getChildren('conHistoricoEstSolicitud')
+  };
+}
+
+// ─── CREAR SOLICITUD ────────────────────────────────────────────────────
+function createRequest(email, payload) {
+  const emailFinal = email || Session.getActiveUser().getEmail() || 'UsuarioDesconocido';
+
+  const servicesToCheck = [
+    payload.visitaDomiciliaria, payload.consultaAntecedentes,
+    payload.referenciacion, payload.estudiosPoligrafia,
+    payload.consultaDatacredito, payload.comparativoOEA
+  ];
+  if (!servicesToCheck.some(s => s === true || String(s).toUpperCase() === 'SI')) {
+    throw new Error("Solicitud Rechazada: Debe seleccionar al menos un servicio a aplicar.");
+  }
+
+  const context = getUserContext(email);
+  if (!context.isValidUser) throw new Error("Acceso Denegado.");
+  if (!context.isAdmin && !context.allowedClientIds.includes(String(payload.clientId))) {
+    throw new Error("No tiene permisos para crear solicitudes para este cliente.");
+  }
+
+  const bq = new BigQueryClient();
+  const projectId = BQ_CREDENTIALS.project_id;
+  const tableWrite = `${projectId}.${DATASET_ID}.${TABLES.WRITE_TABLE}`;
+  const newId = generateUniqueId();
+
+  const insertSql = `
+    INSERT INTO \`${tableWrite}\`
+    (
+      ID_SolicitudesConfiabilidad, usuarioActualizacion, ID_Cliente, Identificacion, NombreCompleto,
+      CentroCostos, TipoTrabajador, EstadoActual, FechaSolicitud,
+      TipoIdentificacion, FechaExpedicion, Cargo, Correo, Celular,
+      Ciudad, Barrio, Direccion,
+      VisitaDomiciliaria, ModalidadVisita, ConsultaAntecedentes, Referenciacion,
+      ReferenciaAcademica, ReferenciaLaboral, ReferenciaPersonal,
+      EstudiosPoligrafia, TipoPoligrafia,
+      CiudadP, ConsultaDatacredito, ComparativoOEA, Notas,
+      ClienteProyectoInterno, Linea, LineaNegocio,
+      ClienteClientesSecundarios, NITClienteSecundario, ConvenioClienteSecundario, TipoCostoClienteSecundario, CentroCostosExterno
+    )
+    VALUES (
+      @id, @usuarioActualizacion, @cliente, @identificacion, @nombre,
+      @cc, @tipo, @estado, CAST(CURRENT_TIMESTAMP() AS STRING),
+      @tipoId, @fechaExp, @cargo, @correo, @celular,
+      @ciudad, @barrio, @direccion,
+      @visita, @modalidad, @antecedentes, @referencia,
+      @refAcad, @refLab, @refPers,
+      @poligrafia, @tipoPoli,
+      @ciudadPoli, @datacredito, @oea, @notas,
+      @cliProy, @linea, @lineaNeg,
+      @cliSec, @nitSec, @convSec, @tipoCostoSec, @ccExterno
+    )
+  `;
+
+  bq.query(insertSql, {
+    id: newId, usuarioActualizacion: emailFinal, cliente: payload.clientId,
+    identificacion: payload.identificacion, nombre: payload.nombre,
+    cc: payload.centroCostos || 'N/A', tipo: payload.tipoTrabajador, estado: "Creada",
+    tipoId: payload.tipoIdentificacion || '', fechaExp: payload.fechaExpedicion || '',
+    cargo: payload.cargo || '', correo: payload.correo || '', celular: payload.celular || '',
+    ciudad: payload.ciudad || '', barrio: payload.barrio || '', direccion: payload.direccion || '',
+    visita: payload.visitaDomiciliaria || 'NO', modalidad: payload.modalidadVisita || '',
+    antecedentes: payload.consultaAntecedentes || 'NO', referencia: payload.referenciacion || 'NO',
+    refAcad: payload.referenciaAcademica || 'NO', refLab: payload.referenciaLaboral || 'NO',
+    refPers: payload.referenciaPersonal || 'NO', poligrafia: payload.estudiosPoligrafia || 'NO',
+    tipoPoli: payload.tipoPoligrafia || '', ciudadPoli: payload.ciudadPoligrafia || '',
+    datacredito: payload.consultaDatacredito || 'NO', oea: payload.comparativoOEA || 'NO',
+    notas: payload.notas || '', cliProy: payload.clienteProyectoInterno || '',
+    linea: payload.linea || '', lineaNeg: payload.lineaNegocio || '',
+    cliSec: payload.clienteClientesSecundarios || '', nitSec: payload.nitClienteSecundario || '',
+    convSec: payload.convenioClienteSecundario || '', tipoCostoSec: payload.tipoCostoClienteSecundario || '',
+    ccExterno: payload.centroCostosExterno || ''
+  });
+
+  return { success: true, requestId: newId, message: "Solicitud creada correctamente." };
+}
+
+// ─── CARGA MASIVA ───────────────────────────────────────────────────────
+function getTemplateName(email, { clientId }) {
+  const context = getUserContext(email);
+  if (!context.isValidUser) throw new Error("Acceso Denegado.");
+  if (!context.isAdmin && !context.allowedClientIds.includes(String(clientId))) {
+    throw new Error("No tiene permisos para descargar plantillas de este cliente.");
+  }
+  const bq = new BigQueryClient();
+  const projectId = BQ_CREDENTIALS.project_id;
+  const sql = `SELECT PlantillaMasivo FROM \`${projectId}.${DATASET_ID}.${TABLES.CLIENT_CONF}\` WHERE ID_ClientesConfiabilidad = @id LIMIT 1`;
+  const rows = bq.query(sql, { id: clientId });
+  if (rows.length === 0 || !rows[0].PlantillaMasivo) throw new Error("No hay plantilla configurada para este cliente.");
+  const fullPath = rows[0].PlantillaMasivo;
+  const filename = fullPath.split(/[/\\]/).pop();
+  return { success: true, filename };
+}
+
+function processBulkUpload(email, { csvContent, clientId }) {
+  const context = getUserContext(email);
+  if (!context.isValidUser) throw new Error("Acceso Denegado.");
+  if (!context.isAdmin && !context.allowedClientIds.includes(String(clientId))) {
+    throw new Error("No tiene permisos para cargar datos para este cliente.");
+  }
+
+  const bq = new BigQueryClient();
+  const projectId = BQ_CREDENTIALS.project_id;
+  const tableWrite = `${projectId}.${DATASET_ID}.${TABLES.WRITE_TABLE}`;
+
+  const normalizeStr = (str) => {
+    if (!str) return "";
+    return String(str).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+  };
+
+  // Verificar tipo de cliente
+  let clientTypeRaw = context.clientTypes[clientId];
+  if (!clientTypeRaw) {
+    try {
+      const sqlCheck = `SELECT TipodeCliente FROM \`${projectId}.${DATASET_ID}.${TABLES.CLIENT_CONF}\` WHERE ID_ClientesConfiabilidad = @id LIMIT 1`;
+      const checkRes = bq.query(sqlCheck, { id: clientId });
+      if (checkRes.length > 0) clientTypeRaw = checkRes[0].TipodeCliente;
+    } catch (e) { console.warn("No se pudo verificar tipo de cliente:", e.message); }
+  }
+  const isInternal = String(clientTypeRaw || 'Externo').toLowerCase().includes('interno');
+
+  // Datos maestros para validación
+  const sqlMasters = `
+    SELECT 'LineaCC' as Tipo, Linea, LN_Nombre, CC_Nombre, NULL as Descripcion FROM \`${projectId}.${DATASET_ID}.conLineaCC\`
+    UNION ALL SELECT 'Ciudad', Ciudades, NULL, NULL, NULL FROM \`${projectId}.${DATASET_ID}.conCiudades\`
+    UNION ALL SELECT 'Poligrafia', Ciudad, NULL, NULL, NULL FROM \`${projectId}.${DATASET_ID}.conPoligrafias\`
+    UNION ALL SELECT 'ClienteProyecto', NULL, NULL, NULL, Descripcion FROM \`${projectId}.${DATASET_ID}.conClienteProyecto\`
+  `;
+  let masterData = [];
+  try { masterData = bq.query(sqlMasters); }
+  catch (e) { throw new Error("Error consultando tablas maestras: " + e.message); }
+
+  const validLineaCC = new Set(), validCiudades = new Set(), validPoligrafias = new Set(), validProyectos = new Set();
+  masterData.forEach(row => {
+    const tipo = row.Tipo || row.f?.[0]?.v;
+    if (tipo === 'LineaCC')          validLineaCC.add(`${normalizeStr(row.Linea)}|${normalizeStr(row.LN_Nombre)}|${normalizeStr(row.CC_Nombre)}`);
+    else if (tipo === 'Ciudad')      validCiudades.add(normalizeStr(row.Linea));
+    else if (tipo === 'Poligrafia')  validPoligrafias.add(normalizeStr(row.Linea));
+    else if (tipo === 'ClienteProyecto') validProyectos.add(normalizeStr(row.Descripcion));
+  });
+
+  const validTiposID = new Set(['CEDULA DE CIUDADANIA','TARJETA DE IDENTIDAD','CEDULA DE EXTRANJERIA','PASAPORTE','PERMISO ESPECIAL','PERMISO PERMANENTE DE TRABAJO','PEP','OTRO']);
+
+  // Procesar CSV
+  let csvString = Utilities.newBlob(Utilities.base64Decode(csvContent)).getDataAsString('UTF-8');
+  if (csvString.charCodeAt(0) === 0xFEFF) csvString = csvString.slice(1);
+  const lines = csvString.split(/\r\n|\n|\r/);
+  if (lines.length < 2) throw new Error("El archivo está vacío o sin formato correcto.");
+
+  const firstLine = lines[0];
+  const delimiter = firstLine.includes(';') ? ';' : ',';
+  const headers = firstLine.split(delimiter).map(h => h.trim().replace(/^"|"$/g, ''));
+  const normalizeHeader = (str) => str.toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+  const columnMap = {
+    'ID_Cliente':'ID_Cliente','CentroCostos':'CentroCostos','NombreCompleto':'NombreCompleto',
+    'TipoIdentificacion':'TipoIdentificacion','Identificacion':'Identificacion','FechaExpedicion':'FechaExpedicion',
+    'Cargo':'Cargo','Correo':'Correo','Celular':'Celular','Ciudad':'Ciudad','Direccion':'Direccion',
+    'Barrio':'Barrio','TipoTrabajador':'TipoTrabajador','VisitaDomiciliaria':'VisitaDomiciliaria',
+    'ModalidadVisita':'ModalidadVisita','ConsultaAntecedentes':'ConsultaAntecedentes',
+    'Referenciacion':'Referenciacion','ReferenciaAcademica':'ReferenciaAcademica',
+    'ReferenciaLaboral':'ReferenciaLaboral','ReferenciaPersonal':'ReferenciaPersonal',
+    'EstudiosPoligrafia':'EstudiosPoligrafia','TipoPoligrafia':'TipoPoligrafia','CiudadP':'CiudadP',
+    'ConsultaDatacredito':'ConsultaDatacredito','ComparativoOEA':'ComparativoOEA','Notas':'Notas',
+    'Linea':'Linea','LineaNegocio':'LineaNegocio','ClienteProyectoInterno':'ClienteProyectoInterno',
+    'CentroCostosExterno':'CentroCostosExterno'
+  };
+  const normalizedMap = {};
+  Object.keys(columnMap).forEach(k => { normalizedMap[normalizeHeader(k)] = columnMap[k]; });
+
+  const parsedRows = [];
+  const validationErrors = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    const values = line.split(delimiter);
+    let rowData = {};
+    let hasData = false;
+    headers.forEach((header, index) => {
+      const bqColumn = normalizedMap[normalizeHeader(header)];
+      if (bqColumn && values[index] !== undefined) {
+        let val = values[index].trim().replace(/^"|"$/g, '');
+        if (val.toUpperCase() === 'TRUE')  val = 'SI';
+        if (val.toUpperCase() === 'FALSE') val = 'NO';
+        rowData[bqColumn] = val;
+        if (val) hasData = true;
+      }
+    });
+    if (!hasData) continue;
+    const rowNum = i + 1;
+
+    if (!rowData.NombreCompleto)    validationErrors.push(`Fila ${rowNum}: NombreCompleto es obligatorio`);
+    if (!rowData.Identificacion)    validationErrors.push(`Fila ${rowNum}: Identificacion es obligatoria`);
+    if (!rowData.TipoIdentificacion) {
+      validationErrors.push(`Fila ${rowNum}: TipoIdentificacion es obligatorio`);
+    } else if (!validTiposID.has(normalizeStr(rowData.TipoIdentificacion))) {
+      validationErrors.push(`Fila ${rowNum}: TipoIdentificacion "${rowData.TipoIdentificacion}" no es válido`);
+    }
+    if (rowData.Ciudad && !validCiudades.has(normalizeStr(rowData.Ciudad))) {
+      validationErrors.push(`Fila ${rowNum}: Ciudad "${rowData.Ciudad}" no existe en el maestro`);
+    }
+    if (isInternal) {
+      if (!rowData.Linea)        validationErrors.push(`Fila ${rowNum}: Linea obligatoria para Cliente Interno`);
+      if (!rowData.LineaNegocio) validationErrors.push(`Fila ${rowNum}: LineaNegocio obligatoria para Cliente Interno`);
+      if (!rowData.CentroCostos) validationErrors.push(`Fila ${rowNum}: CentroCostos obligatorio para Cliente Interno`);
+    }
+    parsedRows.push(rowData);
+  }
+
+  if (validationErrors.length > 0) {
+    return {
+      success: false,
+      validationError: true,
+      message: `Se encontraron ${validationErrors.length} error(es) de validación. La carga fue rechazada.`,
+      errorList: validationErrors,
+      errorSummary: {
+        total: validationErrors.length,
+        rows: parsedRows.length,
+        detail: validationErrors.slice(0, 50)
+      }
+    };
+  }
+
+  let successCount = 0;
+  let insertErrors = 0;
+  const insertErrorDetails = [];
+
+  for (const rowData of parsedRows) {
+    try {
+      const insertSql = `
+        INSERT INTO \`${tableWrite}\`
+        (
+          ID_SolicitudesConfiabilidad, usuarioActualizacion, ID_Cliente, Identificacion, NombreCompleto,
+          CentroCostos, TipoTrabajador, EstadoActual, FechaSolicitud,
+          TipoIdentificacion, FechaExpedicion, Cargo, Correo, Celular,
+          Ciudad, Barrio, Direccion,
+          VisitaDomiciliaria, ModalidadVisita, ConsultaAntecedentes, Referenciacion,
+          ReferenciaAcademica, ReferenciaLaboral, ReferenciaPersonal,
+          EstudiosPoligrafia, TipoPoligrafia,
+          CiudadP, ConsultaDatacredito, ComparativoOEA, Notas,
+          Linea, LineaNegocio, ClienteProyectoInterno, CentroCostosExterno
+        )
+        VALUES (
+          @id, @usuarioActualizacion, @cliente, @ident, @nombre,
+          @cc, @tipo, @estado, CAST(CURRENT_TIMESTAMP() AS STRING),
+          @tipoId, @fechaExp, @cargo, @correo, @celular,
+          @ciudad, @barrio, @dir,
+          @visita, @modVisita, @antec, @ref,
+          @refAcad, @refLab, @refPers,
+          @poli, @tipoPoli,
+          @ciudPoli, @datac, @oea, @notas,
+          @linea, @lineaNeg, @proyInt, @ccExt
+        )
+      `;
+      bq.query(insertSql, {
+        id: generateUniqueId(), usuarioActualizacion: email, cliente: clientId,
+        ident: rowData.Identificacion || '', nombre: rowData.NombreCompleto || '',
+        cc: rowData.CentroCostos || '', tipo: rowData.TipoTrabajador || 'Nuevo', estado: "Creada",
+        tipoId: rowData.TipoIdentificacion || '', fechaExp: rowData.FechaExpedicion || '',
+        cargo: rowData.Cargo || '', correo: rowData.Correo || '', celular: rowData.Celular || '',
+        ciudad: rowData.Ciudad || '', barrio: rowData.Barrio || '', dir: rowData.Direccion || '',
+        visita: rowData.VisitaDomiciliaria || 'NO', modVisita: rowData.ModalidadVisita || '',
+        antec: rowData.ConsultaAntecedentes || 'NO', ref: rowData.Referenciacion || 'NO',
+        refAcad: rowData.ReferenciaAcademica || 'NO', refLab: rowData.ReferenciaLaboral || 'NO',
+        refPers: rowData.ReferenciaPersonal || 'NO', poli: rowData.EstudiosPoligrafia || 'NO',
+        tipoPoli: rowData.TipoPoligrafia || '', ciudPoli: rowData.CiudadP || '',
+        datac: rowData.ConsultaDatacredito || 'NO', oea: rowData.ComparativoOEA || 'NO',
+        notas: rowData.Notas || '', linea: rowData.Linea || '', lineaNeg: rowData.LineaNegocio || '',
+        proyInt: rowData.ClienteProyectoInterno || '', ccExt: rowData.CentroCostosExterno || ''
+      });
+      successCount++;
+    } catch (e) {
+      insertErrors++;
+      insertErrorDetails.push(`Error técnico en "${rowData.NombreCompleto}": ${e.message}`);
+      console.error("Error insertando fila:", e);
+    }
+  }
+
+  return {
+    success: true,
+    loaded: successCount,
+    failed: insertErrors,
+    message: `Proceso finalizado. Cargados: ${successCount}, Errores técnicos: ${insertErrors}`,
+    technicalErrors: insertErrorDetails
+  };
+}
+
+function registerTempDocument(email, { requestId, docName, fileName }) {
+  const context = getUserContext(email);
+  if (!context.isValidUser) throw new Error("Usuario no autorizado.");
+  const bq = new BigQueryClient();
+  const projectId = BQ_CREDENTIALS.project_id;
+  const tableId = `${projectId}.${DATASET_ID}.${TABLES.DOCS_TEMP}`;
+  const docId = generateUniqueId();
+  const insertSql = `
+    INSERT INTO \`${tableId}\`
+    (ID_DocumentosSolicitud, ID_SolicitudesConfiabilidad, NombreDocumento, Documento, UsuarioActualziacion, FechaActualizacion, EstadoActual)
+    VALUES (@docId, @reqId, @docName, @fileAlias, @user, CAST(CURRENT_TIMESTAMP() AS STRING), 'Creada')
+  `;
+  bq.query(insertSql, { docId, reqId: requestId, docName, fileAlias: fileName, user: email });
+  return { success: true, message: "Metadatos registrados." };
+}
+
+// ─── UTILIDADES ──────────────────────────────────────────────────────────
+function generateUniqueId() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let result = '';
+  for (let i = 0; i < 8; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
+  return result;
+}
+
+// ─── CLIENTE BIGQUERY ─────────────────────────────────────────────────
+class BigQueryClient {
+  constructor() { this.token = this.getServiceAccountToken(); }
+
+  getServiceAccountToken() {
+    const header = { alg: 'RS256', typ: 'JWT' };
+    const now = Math.floor(Date.now() / 1000);
+    const claim = {
+      iss: BQ_CREDENTIALS.client_email,
+      scope: 'https://www.googleapis.com/auth/bigquery',
+      aud: 'https://oauth2.googleapis.com/token',
+      exp: now + 3600, iat: now
+    };
+    const signatureInput = Utilities.base64EncodeWebSafe(JSON.stringify(header)) + '.' + Utilities.base64EncodeWebSafe(JSON.stringify(claim));
+    const signature = Utilities.computeRsaSha256Signature(signatureInput, BQ_CREDENTIALS.private_key);
+    const jwt = signatureInput + '.' + Utilities.base64EncodeWebSafe(signature);
+    const response = UrlFetchApp.fetch('https://oauth2.googleapis.com/token', {
+      method: 'post',
+      payload: { grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: jwt }
+    });
+    return JSON.parse(response.getContentText()).access_token;
+  }
+
+  query(sql, params = {}) {
+    const projectId = BQ_CREDENTIALS.project_id;
+    const url = `https://bigquery.googleapis.com/bigquery/v2/projects/${projectId}/queries`;
+    const queryParameters = Object.keys(params).map(key => ({
+      name: key, parameterType: { type: 'STRING' }, parameterValue: { value: String(params[key]) }
+    }));
+    const payload = {
+      query: sql, useLegacySql: false,
+      parameterMode: queryParameters.length > 0 ? 'NAMED' : undefined,
+      queryParameters: queryParameters.length > 0 ? queryParameters : undefined,
+      maxResults: 10000
+    };
+    const options = {
+      method: 'post', contentType: 'application/json',
+      headers: { Authorization: `Bearer ${this.token}` },
+      payload: JSON.stringify(payload), muteHttpExceptions: true
+    };
+    const response = UrlFetchApp.fetch(url, options);
+    if (response.getResponseCode() !== 200) throw new Error(`BigQuery Error: ${response.getContentText()}`);
+    let json = JSON.parse(response.getContentText());
+    if (!json.schema) return [];
+    const fields = json.schema.fields.map(f => f.name);
+    let allRows = json.rows || [];
+    let jobId = json.jobReference.jobId;
+    let pageToken = json.pageToken;
+    while (pageToken) {
+      const nextUrl = `https://bigquery.googleapis.com/bigquery/v2/projects/${projectId}/queries/${jobId}?pageToken=${pageToken}&maxResults=10000`;
+      const nextRes = UrlFetchApp.fetch(nextUrl, { method: 'get', headers: { Authorization: `Bearer ${this.token}` }, muteHttpExceptions: true });
+      if (nextRes.getResponseCode() !== 200) { console.warn("Error paginando BigQuery"); break; }
+      const nextJson = JSON.parse(nextRes.getContentText());
+      if (nextJson.rows) allRows = allRows.concat(nextJson.rows);
+      pageToken = nextJson.pageToken;
+    }
+    return allRows.map(row => {
+      let obj = {};
+      row.f.forEach((cell, i) => { obj[fields[i]] = cell.v; });
+      return obj;
+    });
+  }
+}
