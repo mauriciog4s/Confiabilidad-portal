@@ -36,6 +36,7 @@ function apiHandler(request) {
       case 'getTemplateName':   return getTemplateName(userEmail, payload);
       case 'processBulkUpload': return processBulkUpload(userEmail, payload);
       case 'registerTempDocument': return registerTempDocument(userEmail, payload);
+      case 'updateClientConfig': return updateClientConfig(userEmail, payload);
       default: throw new Error(`Endpoint desconocido: ${endpoint}`);
     }
   } catch (err) {
@@ -78,7 +79,7 @@ function getUserContext(email) {
   if (context.allowedClientIds.length > 0) {
     const idsFormatted = context.allowedClientIds.map(id => `'${id}'`).join(',');
     const sqlDetails = `
-      SELECT ID_ClientesConfiabilidad, RazonSocial, TipodeCliente, NIT
+      SELECT ID_ClientesConfiabilidad, RazonSocial, TipodeCliente, NIT, ForcedMyRequests
       FROM \`${projectId}.${DATASET_ID}.${TABLES.CLIENT_CONF}\`
       WHERE ID_ClientesConfiabilidad IN (${idsFormatted})
     `;
@@ -88,7 +89,12 @@ function getUserContext(email) {
         const id = row.ID_ClientesConfiabilidad;
         context.clientNames[id]  = row.RazonSocial || `Cliente ${id}`;
         context.clientTypes[id]  = row.TipodeCliente || 'Externo';
-        context.clientData[id]   = { nit: row.NIT, razonSocial: row.RazonSocial, tipo: row.TipodeCliente };
+        context.clientData[id]   = {
+          nit: row.NIT,
+          razonSocial: row.RazonSocial,
+          tipo: row.TipodeCliente,
+          forcedMyRequests: row.ForcedMyRequests === 'SI' || row.ForcedMyRequests === true
+        };
       });
     } catch (e) {
       console.warn("Error cargando detalles de clientes:", e.message);
@@ -100,7 +106,7 @@ function getUserContext(email) {
 
 // ─── OBTENER SOLICITUDES (con filtro de período) ─────────────────────────
 // period: 'today' | 'week' | 'month' | 'year' | 'all'
-function getRequests(email, { period = 'today' } = {}) {
+function getRequests(email, { period = 'today', clientId = null } = {}) {
   const context = getUserContext(email);
   if (!context.isValidUser) throw new Error("Acceso Denegado.");
 
@@ -121,40 +127,68 @@ function getRequests(email, { period = 'today' } = {}) {
 
   let clientParams = {};
   let clientClause = '';
-  if (!context.isAdmin) {
+
+  if (clientId) {
+    if (!context.isAdmin && !context.allowedClientIds.includes(clientId)) throw new Error("Acceso denegado a este cliente.");
+    clientClause = `ID_Cliente = @clientId`;
+    clientParams.clientId = clientId;
+  } else if (!context.isAdmin) {
     if (context.allowedClientIds.length === 0) return { data: [], total: 0 };
     const paramKeys = context.allowedClientIds.map((_, i) => `id${i}`);
     clientClause = `ID_Cliente IN (${paramKeys.map(k => `@${k}`).join(', ')})`;
     context.allowedClientIds.forEach((val, i) => { clientParams[`id${i}`] = val; });
   }
 
+  // Tarea 8: Forzar "Mis Solicitudes" (Seguridad robusta)
+  let securityClause = '';
+  if (!context.isAdmin) {
+    const forcedClientIds = context.allowedClientIds.filter(id => context.clientData[id]?.forcedMyRequests);
+    if (forcedClientIds.length > 0) {
+      const forcedIdsStr = forcedClientIds.map(id => `'${id}'`).join(',');
+      if (clientId) {
+        if (forcedClientIds.includes(clientId)) {
+          securityClause = `usuarioActualizacion = @userEmail`;
+          clientParams.userEmail = email;
+        }
+      } else {
+        // Si no hay clientId, filtramos: (Si el cliente es de los forzados, debe ser mi solicitud; si no, ver todo lo permitido)
+        securityClause = `(ID_Cliente NOT IN (${forcedIdsStr}) OR usuarioActualizacion = @userEmail)`;
+        clientParams.userEmail = email;
+      }
+    }
+  }
+
   // Construir WHERE
   const buildWhere = (extra = '') => {
     const parts = [];
-    if (clientClause) parts.push(clientClause);
-    if (dateClause)   parts.push(dateClause);
-    if (extra)        parts.push(extra);
+    if (clientClause)   parts.push(clientClause);
+    if (dateClause)     parts.push(dateClause);
+    if (securityClause) parts.push(securityClause);
+    if (extra)          parts.push(extra);
     return parts.length > 0 ? `WHERE ${parts.join(' AND ')}` : '';
   };
 
-  // 1. Vista principal
-  const sqlView = `SELECT * FROM \`${tableView}\` ${buildWhere()} ORDER BY FechaSolicitud DESC LIMIT 500`;
+  // 1. Vista principal (Optimization & Mapping fix)
+  const sqlColumns = `
+    ID_SolicitudesConfiabilidad, NSolicitud, FechaSolicitud, Identificacion,
+    NombreCompleto, Cargo, EstadoActual, EstadoActualEP,
+    Fecha_Programacion_Visita AS ProgramacionVisita,
+    Fecha_Programacion_Poligrafia AS ProgramacionPoligrafia,
+    Fecha_Entrega_ECP AS FechaEntregaECP,
+    Fecha_Entrega_EP AS FechaEntregaEP,
+    ID_Cliente, usuarioActualizacion
+  `;
+  const sqlView = `SELECT ${sqlColumns} FROM \`${tableView}\` ${buildWhere()} ORDER BY FechaSolicitud DESC LIMIT 500`;
   let rowsView = [];
   try {
     rowsView = bq.query(sqlView, clientParams);
-    rowsView.forEach(row => {
-      row.ProgramacionVisita     = row.Fecha_Programacion_Visita  || null;
-      row.ProgramacionPoligrafia = row.Fecha_Programacion_Poligrafia || null;
-      row.FechaEntregaECP        = row.Fecha_Entrega_ECP          || null;
-      row.FechaEntregaEP         = row.Fecha_Entrega_EP           || null;
-    });
   } catch (e) {
     console.warn("Error leyendo vista principal:", e.message);
     throw new Error("Error cargando solicitudes: " + e.message);
   }
 
   // 2. Temporales (recién creadas)
-  const sqlTemp = `SELECT * FROM \`${tableTemp}\` ${buildWhere("EstadoActual = 'Creada'")} ORDER BY FechaSolicitud DESC LIMIT 100`;
+  const sqlTemp = `SELECT ${sqlColumns} FROM \`${tableTemp}\` ${buildWhere("EstadoActual = 'Creada'")} ORDER BY FechaSolicitud DESC LIMIT 100`;
   let rowsTemp = [];
   try {
     rowsTemp = bq.query(sqlTemp, clientParams);
@@ -202,7 +236,8 @@ function getMasterData(email) {
     conPoligrafias:        `SELECT DISTINCT Ciudad FROM \`${projectId}.${ds}.conPoligrafias\` WHERE Ciudad IS NOT NULL ORDER BY Ciudad ASC`,
     ClienteProyecto:       `SELECT Descripcion FROM \`${projectId}.${ds}.conClienteProyecto\` ORDER BY Descripcion ASC`,
     LineaCC:               `SELECT Linea, LN_Nombre, CC_Nombre FROM \`${projectId}.${ds}.conLineaCC\``,
-    conClientesSecundarios:`SELECT ClientePrincipal, ClienteSecundarioNombre FROM \`${projectId}.${ds}.conClientesSecundarios\``
+    conClientesSecundarios:`SELECT ClientePrincipal, ClienteSecundarioNombre FROM \`${projectId}.${ds}.conClientesSecundarios\``,
+    conEstados:            `SELECT DISTINCT EstadoSol FROM \`${projectId}.${ds}.conHistoricoEstSolicitud\` WHERE EstadoSol != 'Depurada' AND EstadoSol IS NOT NULL ORDER BY EstadoSol ASC`
   };
 
   Object.entries(queries).forEach(([key, sql]) => {
@@ -567,6 +602,17 @@ function registerTempDocument(email, { requestId, docName, fileName }) {
   `;
   bq.query(insertSql, { docId, reqId: requestId, docName, fileAlias: fileName, user: email });
   return { success: true, message: "Metadatos registrados." };
+}
+
+function updateClientConfig(email, { clientId, forcedMyRequests }) {
+  const context = getUserContext(email);
+  if (!context.isAdmin) throw new Error("Solo administradores pueden realizar esta acción.");
+
+  const bq = new BigQueryClient();
+  const projectId = BQ_CREDENTIALS.project_id;
+  const sql = `UPDATE \`${projectId}.${DATASET_ID}.${TABLES.CLIENT_CONF}\` SET ForcedMyRequests = @val WHERE ID_ClientesConfiabilidad = @id`;
+  bq.query(sql, { val: forcedMyRequests ? 'SI' : 'NO', id: clientId });
+  return { success: true, message: "Configuración actualizada." };
 }
 
 // ─── UTILIDADES ──────────────────────────────────────────────────────────
