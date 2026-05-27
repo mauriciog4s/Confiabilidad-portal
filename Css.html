@@ -1,0 +1,49 @@
+<style type="text/tailwindcss">
+  html, body {
+    margin: 0; padding: 0;
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background-color: #f3f4f6;
+  }
+  #root { width: 100%; height: 100%; display: flex; flex-direction: column; }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: #f1f1f1; }
+  ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: #a1a1a1; }
+
+  body { font-family: 'Segoe UI', 'Roboto', sans-serif; }
+
+  .animate-fade-in  { animation: fadeIn 0.25s ease-out; }
+  .animate-scale-in { animation: scaleIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+
+  @keyframes fadeIn  { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes scaleIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
+  @keyframes spin    { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+  .spin-slow { animation: spin 1.5s linear infinite; }
+
+  .toast {
+    @apply fixed bottom-5 right-5 bg-white border border-gray-200 shadow-xl rounded-xl p-4 z-[200] animate-fade-in flex items-center gap-3 max-w-[88vw];
+  }
+
+  .toggle-group {
+    @apply flex rounded-lg overflow-hidden border border-gray-200 bg-gray-100 p-1 gap-1 h-10 w-full max-w-[200px];
+  }
+  .toggle-btn {
+    @apply flex-1 text-xs font-bold rounded-md transition-all duration-200 flex items-center justify-center;
+  }
+  .toggle-btn-inactive { @apply text-gray-400; }
+  .toggle-btn-no  { @apply bg-white text-gray-700 shadow-sm border border-gray-200; }
+  .toggle-btn-si  { @apply bg-[#e60023] text-white shadow-md transform scale-105; }
+
+  /* Botones con feedback visual */
+  .btn-action {
+    @apply transition-all duration-150 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Periodo filter pill */
+  .period-pill        { @apply px-3 py-1.5 rounded-full text-xs font-bold border transition-all duration-150 whitespace-nowrap; }
+  .period-pill-active { @apply bg-appBlue text-white border-appBlue shadow-sm; }
+  .period-pill-idle   { @apply bg-white text-gray-600 border-gray-300 hover:border-appBlue hover:text-appBlue; }
+</style>
