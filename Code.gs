@@ -146,11 +146,17 @@ function getRequests(email, { period = 'today', clientId = null } = {}) {
     if (!context.isAdmin && !context.allowedClientIds.includes(clientId)) throw new Error("Acceso denegado a este cliente.");
     clientClause = `ID_Cliente = @clientId`;
     clientParams.clientId = clientId;
-  } else if (!context.isAdmin) {
-    if (context.allowedClientIds.length === 0) return { data: [], total: 0 };
-    const paramKeys = context.allowedClientIds.map((_, i) => `id${i}`);
-    clientClause = `ID_Cliente IN (${paramKeys.map(k => `@${k}`).join(', ')})`;
-    context.allowedClientIds.forEach((val, i) => { clientParams[`id${i}`] = val; });
+  } else {
+    // Tarea 3: Ver solo clientes asignados.
+    // Si tiene asignaciones, filtramos por ellas (aplica a todos, incluidos admins).
+    // Si no tiene asignaciones y es admin, ve todos.
+    if (context.allowedClientIds.length > 0) {
+      const paramKeys = context.allowedClientIds.map((_, i) => `id${i}`);
+      clientClause = `ID_Cliente IN (${paramKeys.map(k => `@${k}`).join(', ')})`;
+      context.allowedClientIds.forEach((val, i) => { clientParams[`id${i}`] = val; });
+    } else if (!context.isAdmin) {
+      return { data: [], total: 0 };
+    }
   }
 
   // Tarea 8: Forzar "Mis Solicitudes" (Seguridad robusta)
@@ -183,15 +189,16 @@ function getRequests(email, { period = 'today', clientId = null } = {}) {
   };
 
   // 1. Vista principal (Optimization & Mapping fix)
-  // Se incluye 'Estado' y 'EstadoSol' como alias de EstadoActual para mayor compatibilidad de filtrado
+  // Usamos SELECT * para asegurar que no falte ninguna columna (como 'Estado'),
+  // pero añadimos los alias requeridos por el frontend para las fechas y estados.
   const sqlColumns = `
-    ID_SolicitudesConfiabilidad, NSolicitud, FechaSolicitud, Identificacion,
-    NombreCompleto, Cargo, EstadoActual, EstadoActual AS Estado, EstadoActual AS EstadoSol, EstadoActualEP,
+    *,
+    EstadoActual AS EstadoSol,
+    EstadoActual AS Estado,
     Fecha_Programacion_Visita AS ProgramacionVisita,
     Fecha_Programacion_Poligrafia AS ProgramacionPoligrafia,
     Fecha_Entrega_ECP AS FechaEntregaECP,
-    Fecha_Entrega_EP AS FechaEntregaEP,
-    ID_Cliente, RazonSocial, NIT, usuarioActualizacion
+    Fecha_Entrega_EP AS FechaEntregaEP
   `;
   const sqlView = `SELECT ${sqlColumns} FROM \`${tableView}\` ${buildWhere()} ORDER BY FechaSolicitud DESC LIMIT 500`;
   let rowsView = [];
