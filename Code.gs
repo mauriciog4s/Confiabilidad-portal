@@ -76,13 +76,20 @@ function getUserContext(email) {
   const relResult = bq.query(sqlRel, { email });
   context.allowedClientIds = relResult.map(r => r.ID_ClientesConfiabilidad);
 
-  if (context.allowedClientIds.length > 0) {
+  // Si es admin, cargar TODOS los clientes para la vista de configuración
+  let sqlDetails = "";
+  if (context.isAdmin) {
+    sqlDetails = `SELECT ID_ClientesConfiabilidad, RazonSocial, TipodeCliente, NIT, ForcedMyRequests FROM \`${projectId}.${DATASET_ID}.${TABLES.CLIENT_CONF}\``;
+  } else if (context.allowedClientIds.length > 0) {
     const idsFormatted = context.allowedClientIds.map(id => `'${id}'`).join(',');
-    const sqlDetails = `
+    sqlDetails = `
       SELECT ID_ClientesConfiabilidad, RazonSocial, TipodeCliente, NIT, ForcedMyRequests
       FROM \`${projectId}.${DATASET_ID}.${TABLES.CLIENT_CONF}\`
       WHERE ID_ClientesConfiabilidad IN (${idsFormatted})
     `;
+  }
+
+  if (sqlDetails) {
     try {
       const details = bq.query(sqlDetails);
       details.forEach(row => {
@@ -96,6 +103,13 @@ function getUserContext(email) {
           forcedMyRequests: row.ForcedMyRequests === 'SI' || row.ForcedMyRequests === true
         };
       });
+      // Para admins que no tengan clientes asignados específicamente en REL_CLIENTS,
+      // pero que deben poder verlos todos en Configuración.
+      if (context.isAdmin && context.allowedClientIds.length === 0) {
+        // Opcional: permitirles ver todos en el dashboard también?
+        // El usuario dijo "verifica que el usuario con sesion activa solo vea sus clientes asignados"
+        // Así que si no tiene asignados, no ve nada en dashboard.
+      }
     } catch (e) {
       console.warn("Error cargando detalles de clientes:", e.message);
       context.allowedClientIds.forEach(id => { if (!context.clientNames[id]) context.clientNames[id] = `Cliente ${id}`; });
@@ -169,14 +183,15 @@ function getRequests(email, { period = 'today', clientId = null } = {}) {
   };
 
   // 1. Vista principal (Optimization & Mapping fix)
+  // Se incluye 'Estado' y 'EstadoSol' como alias de EstadoActual para mayor compatibilidad de filtrado
   const sqlColumns = `
     ID_SolicitudesConfiabilidad, NSolicitud, FechaSolicitud, Identificacion,
-    NombreCompleto, Cargo, EstadoActual, EstadoActualEP,
+    NombreCompleto, Cargo, EstadoActual, EstadoActual AS Estado, EstadoActual AS EstadoSol, EstadoActualEP,
     Fecha_Programacion_Visita AS ProgramacionVisita,
     Fecha_Programacion_Poligrafia AS ProgramacionPoligrafia,
     Fecha_Entrega_ECP AS FechaEntregaECP,
     Fecha_Entrega_EP AS FechaEntregaEP,
-    ID_Cliente, usuarioActualizacion
+    ID_Cliente, RazonSocial, NIT, usuarioActualizacion
   `;
   const sqlView = `SELECT ${sqlColumns} FROM \`${tableView}\` ${buildWhere()} ORDER BY FechaSolicitud DESC LIMIT 500`;
   let rowsView = [];

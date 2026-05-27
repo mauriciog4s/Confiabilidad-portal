@@ -434,7 +434,12 @@ const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onCh
 
   const filteredRequests = useMemo(() => {
     let result = requests;
-    if (filter !== 'Todo')  result = result.filter(r => (r.EstadoActual || 'Sin Estado') === filter);
+    if (filter !== 'Todo') {
+      result = result.filter(r => {
+        const s = (r.EstadoActual || r.Estado || r.EstadoSol || 'Sin Estado').toString().trim().toLowerCase();
+        return s === filter.toLowerCase().trim();
+      });
+    }
     if (onlyMine && userContext?.email) result = result.filter(r => r.usuarioActualizacion === userContext.email);
     if (search) {
       const q = search.toLowerCase();
@@ -1535,12 +1540,13 @@ const ConfigurationView = ({ userContext, onForceSync, syncStatus, lastSync, onR
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {userContext.allowedClientIds.map(id => {
+                {(Object.keys(userContext.clientData || {})).sort().map(id => {
                   const cd = userContext.clientData[id];
+                  if (!cd) return null;
                   return (
                     <tr key={id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3">
-                        <div className="font-bold text-gray-700">{userContext.clientNames[id]}</div>
+                        <div className="font-bold text-gray-700">{userContext.clientNames[id] || id}</div>
                         <div className="text-[10px] text-gray-400 font-mono">{id}</div>
                       </td>
                       <td className="px-4 py-3">
@@ -1550,7 +1556,7 @@ const ConfigurationView = ({ userContext, onForceSync, syncStatus, lastSync, onR
                             onClick={() => handleToggleForced(id, cd.forcedMyRequests)}
                             className={`w-12 h-6 rounded-full transition-all duration-300 flex items-center px-1 ${cd.forcedMyRequests ? 'bg-appBlue' : 'bg-gray-200'} ${updatingClient === id ? 'opacity-50 cursor-not-allowed' : ''}`}
                           >
-                            <div className={`w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-300 ${cd.forcedMyRequests ? 'translate-x-6' : 'translate-x-0'} flex items-center justify-center`}>
+                            <div className={`w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-200 ${cd.forcedMyRequests ? 'translate-x-6' : 'translate-x-0'} flex items-center justify-center`}>
                               {updatingClient === id && <div className="w-2 h-2 border border-appBlue border-t-transparent rounded-full animate-spin"></div>}
                             </div>
                           </button>
