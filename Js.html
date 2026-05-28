@@ -272,12 +272,18 @@ const LoginView = ({ onSuccess, isLoading }) => (
 
 // ─── SIDEBAR ──────────────────────────────────────────────────────────────
 const Sidebar = ({ currentView, setView, onLogout, userContext, syncStatus, lastSync, isOpen, toggleSidebar, isCollapsed, toggleCollapse }) => {
-  const menuItems = [
-    { id: 'home',    icon: 'Home',          title: 'Inicio' },
-    { id: 'create',  icon: 'ClipboardList', title: 'Nueva Solicitud' },
-    { id: 'bulk',    icon: 'Upload',        title: 'Carga Masiva' },
-    { id: 'history', icon: 'History',       title: 'Histórico' },
-  ];
+  const menuItems = useMemo(() => {
+    const all = [
+      { id: 'home',    icon: 'Home',          title: 'Inicio' },
+      { id: 'create',  icon: 'ClipboardList', title: 'Nueva Solicitud' },
+      { id: 'bulk',    icon: 'Upload',        title: 'Carga Masiva' },
+      { id: 'history', icon: 'History',       title: 'Histórico' },
+    ];
+    const role = userContext?.role || '';
+    if (role === 'Cliente Creación') return all.filter(i => ['home', 'create', 'bulk'].includes(i.id));
+    if (role === 'Cliente Consulta') return all.filter(i => ['home', 'history'].includes(i.id));
+    return all;
+  }, [userContext]);
   const handleNav = (id) => {
     setView(id);
     if (window.innerWidth < 768 && toggleSidebar) toggleSidebar(false);
@@ -379,7 +385,7 @@ const HomeDashboard = ({ userContext, requests, setView, syncStatus }) => {
           { label:'En Proceso', sub:'Estudios activos', val: stats.pending,  icon:'Clock',      bg:'bg-yellow-50', fg:'text-yellow-600' },
           { label:'Finalizados', sub:'Estudios completados', val: stats.completed, icon:'CheckCircle', bg:'bg-green-50',  fg:'text-green-600'  },
         ].map(s => (
-          <div key={s.label} onClick={() => setView('history')} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 cursor-pointer hover:shadow-md transition transform hover:-translate-y-1 btn-action">
+          <div key={s.label} onClick={() => userContext.role !== 'Cliente Creación' && setView('history')} className={`bg-white p-6 rounded-xl shadow-sm border border-gray-200 transition transform ${userContext.role !== 'Cliente Creación' ? 'cursor-pointer hover:shadow-md hover:-translate-y-1 btn-action' : 'opacity-80'}`}>
             <div className="flex justify-between items-start mb-4">
               <div className={`p-3 ${s.bg} ${s.fg} rounded-lg`}><Icon name={s.icon} size={24}/></div>
               <span className="text-xs font-bold text-gray-400 uppercase">{s.label}</span>
@@ -444,7 +450,7 @@ const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onCh
         result = result.filter(r => r.EstadoActual === filter);
       }
     }
-    if (onlyMine && userContext?.email) result = result.filter(r => r.usuarioActualizacion === userContext.email);
+    if (onlyMine && userContext?.email) result = result.filter(r => r.UsuarioCreación === userContext.email);
     if (search) {
       const q = search.toLowerCase();
       result = result.filter(r => (String(r.NSolicitud || r.ID_SolicitudesConfiabilidad) + r.Identificacion + r.NombreCompleto).toLowerCase().includes(q));
@@ -482,7 +488,9 @@ const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onCh
   const isForcedMyRequests = useMemo(() => {
     if (userContext?.isAdmin) return false;
     if (!clientFilter) return false;
-    return userContext?.clientData?.[clientFilter]?.forcedMyRequests || false;
+    // Forzado a nivel de cliente O a nivel de relación usuario-cliente
+    return userContext?.clientData?.[clientFilter]?.forcedMyRequests ||
+           userContext?.userClientConfig?.[clientFilter]?.forcedMyRequests || false;
   }, [clientFilter, userContext]);
 
   useEffect(() => {
@@ -1495,8 +1503,125 @@ const BulkUpload = ({ userContext, setView, onReload }) => {
 };
 
 // ─── CONFIGURACIÓN ────────────────────────────────────────────────────────
+// ─── MODAL DE ADMINISTRACIÓN DE USUARIOS POR CLIENTE ──────────────────────
+const AdminClientModal = ({ clientId, clientName, onClose, showToast }) => {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(null);
+
+  useEffect(() => {
+    runServer('getClientUsers', { clientId })
+      .then(res => { setUsers(res || []); setLoading(false); })
+      .catch(e => { showToast(e.message, "error"); setLoading(false); });
+  }, [clientId]);
+
+  const handleUpdate = async (targetEmail, role, userForced) => {
+    setUpdating(targetEmail);
+    try {
+      await runServer('updateUserConfig', { targetEmail, clientId, role, userForced });
+      setUsers(prev => prev.map(u => u.Email === targetEmail ? {
+        ...u,
+        Rol_Asignado: role || u.Rol_Asignado,
+        userForced: userForced !== undefined ? (userForced ? 'SI' : 'NO') : u.userForced
+      } : u));
+      showToast("Usuario actualizado.", "success");
+    } catch (e) {
+      showToast(e.message, "error");
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  const ROLES = ['Cliente Completo', 'Cliente Creación', 'Cliente Consulta'];
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col transform animate-scale-in">
+        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+          <div>
+            <h3 className="text-xl font-bold text-gray-800">{clientName || 'Cliente'}</h3>
+            <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">Gestión de Usuarios / {clientId}</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors"><Icon name="X" size={24}/></button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6">
+          {loading ? (
+            <div className="flex flex-col items-center py-20 gap-4">
+              <div className="w-10 h-10 border-4 border-appBlue border-t-transparent rounded-full animate-spin"></div>
+              <p className="text-gray-400 text-sm">Cargando usuarios...</p>
+            </div>
+          ) : users.length === 0 ? (
+            <div className="text-center py-20 text-gray-400 italic">No hay usuarios asociados a este cliente.</div>
+          ) : (
+            <div className="space-y-4">
+              {users.map(u => (
+                <div key={u.Email} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl"><Icon name="User" size={20}/></div>
+                      <div>
+                        <div className="font-bold text-gray-800">{u.Email}</div>
+                        <div className="text-[10px] uppercase font-black text-gray-400 mt-0.5">{u.Rol_Asignado}</div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex bg-gray-100 p-1 rounded-xl gap-1">
+                        {ROLES.map(role => (
+                          <button
+                            key={role}
+                            disabled={!!updating}
+                            onClick={() => handleUpdate(u.Email, role)}
+                            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${u.Rol_Asignado === role ? 'bg-white text-appBlue shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                          >
+                            {role.replace('Cliente ', '')}
+                          </button>
+                        ))}
+                      </div>
+
+                      <button
+                        disabled={!!updating}
+                        onClick={() => handleUpdate(u.Email, null, u.userForced !== 'SI')}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all text-[10px] font-bold ${u.userForced === 'SI' ? 'bg-orange-50 border-orange-200 text-orange-700' : 'bg-white border-gray-200 text-gray-500'}`}
+                      >
+                        <div className={`w-8 h-4 rounded-full transition-colors flex items-center px-0.5 ${u.userForced === 'SI' ? 'bg-orange-500' : 'bg-gray-300'}`}>
+                          <div className={`w-3 h-3 bg-white rounded-full shadow transform transition-transform ${u.userForced === 'SI' ? 'translate-x-4' : 'translate-x-0'}`}></div>
+                        </div>
+                        Solo mis solicitudes
+                      </button>
+
+                      {updating === u.Email && <div className="w-5 h-5 border-2 border-appBlue border-t-transparent rounded-full animate-spin"></div>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="p-4 border-t bg-gray-50 text-center">
+          <button onClick={onClose} className="px-8 py-2 bg-gray-800 text-white font-bold rounded-xl hover:bg-black transition btn-action">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const ConfigurationView = ({ userContext, onForceSync, syncStatus, lastSync, onRefreshClients, showToast }) => {
   const [updatingClient, setUpdatingClient] = useState(null);
+  const [clientSearch, setClientSearch] = useState('');
+  const [selectedAdminClient, setSelectedAdminClient] = useState(null);
+
+  const filteredClientIds = useMemo(() => {
+    if (!userContext?.allowedClientIds) return [];
+    if (!clientSearch) return userContext.allowedClientIds;
+    const q = clientSearch.toLowerCase();
+    return userContext.allowedClientIds.filter(id => {
+      const name = (userContext.clientNames?.[id] || '').toLowerCase();
+      return name.includes(q) || id.toLowerCase().includes(q);
+    });
+  }, [userContext, clientSearch]);
 
   const handleToggleForced = async (clientId, currentVal) => {
     setUpdatingClient(clientId);
@@ -1527,11 +1652,23 @@ const ConfigurationView = ({ userContext, onForceSync, syncStatus, lastSync, onR
       {/* Tarea 8: Panel de Administración de Clientes */}
       {userContext.isAdmin && (
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 mb-8 animate-fade-in">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="bg-appRed p-2 rounded-lg text-white shadow-sm"><Icon name="ShieldCheck" size={20}/></div>
-            <div>
-              <h3 className="font-bold text-gray-800">Panel de Administración de Clientes</h3>
-              <p className="text-xs text-gray-500">Configure restricciones por cliente.</p>
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <div className="flex items-center gap-3">
+              <div className="bg-appRed p-2 rounded-lg text-white shadow-sm"><Icon name="ShieldCheck" size={20}/></div>
+              <div>
+                <h3 className="font-bold text-gray-800">Panel de Administración de Clientes</h3>
+                <p className="text-xs text-gray-500">Configure restricciones por cliente.</p>
+              </div>
+            </div>
+            <div className="relative w-full md:w-64">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><Icon name="Search" size={14}/></div>
+              <input
+                type="text"
+                placeholder="Buscar cliente..."
+                value={clientSearch}
+                onChange={e => setClientSearch(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-appRed/20 focus:border-appRed outline-none transition-all"
+              />
             </div>
           </div>
           
@@ -1544,22 +1681,28 @@ const ConfigurationView = ({ userContext, onForceSync, syncStatus, lastSync, onR
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {userContext.allowedClientIds.map(id => {
-                  const cd = userContext.clientData[id];
+                {filteredClientIds.length === 0 ? (
+                  <tr><td colSpan="2" className="px-4 py-8 text-center text-gray-400 italic">No se encontraron clientes.</td></tr>
+                ) : filteredClientIds.map(id => {
+                  const cd = userContext?.clientData?.[id] || {};
+                  const isForced = !!cd.forcedMyRequests;
                   return (
                     <tr key={id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3">
-                        <div className="font-bold text-gray-700">{userContext.clientNames[id]}</div>
+                      <td className="px-4 py-3 cursor-pointer" onClick={() => setSelectedAdminClient(id)}>
+                        <div className="font-bold text-gray-700 hover:text-appBlue transition-colors flex items-center gap-2">
+                          {userContext?.clientNames?.[id] || id}
+                          <Icon name="ChevronRight" size={12}/>
+                        </div>
                         <div className="text-[10px] text-gray-400 font-mono">{id}</div>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex justify-center">
                           <button 
                             disabled={updatingClient === id}
-                            onClick={() => handleToggleForced(id, cd.forcedMyRequests)}
-                            className={`w-12 h-6 rounded-full transition-all duration-300 flex items-center px-1 ${cd.forcedMyRequests ? 'bg-appBlue' : 'bg-gray-200'} ${updatingClient === id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            onClick={() => handleToggleForced(id, isForced)}
+                            className={`w-12 h-6 rounded-full transition-all duration-300 flex items-center px-1 ${isForced ? 'bg-appBlue' : 'bg-gray-200'} ${updatingClient === id ? 'opacity-50 cursor-not-allowed' : ''}`}
                           >
-                            <div className={`w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-300 ${cd.forcedMyRequests ? 'translate-x-6' : 'translate-x-0'} flex items-center justify-center`}>
+                            <div className={`w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-300 ${isForced ? 'translate-x-6' : 'translate-x-0'} flex items-center justify-center`}>
                               {updatingClient === id && <div className="w-2 h-2 border border-appBlue border-t-transparent rounded-full animate-spin"></div>}
                             </div>
                           </button>
@@ -1619,9 +1762,19 @@ const ConfigurationView = ({ userContext, onForceSync, syncStatus, lastSync, onR
           </div>
         </div>
       </div>
+
+      {selectedAdminClient && (
+        <AdminClientModal
+          clientId={selectedAdminClient}
+          clientName={userContext.clientNames[selectedAdminClient]}
+          onClose={() => setSelectedAdminClient(null)}
+          showToast={showToast}
+        />
+      )}
     </div>
   );
 };
+
 
 // ─── APP PRINCIPAL ────────────────────────────────────────────────────────
 const App = () => {
@@ -1752,14 +1905,23 @@ const App = () => {
   );
 
   const renderView = () => {
+    const role = userCtx?.role || '';
     switch (view) {
       case 'home':    return <HomeDashboard userContext={userCtx} requests={initialData?.data||[]} setView={setView} syncStatus={syncStatus}/>;
-      case 'history': return <RequestList setView={setView} setSelectedRequest={setSelectedRequest} initialData={initialData} onRefresh={() => refreshAll(true)} onChangePeriod={handleChangePeriod} currentPeriod={period} refreshing={syncStatus !== 'idle'} userContext={userCtx} masterData={masterData}/>;
-      case 'detail':  return selectedRequest ? <RequestDetail requestId={selectedRequest.ID_SolicitudesConfiabilidad || selectedRequest.NSolicitud} preloadedData={selectedRequest} onBack={() => setView('history')}/> : null;
-      case 'create':  return <CreateRequest userContext={userCtx} setView={setView} onReload={() => loadRequests()} masterData={masterData}/>;
-      case 'bulk':    return <BulkUpload userContext={userCtx} setView={setView} onReload={() => loadRequests()}/>;
+      case 'history':
+        if (role === 'Cliente Creación') return <HomeDashboard userContext={userCtx} requests={initialData?.data||[]} setView={setView} syncStatus={syncStatus}/>;
+        return <RequestList setView={setView} setSelectedRequest={setSelectedRequest} initialData={initialData} onRefresh={() => refreshAll(true)} onChangePeriod={handleChangePeriod} currentPeriod={period} refreshing={syncStatus !== 'idle'} userContext={userCtx} masterData={masterData}/>;
+      case 'detail':
+        if (role === 'Cliente Creación') return <HomeDashboard userContext={userCtx} requests={initialData?.data||[]} setView={setView} syncStatus={syncStatus}/>;
+        return selectedRequest ? <RequestDetail requestId={selectedRequest.ID_SolicitudesConfiabilidad || selectedRequest.NSolicitud} preloadedData={selectedRequest} onBack={() => setView('history')}/> : null;
+      case 'create':
+        if (role === 'Cliente Consulta') return <HomeDashboard userContext={userCtx} requests={initialData?.data||[]} setView={setView} syncStatus={syncStatus}/>;
+        return <CreateRequest userContext={userCtx} setView={setView} onReload={() => loadRequests()} masterData={masterData}/>;
+      case 'bulk':
+        if (role === 'Cliente Consulta') return <HomeDashboard userContext={userCtx} requests={initialData?.data||[]} setView={setView} syncStatus={syncStatus}/>;
+        return <BulkUpload userContext={userCtx} setView={setView} onReload={() => loadRequests()}/>;
       case 'config':  return <ConfigurationView userContext={userCtx} onForceSync={() => refreshAll(true)} syncStatus={syncStatus} lastSync={lastSync} onRefreshClients={handleRefreshClients} showToast={showToast}/>;
-      default:        return <RequestList setView={setView} setSelectedRequest={setSelectedRequest} initialData={initialData} onRefresh={() => refreshAll(true)} onChangePeriod={handleChangePeriod} currentPeriod={period} refreshing={syncStatus !== 'idle'} userContext={userCtx}/>;
+      default:        return <HomeDashboard userContext={userCtx} requests={initialData?.data||[]} setView={setView} syncStatus={syncStatus}/>;
     }
   };
 
