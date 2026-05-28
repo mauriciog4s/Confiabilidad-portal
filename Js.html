@@ -153,26 +153,6 @@ const Icon = ({ name, size = 20, className = "" }) => {
   );
 };
 
-// ─── COMPONENTES OPTIMIZADOS ──────────────────────────────────────────────
-const RequestRow = React.memo(({ req, onClick }) => (
-  <div onClick={onClick}
-    className="grid grid-cols-12 gap-2 p-3 border-b hover:bg-gray-50 cursor-pointer text-[10px] items-center transition-colors">
-    <div className="col-span-1 font-bold text-blue-600 truncate">{req.NSolicitud || req.ID_SolicitudesConfiabilidad}</div>
-    <div className="col-span-2 text-gray-500">{formatDateCO(req.FechaSolicitud?.value || req.FechaSolicitud)}</div>
-    <div className="col-span-1 font-mono truncate">{req.Identificacion}</div>
-    <div className="col-span-2 flex flex-col">
-      <span className="truncate font-medium text-gray-700">{req.NombreCompleto}</span>
-      {req.Cargo && <span className="text-[9px] text-gray-400 uppercase truncate">{req.Cargo}</span>}
-    </div>
-    <div className="col-span-1 text-center"><span className={`inline-flex items-center justify-center w-20 h-[22px] rounded text-[9px] font-bold uppercase ${getStatusBadgeColor(req.EstadoActual)}`}>{req.EstadoActual}</span></div>
-    <div className="col-span-1 text-center">{req.EstadoActualEP ? <span className="inline-flex items-center justify-center w-20 h-[22px] rounded text-[9px] font-bold uppercase bg-purple-100 text-purple-700 border border-purple-200 truncate">{req.EstadoActualEP}</span> : <span className="text-gray-300">-</span>}</div>
-    <div className="col-span-1 text-center text-gray-500">{formatDateCO(req.ProgramacionVisita, false) || '-'}</div>
-    <div className="col-span-1 text-center text-gray-500">{formatDateCO(req.ProgramacionPoligrafia, false) || '-'}</div>
-    <div className="col-span-1 text-center text-gray-500">{formatDateCO(req.FechaEntregaECP, false) || '-'}</div>
-    <div className="col-span-1 text-center text-gray-500">{formatDateCO(req.FechaEntregaEP, false) || '-'}</div>
-  </div>
-));
-
 // ─── UTILIDADES UI ────────────────────────────────────────────────────────
 const Toast = ({ message, type = 'info', onClose }) => {
   useEffect(() => { const t = setTimeout(onClose, 4000); return () => clearTimeout(t); }, [onClose]);
@@ -271,7 +251,7 @@ const LoginView = ({ onSuccess, isLoading }) => (
 );
 
 // ─── SIDEBAR ──────────────────────────────────────────────────────────────
-const Sidebar = ({ currentView, setView, onLogout, userContext, syncStatus, lastSync, isOpen, toggleSidebar, isCollapsed, toggleCollapse }) => {
+const Sidebar = ({ currentView, setView, onLogout, userContext, syncStatus, lastSync, isOpen, toggleSidebar }) => {
   const menuItems = [
     { id: 'home',    icon: 'Home',          title: 'Inicio' },
     { id: 'create',  icon: 'ClipboardList', title: 'Nueva Solicitud' },
@@ -285,67 +265,49 @@ const Sidebar = ({ currentView, setView, onLogout, userContext, syncStatus, last
   return (
     <>
       {isOpen && <div className="fixed inset-0 bg-black/50 z-30 md:hidden" onClick={() => toggleSidebar(false)}></div>}
-      <div className={`fixed inset-y-0 left-0 z-40 ${isCollapsed ? 'w-20' : 'w-64'} bg-white border-r border-gray-200 flex flex-col shadow-lg transform transition-all duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
-        <div className={`p-4 border-b border-gray-100 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
-          <div className="flex items-center gap-3 cursor-pointer overflow-hidden" onClick={() => handleNav('home')}>
-            <img src="https://www.g4s.com/es-co/-/media/g4s/global/images/logos/g4s---an-allied-universal-company-logo/g4s_one-company_logo_180x136.ashx" alt="G4S" className="h-8 w-auto object-contain flex-shrink-0"/>
-            {!isCollapsed && <span className="font-bold text-gray-800 text-lg whitespace-nowrap animate-fade-in">Confiabilidad</span>}
+      <div className={`fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-gray-200 flex flex-col shadow-lg transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
+        <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+          <div className="flex items-center gap-3 cursor-pointer" onClick={() => handleNav('home')}>
+            <img src="https://www.g4s.com/es-co/-/media/g4s/global/images/logos/g4s---an-allied-universal-company-logo/g4s_one-company_logo_180x136.ashx" alt="G4S" className="h-8 w-auto object-contain"/>
+            <span className="font-bold text-gray-800 text-lg">Confiabilidad</span>
           </div>
           <button onClick={() => toggleSidebar(false)} className="md:hidden text-gray-400 hover:text-gray-700"><Icon name="X" size={22}/></button>
-          {!isCollapsed && (
-            <button onClick={toggleCollapse} className="hidden md:flex text-gray-400 hover:text-appBlue transition-colors">
-              <Icon name="Menu" size={20}/>
-            </button>
-          )}
         </div>
-        
-        {isCollapsed && (
-          <div className="hidden md:flex justify-center p-3 border-b border-gray-50">
-            <button onClick={toggleCollapse} className="p-2 text-gray-400 hover:text-appBlue bg-gray-50 rounded-lg transition-colors">
-              <Icon name="Menu" size={20}/>
-            </button>
-          </div>
-        )}
-
-        <div className="flex-1 overflow-y-auto py-3 space-y-1">
+        <div className="flex-1 overflow-y-auto py-3">
           {menuItems.map((item) => (
-            <div key={item.id} onClick={() => handleNav(item.id)} title={isCollapsed ? item.title : ""} className={`px-4 py-2.5 cursor-pointer transition-colors border-l-4 ${currentView === item.id ? 'bg-red-50 border-appRed' : 'border-transparent hover:bg-gray-50'}`}>
-              <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
-                <Icon name={item.icon} className={currentView === item.id ? 'text-appRed' : 'text-gray-400'} size={isCollapsed ? 22 : 18}/>
-                {!isCollapsed && <span className={`font-medium text-xs ${currentView === item.id ? 'text-appRed font-bold' : 'text-gray-600'}`}>{item.title}</span>}
+            <div key={item.id} onClick={() => handleNav(item.id)} className={`px-5 py-3 cursor-pointer transition-colors border-l-4 ${currentView === item.id ? 'bg-red-50 border-appRed' : 'border-transparent hover:bg-gray-50'}`}>
+              <div className="flex items-center gap-3">
+                <Icon name={item.icon} className={currentView === item.id ? 'text-appRed' : 'text-gray-400'} size={19}/>
+                <span className={`font-medium text-sm ${currentView === item.id ? 'text-appRed font-bold' : 'text-gray-600'}`}>{item.title}</span>
               </div>
             </div>
           ))}
           <div className="my-2 border-t border-gray-100 mx-4"></div>
-          <div onClick={() => handleNav('config')} title={isCollapsed ? "Configuración" : ""} className={`px-4 py-2.5 cursor-pointer transition-colors border-l-4 ${currentView === 'config' ? 'bg-blue-50 border-appBlue' : 'border-transparent hover:bg-gray-50'}`}>
-            <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
-              <Icon name="Settings" className={currentView === 'config' ? 'text-appBlue' : 'text-gray-400'} size={isCollapsed ? 22 : 18}/>
-              {!isCollapsed && <span className={`font-medium text-xs ${currentView === 'config' ? 'text-appBlue font-bold' : 'text-gray-600'}`}>Configuración</span>}
+          <div onClick={() => handleNav('config')} className={`px-5 py-3 cursor-pointer transition-colors border-l-4 ${currentView === 'config' ? 'bg-blue-50 border-appBlue' : 'border-transparent hover:bg-gray-50'}`}>
+            <div className="flex items-center gap-3">
+              <Icon name="Settings" className={currentView === 'config' ? 'text-appBlue' : 'text-gray-400'} size={19}/>
+              <span className={`font-medium text-sm ${currentView === 'config' ? 'text-appBlue font-bold' : 'text-gray-600'}`}>Configuración</span>
             </div>
           </div>
         </div>
-        <div className={`p-4 border-t bg-gray-50 ${isCollapsed ? 'flex flex-col items-center' : ''}`}>
-          <div className="flex flex-col gap-2 mb-3 w-full">
-            <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'}`}>
-              <div className="p-2 rounded-full bg-gray-200 flex items-center justify-center min-w-[32px] h-8 w-8"><Icon name="User" size={14} className="text-gray-600"/></div>
-              {!isCollapsed && (
-                <div className="overflow-hidden flex-1 animate-fade-in">
-                  <div className="text-[9px] uppercase font-bold text-gray-400">Usuario</div>
-                  <div className="text-[10px] font-bold text-gray-800 truncate" title={userContext?.email}>{userContext?.email || '...'}</div>
-                </div>
-              )}
-            </div>
-            {!isCollapsed && (
-              <div className="flex justify-between items-center bg-white border border-gray-200 rounded px-2 py-1 animate-fade-in">
-                <div className="text-gray-500 text-[9px] font-bold flex items-center gap-1">
-                  <Icon name="CloudLightning" size={9}/> {syncStatus !== 'idle' ? '...' : 'Al día'}
-                </div>
-                {lastSync && <span className="text-[9px] text-gray-400">{new Date(Number(lastSync)).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span>}
+        <div className="p-4 border-t bg-gray-50">
+          <div className="flex flex-col gap-2 mb-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-full bg-gray-200 min-w-[32px]"><Icon name="User" size={15} className="text-gray-600"/></div>
+              <div className="overflow-hidden flex-1">
+                <div className="text-[10px] uppercase font-bold text-gray-500">Usuario</div>
+                <div className="text-xs font-bold text-gray-800 truncate" title={userContext?.email}>{userContext?.email || '...'}</div>
               </div>
-            )}
+            </div>
+            <div className="flex justify-between items-center bg-white border border-gray-200 rounded px-2 py-1">
+              <div className="text-gray-500 text-[10px] font-bold flex items-center gap-1">
+                <Icon name="CloudLightning" size={10}/> {syncStatus !== 'idle' ? 'Sincronizando...' : 'Al día'}
+              </div>
+              {lastSync && <span className="text-[9px] text-gray-400">{new Date(Number(lastSync)).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span>}
+            </div>
           </div>
-          <button onClick={onLogout} title={isCollapsed ? "Salir" : ""} className={`w-full py-2 bg-white border border-gray-300 rounded text-[10px] font-bold text-gray-700 hover:bg-gray-100 transition flex items-center justify-center gap-2 btn-action ${isCollapsed ? 'px-0' : 'px-3'}`}>
-            <Icon name="LogIn" size={13} className="rotate-180"/> {!isCollapsed && "Salir"}
+          <button onClick={onLogout} className="w-full py-2 px-3 bg-white border border-gray-300 rounded text-xs font-bold text-gray-700 hover:bg-gray-100 transition flex items-center justify-center gap-2 btn-action">
+            <Icon name="LogIn" size={13} className="rotate-180"/> Salir
           </button>
         </div>
       </div>
@@ -410,9 +372,10 @@ const PERIODS = [
   { key: 'week',  label: 'Semana'  },
   { key: 'month', label: 'Mes'     },
   { key: 'year',  label: 'Año'     },
+  { key: 'all',   label: 'Todo'    },
 ];
 
-const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onChangePeriod, currentPeriod, refreshing, userContext, masterData }) => {
+const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onChangePeriod, currentPeriod, refreshing, userContext }) => {
   const [filter,       setFilter]       = useState('Todo');
   const [search,       setSearch]       = useState('');
   const [page,         setPage]         = useState(1);
@@ -424,13 +387,10 @@ const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onCh
 
   const statusTabs = useMemo(() => {
     const counts = { 'Todo': requests.length };
-    requests.forEach(r => { const s = r.EstadoActual || 'Sin Estado'; counts[s] = (counts[s] || 0) + 1; });
-    
-    const masterStatuses = masterData?.conEstados?.map(i => i.EstadoSol) || [];
-    const displayStatuses = ['Todo', ...masterStatuses];
-    
-    return displayStatuses.map(s => ({ name: s, count: counts[s] || 0 }));
-  }, [requests, masterData]);
+    const statuses = new Set();
+    requests.forEach(r => { const s = r.EstadoActual || 'Sin Estado'; statuses.add(s); counts[s] = (counts[s] || 0) + 1; });
+    return ['Todo', ...Array.from(statuses).sort()].map(s => ({ name: s, count: counts[s] || 0 }));
+  }, [requests]);
 
   const filteredRequests = useMemo(() => {
     let result = requests;
@@ -470,93 +430,66 @@ const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onCh
   const paginatedData = filteredRequests.slice((page - 1) * 50, page * 50);
   const totalPages    = Math.ceil(filteredRequests.length / 50);
 
-  const isForcedMyRequests = useMemo(() => {
-    if (userContext?.isAdmin) return false;
-    if (!clientFilter) return false;
-    return userContext?.clientData?.[clientFilter]?.forcedMyRequests || false;
-  }, [clientFilter, userContext]);
-
-  useEffect(() => {
-    if (isForcedMyRequests) setOnlyMine(true);
-  }, [isForcedMyRequests]);
-
   return (
-    <div className="p-4 md:p-6 h-full flex flex-col animate-fade-in overflow-hidden">
-      {/* Barra de Filtros Estructurada */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm mb-4 overflow-hidden">
-        <div className="p-4 bg-gray-50/50 border-b border-gray-100">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="bg-appBlue p-2 rounded-lg text-white shadow-sm">
-                <Icon name="Filter" size={18}/>
-              </div>
-              <div>
-                <h2 className="text-sm font-bold text-gray-800">Filtros de Búsqueda</h2>
-                <p className="text-[10px] text-gray-500 font-medium uppercase tracking-wider">Gestión de Solicitudes</p>
+    <div className="p-4 md:p-6 h-full flex flex-col animate-fade-in">
+      {/* Filtros de período (Tarea 1) */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-4">
+        <div className="p-4 border-b border-gray-100">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Icon name="Calendar" size={16} className="text-appBlue"/>
+              <span className="text-sm font-bold text-gray-700">Período:</span>
+              <div className="flex gap-1.5 flex-wrap">
+                {PERIODS.map(p => (
+                  <button key={p.key} onClick={() => onChangePeriod(p.key)}
+                    className={`period-pill ${currentPeriod === p.key ? 'period-pill-active' : 'period-pill-idle'}`}>
+                    {p.label}
+                  </button>
+                ))}
               </div>
             </div>
-            
             <div className="flex items-center gap-2">
-              <button onClick={handleExport} className="px-4 py-2 text-green-700 hover:bg-green-100 border border-green-200 rounded-xl bg-green-50 flex items-center gap-2 text-xs font-bold transition-all btn-action">
-                <Icon name="Download" size={14}/> Exportar CSV
+              <button onClick={handleExport} className="px-3 py-1.5 text-green-600 hover:text-green-800 border rounded-lg bg-green-50 flex items-center gap-1.5 text-xs font-bold btn-action">
+                <Icon name="Download" size={13}/> Exportar
               </button>
-              <button onClick={onRefresh} disabled={refreshing} className="px-4 py-2 text-appBlue hover:bg-blue-100 border border-blue-200 rounded-xl bg-blue-50 flex items-center gap-2 text-xs font-bold transition-all btn-action disabled:opacity-50">
-                <Icon name="RefreshCw" size={14} className={refreshing ? "animate-spin" : ""}/>
-                {refreshing ? 'Sincronizando...' : 'Actualizar'}
+              <button onClick={onRefresh} disabled={refreshing} className="px-3 py-1.5 text-blue-600 hover:text-blue-800 border rounded-lg bg-blue-50 flex items-center gap-1.5 text-xs font-bold btn-action disabled:opacity-50">
+                <Icon name="RefreshCw" size={13} className={refreshing ? "animate-spin" : ""}/>
+                {refreshing ? 'Actualizando...' : 'Actualizar'}
               </button>
             </div>
           </div>
         </div>
-
-        <div className="p-5 space-y-4">
-          {/* Fila 1: Período y Mis Solicitudes */}
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-3 bg-gray-100 p-1 rounded-xl border border-gray-200">
-              {PERIODS.map(p => (
-                <button key={p.key} onClick={() => onChangePeriod(p.key)}
-                  className={`px-4 py-1.5 rounded-lg text-[11px] font-bold transition-all ${currentPeriod === p.key ? 'bg-white text-appBlue shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-                  {p.label}
-                </button>
-              ))}
+        <div className="p-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="relative">
+              <div className="absolute left-2.5 top-2.5 text-gray-400"><Icon name="Search" size={14}/></div>
+              <input type="text" className="w-full pl-8 pr-3 py-2 border rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-appBlue"
+                placeholder="ID, Cédula, Nombre..." value={search} onChange={e => setSearch(e.target.value)}/>
             </div>
-
-            <div className="flex items-center gap-4">
-               <label className={`flex items-center gap-3 p-2 px-4 rounded-xl border transition-all cursor-pointer select-none ${onlyMine ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200'}`}>
-                <div onClick={() => !isForcedMyRequests && setOnlyMine(!onlyMine)} className={`w-10 h-5 rounded-full transition-colors duration-200 flex items-center px-0.5 ${onlyMine ? 'bg-appBlue' : 'bg-gray-300'} ${isForcedMyRequests ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                  <div className={`w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-200 ${onlyMine ? 'translate-x-5' : 'translate-x-0'}`}></div>
-                </div>
-                <span className={`text-xs font-bold ${onlyMine ? 'text-appBlue' : 'text-gray-600'}`}>Mis Solicitudes</span>
-                {isForcedMyRequests && <Icon name="ShieldCheck" size={12} className="text-appBlue" title="Forzado por administrador"/>}
-              </label>
-              <div className="bg-gray-800 text-white px-3 py-2 rounded-xl text-xs font-black shadow-lg">
-                {filteredRequests.length} <span className="text-[10px] text-gray-400 font-normal ml-1">REGISTROS</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Fila 2: Búsqueda, Fechas y Cliente */}
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-            <div className="md:col-span-4 relative group">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-appBlue transition-colors"><Icon name="Search" size={16}/></div>
-              <input type="text" className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-appBlue/20 focus:border-appBlue transition-all"
-                placeholder="ID, Cédula o Nombre del evaluado..." value={search} onChange={e => setSearch(e.target.value)}/>
-            </div>
-
-            <div className="md:col-span-4 flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-1">
-              <Icon name="Calendar" size={14} className="text-gray-400"/>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-gray-500 whitespace-nowrap">Fecha:</span>
               <input type="date" value={dateRange.start} onChange={e => setDateRange({...dateRange, start: e.target.value})}
-                className="w-full bg-transparent p-1.5 text-[11px] font-medium focus:outline-none"/>
-              <span className="text-gray-300">|</span>
+                className="w-full border rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-appBlue"/>
+              <span className="text-xs text-gray-400">-</span>
               <input type="date" value={dateRange.end} onChange={e => setDateRange({...dateRange, end: e.target.value})}
-                className="w-full bg-transparent p-1.5 text-[11px] font-medium focus:outline-none"/>
+                className="w-full border rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-appBlue"/>
             </div>
-
-            <div className="md:col-span-4">
+            <div>
               <select value={clientFilter} onChange={e => setClientFilter(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-appBlue/20 focus:border-appBlue transition-all appearance-none cursor-pointer">
+                className="w-full border rounded-lg p-2 text-xs focus:ring-1 focus:ring-appBlue bg-white">
                 <option value="">Todos los Clientes</option>
                 {userContext?.allowedClientIds?.map(id => <option key={id} value={id}>{userContext.clientNames?.[id] || id}</option>)}
               </select>
+            </div>
+            {/* Tarea 6: Mis Solicitudes */}
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <div onClick={() => setOnlyMine(!onlyMine)} className={`w-9 h-5 rounded-full transition-colors duration-200 flex items-center px-0.5 ${onlyMine ? 'bg-appBlue' : 'bg-gray-300'}`}>
+                  <div className={`w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-200 ${onlyMine ? 'translate-x-4' : 'translate-x-0'}`}></div>
+                </div>
+                <span className="text-xs font-bold text-gray-600">Mis Solicitudes</span>
+              </label>
+              <span className="text-xs font-bold text-gray-500 ml-auto">({filteredRequests.length})</span>
             </div>
           </div>
         </div>
@@ -602,7 +535,22 @@ const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onCh
               }
             </div>
           ) : paginatedData.map((req, i) => (
-            <RequestRow key={req.ID_SolicitudesConfiabilidad || i} req={req} onClick={() => { setSelectedRequest(req); setView('detail'); }} />
+            <div key={i} onClick={() => { setSelectedRequest(req); setView('detail'); }}
+              className="grid grid-cols-12 gap-2 p-3 border-b hover:bg-gray-50 cursor-pointer text-[10px] items-center transition-colors">
+              <div className="col-span-1 font-bold text-blue-600 truncate">{req.NSolicitud || req.ID_SolicitudesConfiabilidad}</div>
+              <div className="col-span-2 text-gray-500">{formatDateCO(req.FechaSolicitud?.value || req.FechaSolicitud)}</div>
+              <div className="col-span-1 font-mono truncate">{req.Identificacion}</div>
+              <div className="col-span-2 flex flex-col">
+                <span className="truncate font-medium text-gray-700">{req.NombreCompleto}</span>
+                {req.Cargo && <span className="text-[9px] text-gray-400 uppercase truncate">{req.Cargo}</span>}
+              </div>
+              <div className="col-span-1 text-center"><span className={`inline-flex items-center justify-center w-20 h-[22px] rounded text-[9px] font-bold uppercase ${getStatusBadgeColor(req.EstadoActual)}`}>{req.EstadoActual}</span></div>
+              <div className="col-span-1 text-center">{req.EstadoActualEP ? <span className="inline-flex items-center justify-center w-20 h-[22px] rounded text-[9px] font-bold uppercase bg-purple-100 text-purple-700 border border-purple-200 truncate">{req.EstadoActualEP}</span> : <span className="text-gray-300">-</span>}</div>
+              <div className="col-span-1 text-center text-gray-500">{formatDateCO(req.ProgramacionVisita, false) || '-'}</div>
+              <div className="col-span-1 text-center text-gray-500">{formatDateCO(req.ProgramacionPoligrafia, false) || '-'}</div>
+              <div className="col-span-1 text-center text-gray-500">{formatDateCO(req.FechaEntregaECP, false) || '-'}</div>
+              <div className="col-span-1 text-center text-gray-500">{formatDateCO(req.FechaEntregaEP, false) || '-'}</div>
+            </div>
           ))}
         </div>
         {totalPages > 1 && (
@@ -1486,140 +1434,68 @@ const BulkUpload = ({ userContext, setView, onReload }) => {
 };
 
 // ─── CONFIGURACIÓN ────────────────────────────────────────────────────────
-const ConfigurationView = ({ userContext, onForceSync, syncStatus, lastSync, onRefreshClients, showToast }) => {
-  const [updatingClient, setUpdatingClient] = useState(null);
-
-  const handleToggleForced = async (clientId, currentVal) => {
-    setUpdatingClient(clientId);
-    try {
-      const res = await runServer('updateClientConfig', { clientId, forcedMyRequests: !currentVal });
-      if (res.success) {
-        showToast("Configuración de cliente actualizada.", "success");
-        onRefreshClients(); // Para recargar el contexto de usuario localmente
-      }
-    } catch (e) {
-      showToast("Error al actualizar: " + e.message, "error");
-    } finally {
-      setUpdatingClient(null);
-    }
-  };
-
-  return (
-    <div className="p-6 md:p-8 max-w-4xl mx-auto animate-fade-in pb-20">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">Configuración</h2>
-        <button onClick={onForceSync} disabled={syncStatus !== 'idle'}
-          className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition flex items-center gap-2 disabled:opacity-50 shadow-sm btn-action">
-          <Icon name="RefreshCw" size={15} className={syncStatus !== 'idle' ? "animate-spin" : ""}/>
-          {syncStatus !== 'idle' ? 'Sincronizando...' : 'Forzar Sincronización'}
-        </button>
-      </div>
-
-      {/* Tarea 8: Panel de Administración de Clientes */}
-      {userContext.isAdmin && (
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 mb-8 animate-fade-in">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="bg-appRed p-2 rounded-lg text-white shadow-sm"><Icon name="ShieldCheck" size={20}/></div>
-            <div>
-              <h3 className="font-bold text-gray-800">Panel de Administración de Clientes</h3>
-              <p className="text-xs text-gray-500">Configure restricciones por cliente.</p>
-            </div>
-          </div>
-          
-          <div className="overflow-hidden border border-gray-100 rounded-xl">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-gray-50 text-gray-400 font-bold uppercase tracking-wider border-b border-gray-100">
-                <tr>
-                  <th className="px-4 py-3">ID / Cliente</th>
-                  <th className="px-4 py-3 text-center">Mis Solicitudes (Forzado)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {userContext.allowedClientIds.map(id => {
-                  const cd = userContext.clientData[id];
-                  return (
-                    <tr key={id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3">
-                        <div className="font-bold text-gray-700">{userContext.clientNames[id]}</div>
-                        <div className="text-[10px] text-gray-400 font-mono">{id}</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex justify-center">
-                          <button 
-                            disabled={updatingClient === id}
-                            onClick={() => handleToggleForced(id, cd.forcedMyRequests)}
-                            className={`w-12 h-6 rounded-full transition-all duration-300 flex items-center px-1 ${cd.forcedMyRequests ? 'bg-appBlue' : 'bg-gray-200'} ${updatingClient === id ? 'opacity-50 cursor-not-allowed' : ''}`}
-                          >
-                            <div className={`w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-300 ${cd.forcedMyRequests ? 'translate-x-6' : 'translate-x-0'} flex items-center justify-center`}>
-                              {updatingClient === id && <div className="w-2 h-2 border border-appBlue border-t-transparent rounded-full animate-spin"></div>}
-                            </div>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-6">
-        <h3 className="font-bold text-gray-700 mb-4">Estado de Datos</h3>
-        <div className="space-y-3">
-          {[
-            { label:'Solicitudes (Período Activo)', sub:'Carga filtrada por fecha.', syncing: syncStatus==='requests' },
-            { label:'Tablas Maestras (Ciudades, Líneas CC...)', sub:'Datos de referencia para formularios.', syncing: syncStatus==='master' },
-          ].map((item, i) => (
-            <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
-              <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-full ${item.syncing ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'}`}>
-                  {item.syncing ? <Icon name="RefreshCw" size={17} className="animate-spin"/> : <Icon name="CheckCircle" size={17}/>}
-                </div>
-                <div>
-                  <div className="font-bold text-gray-700 text-sm">{item.label}</div>
-                  <div className="text-xs text-gray-500">{item.sub}</div>
-                </div>
-              </div>
-              <span className="text-xs font-bold text-gray-400">{lastSync ? 'Actualizado' : 'Pendiente'}</span>
-            </div>
-          ))}
-          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
+const ConfigurationView = ({ userContext, onForceSync, syncStatus, lastSync, onRefreshClients }) => (
+  <div className="p-6 md:p-8 max-w-4xl mx-auto animate-fade-in">
+    <div className="flex justify-between items-center mb-6">
+      <h2 className="text-2xl font-bold text-gray-800">Configuración</h2>
+      <button onClick={onForceSync} disabled={syncStatus !== 'idle'}
+        className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition flex items-center gap-2 disabled:opacity-50 shadow-sm btn-action">
+        <Icon name="RefreshCw" size={15} className={syncStatus !== 'idle' ? "animate-spin" : ""}/>
+        {syncStatus !== 'idle' ? 'Sincronizando...' : 'Forzar Sincronización'}
+      </button>
+    </div>
+    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-6">
+      <h3 className="font-bold text-gray-700 mb-4">Estado de Datos</h3>
+      <div className="space-y-3">
+        {[
+          { label:'Solicitudes (Período Activo)', sub:'Carga filtrada por fecha.', syncing: syncStatus==='requests' },
+          { label:'Tablas Maestras (Ciudades, Líneas CC...)', sub:'Datos de referencia para formularios.', syncing: syncStatus==='master' },
+        ].map((item, i) => (
+          <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-full bg-gray-100 text-gray-600"><Icon name="User" size={17}/></div>
+              <div className={`p-2 rounded-full ${item.syncing ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'}`}>
+                {item.syncing ? <Icon name="RefreshCw" size={17} className="animate-spin"/> : <Icon name="CheckCircle" size={17}/>}
+              </div>
               <div>
-                <div className="font-bold text-gray-700 text-sm">Clientes Asignados</div>
-                <div className="text-xs text-gray-500">Actualiza tu lista sin recargar la página.</div>
+                <div className="font-bold text-gray-700 text-sm">{item.label}</div>
+                <div className="text-xs text-gray-500">{item.sub}</div>
               </div>
             </div>
-            <button onClick={onRefreshClients} className="px-3 py-1.5 bg-white border rounded-lg text-xs font-bold text-gray-600 hover:bg-gray-100 transition btn-action">Actualizar</button>
+            <span className="text-xs font-bold text-gray-400">{lastSync ? 'Actualizado' : 'Pendiente'}</span>
           </div>
+        ))}
+        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-full bg-gray-100 text-gray-600"><Icon name="User" size={17}/></div>
+            <div>
+              <div className="font-bold text-gray-700 text-sm">Clientes Asignados</div>
+              <div className="text-xs text-gray-500">Actualiza tu lista sin recargar la página.</div>
+            </div>
+          </div>
+          <button onClick={onRefreshClients} className="px-3 py-1.5 bg-white border rounded-lg text-xs font-bold text-gray-600 hover:bg-gray-100 transition btn-action">Actualizar</button>
         </div>
       </div>
-
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-        <div className="flex items-center gap-4">
-          <div className="h-14 w-14 bg-blue-100 rounded-full flex items-center justify-center text-blue-600"><Icon name="User" size={28}/></div>
-          <div>
-            <div className="text-xs uppercase font-bold text-gray-500">Cuenta Activa</div>
-            <div className="text-lg font-bold text-gray-800">{userContext?.email}</div>
-            <div className="inline-flex items-center gap-1 bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs font-bold mt-1">
-              <Icon name="ShieldCheck" size={11}/> {userContext?.role}
-            </div>
+    </div>
+    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+      <div className="flex items-center gap-4">
+        <div className="h-14 w-14 bg-blue-100 rounded-full flex items-center justify-center text-blue-600"><Icon name="User" size={28}/></div>
+        <div>
+          <div className="text-xs uppercase font-bold text-gray-500">Cuenta Activa</div>
+          <div className="text-lg font-bold text-gray-800">{userContext?.email}</div>
+          <div className="inline-flex items-center gap-1 bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs font-bold mt-1">
+            <Icon name="ShieldCheck" size={11}/> {userContext?.role}
           </div>
         </div>
       </div>
     </div>
-  );
-};
+  </div>
+);
 
 // ─── APP PRINCIPAL ────────────────────────────────────────────────────────
 const App = () => {
   const [userCtx,       setUserCtx]       = useState(null);
   const [initError,     setInitError]     = useState(null);
   const [sidebarOpen,   setSidebarOpen]   = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
   const [view,          setView]          = useState('loading');
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [syncStatus,    setSyncStatus]    = useState('idle');
@@ -1745,11 +1621,11 @@ const App = () => {
   const renderView = () => {
     switch (view) {
       case 'home':    return <HomeDashboard userContext={userCtx} requests={initialData?.data||[]} setView={setView} syncStatus={syncStatus}/>;
-      case 'history': return <RequestList setView={setView} setSelectedRequest={setSelectedRequest} initialData={initialData} onRefresh={() => refreshAll(true)} onChangePeriod={handleChangePeriod} currentPeriod={period} refreshing={syncStatus !== 'idle'} userContext={userCtx} masterData={masterData}/>;
+      case 'history': return <RequestList setView={setView} setSelectedRequest={setSelectedRequest} initialData={initialData} onRefresh={() => refreshAll(true)} onChangePeriod={handleChangePeriod} currentPeriod={period} refreshing={syncStatus !== 'idle'} userContext={userCtx}/>;
       case 'detail':  return selectedRequest ? <RequestDetail requestId={selectedRequest.ID_SolicitudesConfiabilidad || selectedRequest.NSolicitud} preloadedData={selectedRequest} onBack={() => setView('history')}/> : null;
       case 'create':  return <CreateRequest userContext={userCtx} setView={setView} onReload={() => loadRequests()} masterData={masterData}/>;
       case 'bulk':    return <BulkUpload userContext={userCtx} setView={setView} onReload={() => loadRequests()}/>;
-      case 'config':  return <ConfigurationView userContext={userCtx} onForceSync={() => refreshAll(true)} syncStatus={syncStatus} lastSync={lastSync} onRefreshClients={handleRefreshClients} showToast={showToast}/>;
+      case 'config':  return <ConfigurationView userContext={userCtx} onForceSync={() => refreshAll(true)} syncStatus={syncStatus} lastSync={lastSync} onRefreshClients={handleRefreshClients}/>;
       default:        return <RequestList setView={setView} setSelectedRequest={setSelectedRequest} initialData={initialData} onRefresh={() => refreshAll(true)} onChangePeriod={handleChangePeriod} currentPeriod={period} refreshing={syncStatus !== 'idle'} userContext={userCtx}/>;
     }
   };
@@ -1763,9 +1639,9 @@ const App = () => {
         <div className="w-8"></div>
       </div>
 
-      <Sidebar currentView={view} setView={setView} onLogout={handleLogout} userContext={userCtx} syncStatus={syncStatus} lastSync={lastSync} isOpen={sidebarOpen} toggleSidebar={setSidebarOpen} isCollapsed={isSidebarCollapsed} toggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}/>
+      <Sidebar currentView={view} setView={setView} onLogout={handleLogout} userContext={userCtx} syncStatus={syncStatus} lastSync={lastSync} isOpen={sidebarOpen} toggleSidebar={setSidebarOpen}/>
 
-      <div className={`flex-1 ${isSidebarCollapsed ? 'md:ml-20' : 'md:ml-64'} transition-all duration-300 w-full h-full overflow-y-auto pt-14 md:pt-0`}>
+      <div className="flex-1 md:ml-64 w-full h-full overflow-y-auto pt-14 md:pt-0">
         <ErrorBoundary>{renderView()}</ErrorBoundary>
       </div>
 
