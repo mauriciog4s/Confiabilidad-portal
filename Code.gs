@@ -174,12 +174,12 @@ function getRequests(email, { period = 'today', clientId = null } = {}) {
       const forcedIdsStr = forcedClientIds.map(id => `'${id}'`).join(',');
       if (clientId) {
         if (forcedClientIds.includes(clientId)) {
-          securityClause = `UsuarioCreación = @userEmail`;
+          securityClause = `\`UsuarioCreación\` = @userEmail`;
           clientParams.userEmail = email;
         }
       } else {
         // Si no hay clientId, filtramos: (Si el cliente es de los forzados, debe ser mi solicitud; si no, ver todo lo permitido)
-        securityClause = `(ID_Cliente NOT IN (${forcedIdsStr}) OR UsuarioCreación = @userEmail)`;
+        securityClause = `(ID_Cliente NOT IN (${forcedIdsStr}) OR \`UsuarioCreación\` = @userEmail)`;
         clientParams.userEmail = email;
       }
     }
@@ -203,7 +203,7 @@ function getRequests(email, { period = 'today', clientId = null } = {}) {
     Fecha_Programacion_Poligrafia AS ProgramacionPoligrafia, 
     Fecha_Entrega_ECP AS FechaEntregaECP, 
     Fecha_Entrega_EP AS FechaEntregaEP, 
-    ID_Cliente, usuarioActualizacion, UsuarioCreación
+    ID_Cliente, usuarioActualizacion, \`UsuarioCreación\`
   `;
   const sqlView = `SELECT ${sqlColumns} FROM \`${tableView}\` ${buildWhere()} ORDER BY FechaSolicitud DESC LIMIT 500`;
   let rowsView = [];
@@ -356,7 +356,7 @@ function createRequest(email, payload) {
   const insertSql = `
     INSERT INTO \`${tableWrite}\`
     (
-      ID_SolicitudesConfiabilidad, usuarioActualizacion, UsuarioCreación, ID_Cliente, Identificacion, NombreCompleto,
+      ID_SolicitudesConfiabilidad, usuarioActualizacion, \`UsuarioCreación\`, ID_Cliente, Identificacion, NombreCompleto,
       CentroCostos, TipoTrabajador, EstadoActual, FechaSolicitud,
       TipoIdentificacion, FechaExpedicion, Cargo, Correo, Celular,
       Ciudad, Barrio, Direccion,
@@ -560,7 +560,7 @@ function processBulkUpload(email, { csvContent, clientId }) {
       const insertSql = `
         INSERT INTO \`${tableWrite}\`
         (
-          ID_SolicitudesConfiabilidad, usuarioActualizacion, UsuarioCreación, ID_Cliente, Identificacion, NombreCompleto,
+          ID_SolicitudesConfiabilidad, usuarioActualizacion, \`UsuarioCreación\`, ID_Cliente, Identificacion, NombreCompleto,
           CentroCostos, TipoTrabajador, EstadoActual, FechaSolicitud,
           TipoIdentificacion, FechaExpedicion, Cargo, Correo, Celular,
           Ciudad, Barrio, Direccion,
