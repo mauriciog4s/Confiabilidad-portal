@@ -16,6 +16,7 @@ function doGet(e) {
   return HtmlService.createTemplateFromFile('Index')
     .evaluate()
     .setTitle('Confiabilidad')
+    .setFaviconUrl('https://www.g4s.com/favicon.ico')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
@@ -103,29 +104,40 @@ function getUserContext(email) {
 
   if (fetchIds.length > 0) {
     const idsFormatted = fetchIds.map(id => `'${id}'`).join(',');
+    // Intentamos buscar por ID_ClientesConfiabilidad o ID_Cliente
     const sqlDetails = `
-      SELECT ID_ClientesConfiabilidad, RazonSocial, TipodeCliente, NIT, ForcedMyRequests, PlantillaMasivo, ID_Cliente, Nombre
+      SELECT *
       FROM \`${projectId}.${DATASET_ID}.${TABLES.CLIENT_CONF}\`
       WHERE ID_ClientesConfiabilidad IN (${idsFormatted})
+         OR ID_Cliente IN (${idsFormatted})
     `;
     try {
       const details = bq.query(sqlDetails);
       details.forEach(row => {
-        const id = row.ID_ClientesConfiabilidad;
-        const descriptiveName = String(row.RazonSocial || row.Nombre || row.ID_Cliente || id).trim();
+        // El ID puede venir en cualquiera de estas dos columnas
+        const id = row.ID_ClientesConfiabilidad || row.ID_Cliente;
+        if (!id) return;
+
+        // Búsqueda agresiva de un nombre descriptivo
+        const descriptiveName = String(
+          row.RazonSocial || row.Razon_Social || row.Nombre || row.Nombre_Cliente ||
+          row.Cliente || id
+        ).trim();
+
         context.clientNames[id]  = descriptiveName;
-        context.clientTypes[id]  = row.TipodeCliente || 'Externo';
+        context.clientTypes[id]  = row.TipodeCliente || row.TipoCliente || 'Externo';
         context.clientData[id]   = { 
           nit: row.NIT, 
-          razonSocial: row.RazonSocial, 
-          tipo: row.TipodeCliente,
+          razonSocial: row.RazonSocial || descriptiveName,
+          tipo: row.TipodeCliente || row.TipoCliente,
           forcedMyRequests: row.ForcedMyRequests === 'SI' || row.ForcedMyRequests === true
         };
       });
     } catch (e) {
       console.warn("Error cargando detalles de clientes:", e.message);
-      context.allowedClientIds.forEach(id => { if (!context.clientNames[id]) context.clientNames[id] = id; });
     }
+    // Asegurar que todos los IDs tengan al menos un nombre (aunque sea el ID)
+    fetchIds.forEach(id => { if (!context.clientNames[id]) context.clientNames[id] = id; });
   }
   return context;
 }
