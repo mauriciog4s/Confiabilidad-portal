@@ -56,6 +56,7 @@ function getUserContext(email) {
     email: email,
     role: 'Cliente',
     allowedClientIds: [],
+    adminClientIds: [],
     clientNames: {},
     clientTypes: {},
     clientData: {},
@@ -75,34 +76,37 @@ function getUserContext(email) {
   }
 
   context.userClientConfig = {};
+
+  // Siempre obtener clientes asignados
+  let relResult = [];
+  try {
+    const sqlRel = `SELECT ID_ClientesConfiabilidad, ForcedMyRequests FROM \`${projectId}.${DATASET_ID}.${TABLES.REL_CLIENTS}\` WHERE Correo = @email`;
+    relResult = bq.query(sqlRel, { email });
+  } catch (e) {
+    const sqlRelFallback = `SELECT ID_ClientesConfiabilidad FROM \`${projectId}.${DATASET_ID}.${TABLES.REL_CLIENTS}\` WHERE Correo = @email`;
+    relResult = bq.query(sqlRelFallback, { email });
+  }
+  context.allowedClientIds = relResult.map(r => r.ID_ClientesConfiabilidad);
+  relResult.forEach(r => {
+    context.userClientConfig[r.ID_ClientesConfiabilidad] = {
+      forcedMyRequests: r.ForcedMyRequests === 'SI' || r.ForcedMyRequests === true
+    };
+  });
+
   if (context.isAdmin) {
     const sqlAllClients = `SELECT ID_ClientesConfiabilidad FROM \`${projectId}.${DATASET_ID}.${TABLES.CLIENT_CONF}\``;
     const allRes = bq.query(sqlAllClients);
-    context.allowedClientIds = allRes.map(r => r.ID_ClientesConfiabilidad);
-  } else {
-    // Intentar leer ForcedMyRequests a nivel de usuario si la columna existe
-    let relResult = [];
-    try {
-      const sqlRel = `SELECT ID_ClientesConfiabilidad, ForcedMyRequests FROM \`${projectId}.${DATASET_ID}.${TABLES.REL_CLIENTS}\` WHERE Correo = @email`;
-      relResult = bq.query(sqlRel, { email });
-    } catch (e) {
-      const sqlRelFallback = `SELECT ID_ClientesConfiabilidad FROM \`${projectId}.${DATASET_ID}.${TABLES.REL_CLIENTS}\` WHERE Correo = @email`;
-      relResult = bq.query(sqlRelFallback, { email });
-    }
-    context.allowedClientIds = relResult.map(r => r.ID_ClientesConfiabilidad);
-    relResult.forEach(r => {
-      context.userClientConfig[r.ID_ClientesConfiabilidad] = {
-        forcedMyRequests: r.ForcedMyRequests === 'SI' || r.ForcedMyRequests === true
-      };
-    });
+    context.adminClientIds = allRes.map(r => r.ID_ClientesConfiabilidad);
   }
 
-  if (context.allowedClientIds.length > 0) {
-    const idsFormatted = context.allowedClientIds.map(id => `'${id}'`).join(',');
+  const fetchIds = context.isAdmin ? context.adminClientIds : context.allowedClientIds;
+
+  if (fetchIds.length > 0) {
+    const idsFormatted = fetchIds.map(id => `'${id}'`).join(',');
     const sqlDetails = `
       SELECT ID_ClientesConfiabilidad, RazonSocial, TipodeCliente, NIT, ForcedMyRequests
       FROM \`${projectId}.${DATASET_ID}.${TABLES.CLIENT_CONF}\`
-      ${context.isAdmin ? '' : `WHERE ID_ClientesConfiabilidad IN (${idsFormatted})`}
+      WHERE ID_ClientesConfiabilidad IN (${idsFormatted})
     `;
     try {
       const details = bq.query(sqlDetails);
@@ -150,10 +154,10 @@ function getRequests(email, { period = 'today', clientId = null } = {}) {
   let clientClause = '';
 
   if (clientId) {
-    if (!context.isAdmin && !context.allowedClientIds.includes(clientId)) throw new Error("Acceso denegado a este cliente.");
+    if (!context.allowedClientIds.includes(clientId)) throw new Error("Acceso denegado a este cliente.");
     clientClause = `ID_Cliente = @clientId`;
     clientParams.clientId = clientId;
-  } else if (!context.isAdmin) {
+  } else {
     if (context.allowedClientIds.length === 0) return { data: [], total: 0 };
     const paramKeys = context.allowedClientIds.map((_, i) => `id${i}`);
     clientClause = `ID_Cliente IN (${paramKeys.map(k => `@${k}`).join(', ')})`;
