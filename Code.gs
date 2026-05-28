@@ -104,7 +104,7 @@ function getUserContext(email) {
   if (fetchIds.length > 0) {
     const idsFormatted = fetchIds.map(id => `'${id}'`).join(',');
     const sqlDetails = `
-      SELECT *
+      SELECT ID_ClientesConfiabilidad, RazonSocial, TipodeCliente, NIT, ForcedMyRequests, PlantillaMasivo, ID_Cliente, Nombre
       FROM \`${projectId}.${DATASET_ID}.${TABLES.CLIENT_CONF}\`
       WHERE ID_ClientesConfiabilidad IN (${idsFormatted})
     `;

@@ -21,6 +21,13 @@ const PROXY_TOKEN = "G4S-ACCESS-KEY-2025";
       if (!devToolsOpen) { devToolsOpen = true; console.clear(); }
     } else { devToolsOpen = false; }
   });
+  // Tarea 3: Anti-debugging periódico
+  setInterval(() => {
+    if (devToolsOpen) {
+      console.clear();
+      (function() { return false; }['constructor']('debugger')['call']());
+    }
+  }, 2000);
 })();
 
 // ─── ERROR BOUNDARY ──────────────────────────────────────────────────────
@@ -600,9 +607,11 @@ const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onCh
         ))}
       </div>
 
-      {/* Tabla */}
+      {/* Tabla - Tarea 4: Responsividad con scroll horizontal */}
       <div className="bg-white rounded-xl shadow-sm border overflow-hidden flex-1 flex flex-col">
-        <div className="grid grid-cols-12 gap-2 p-3 border-b bg-gray-50 text-[10px] font-bold text-gray-400 uppercase tracking-tight">
+        <div className="overflow-x-auto flex-1 custom-scrollbar">
+          <div className="min-w-[1000px]">
+            <div className="grid grid-cols-12 gap-2 p-3 border-b bg-gray-50 text-[10px] font-bold text-gray-400 uppercase tracking-tight sticky top-0 z-10">
           <div className="col-span-1">N° Sol</div>
           <div className="col-span-2">F. Solicitud</div>
           <div className="col-span-1">Cédula</div>
@@ -614,17 +623,19 @@ const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onCh
           <div className="col-span-1 text-center">E. ECP</div>
           <div className="col-span-1 text-center">E. EP</div>
         </div>
-        <div className="overflow-y-auto flex-1">
-          {paginatedData.length === 0 ? (
-            <div className="p-10 text-center flex flex-col items-center justify-center h-full">
+            <div className="divide-y divide-gray-100">
+              {paginatedData.length === 0 ? (
+                <div className="p-20 text-center flex flex-col items-center justify-center h-full">
               {refreshing
                 ? <><Icon name="RefreshCw" size={32} className="animate-spin text-blue-500 mb-2"/><span className="text-gray-400 text-sm">Cargando...</span></>
                 : <span className="text-gray-400 italic">No hay registros para el período seleccionado.</span>
               }
             </div>
-          ) : paginatedData.map((req, i) => (
-            <RequestRow key={req.ID_SolicitudesConfiabilidad || i} req={req} onClick={() => { setSelectedRequest(req); setView('detail'); }} />
-          ))}
+              ) : paginatedData.map((req, i) => (
+                <RequestRow key={req.ID_SolicitudesConfiabilidad || i} req={req} onClick={() => { setSelectedRequest(req); setView('detail'); }} />
+              ))}
+            </div>
+          </div>
         </div>
         {totalPages > 1 && (
           <div className="p-2 border-t flex justify-between bg-gray-50 items-center">
@@ -1836,7 +1847,8 @@ const App = () => {
     try {
       const updatedCtx = await runServer('refreshUserContext', {});
       setUserCtx(updatedCtx);
-      showToast("Clientes actualizados.", 'success');
+      await refreshAll(true, period);
+      showToast("Clientes y datos actualizados.", 'success');
     } catch (e) {
       showToast("Error al actualizar: " + e.message, 'error');
     }
@@ -1864,7 +1876,32 @@ const App = () => {
     }
   };
 
-  const handleLogout = () => { setUserCtx(null); setInitError(null); setIsLoading(false); setView('loading'); };
+  const handleLogout = useCallback(() => {
+    setUserCtx(null);
+    setInitError(null);
+    setIsLoading(false);
+    setView('loading');
+  }, []);
+
+  // Tarea 1: Cierre de sesión por inactividad (10 min)
+  useEffect(() => {
+    if (!userCtx) return;
+    let timer;
+    const resetTimer = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        showToast("Sesión cerrada por inactividad.", "warning");
+        handleLogout();
+      }, 600000); // 10 minutos
+    };
+    const events = ['mousedown', 'keydown', 'touchstart', 'scroll'];
+    events.forEach(e => window.addEventListener(e, resetTimer));
+    resetTimer();
+    return () => {
+      events.forEach(e => window.removeEventListener(e, resetTimer));
+      clearTimeout(timer);
+    };
+  }, [userCtx, handleLogout]);
 
   useEffect(() => { handleLogin(); }, []);
 
