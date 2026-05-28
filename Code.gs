@@ -37,6 +37,7 @@ function apiHandler(request) {
       case 'processBulkUpload': return processBulkUpload(userEmail, payload);
       case 'registerTempDocument': return registerTempDocument(userEmail, payload);
       case 'updateClientConfig': return updateClientConfig(userEmail, payload);
+      case 'getAdminSchema':    return getAdminSchema(userEmail);
       default: throw new Error(`Endpoint desconocido: ${endpoint}`);
     }
   } catch (err) {
@@ -93,11 +94,13 @@ function getUserContext(email) {
         if (!id) return;
         context.clientNames[id]  = row.RazonSocial || `Cliente ${id}`;
         context.clientTypes[id]  = row.TipodeCliente || 'Externo';
+        // Buscamos la columna ForcedMyRequests con case-insensitivity
+        const forcedKey = Object.keys(row).find(k => k.toLowerCase() === "forcedmyrequests");
         context.clientData[id]   = {
           nit: row.NIT,
           razonSocial: row.RazonSocial,
           tipo: row.TipodeCliente,
-          forcedMyRequests: String(row.ForcedMyRequests || '').toUpperCase() === 'SI'
+          forcedMyRequests: forcedKey ? String(row[forcedKey] || '').toUpperCase() === 'SI' : false
         };
       });
       // Para admins que no tengan clientes asignados específicamente en REL_CLIENTS,
@@ -633,9 +636,29 @@ function updateClientConfig(email, { clientId, forcedMyRequests }) {
 
   const bq = new BigQueryClient();
   const projectId = BQ_CREDENTIALS.project_id;
-  const sql = `UPDATE \`${projectId}.${DATASET_ID}.${TABLES.CLIENT_CONF}\` SET ForcedMyRequests = @val WHERE ID_ClientesConfiabilidad = @id`;
+  // Robust UPDATE: intentamos encontrar el nombre exacto de la columna para evitar el error 'Unrecognized name'
+  let colName = "ForcedMyRequests";
+  try {
+    const schema = bq.query(`SELECT * FROM \`${projectId}.${DATASET_ID}.${TABLES.CLIENT_CONF}\` LIMIT 1`);
+    if (schema.length > 0) {
+      const keys = Object.keys(schema[0]);
+      const found = keys.find(k => k.toLowerCase() === "forcedmyrequests");
+      if (found) colName = found;
+    }
+  } catch(e) {}
+
+  const sql = `UPDATE \`${projectId}.${DATASET_ID}.${TABLES.CLIENT_CONF}\` SET ${colName} = @val WHERE ID_ClientesConfiabilidad = @id`;
   bq.query(sql, { val: forcedMyRequests ? 'SI' : 'NO', id: clientId });
   return { success: true, message: "Configuración actualizada." };
+}
+
+function getAdminSchema(email) {
+  const bq = new BigQueryClient();
+  const projectId = BQ_CREDENTIALS.project_id;
+  const sql = `SELECT * FROM \`${projectId}.${DATASET_ID}.${TABLES.CLIENT_CONF}\` LIMIT 1`;
+  const res = bq.query(sql);
+  if (res.length === 0) return { columns: [] };
+  return { columns: Object.keys(res[0]) };
 }
 
 // ─── UTILIDADES ──────────────────────────────────────────────────────────

@@ -1505,6 +1505,7 @@ const BulkUpload = ({ userContext, setView, onReload }) => {
 // ─── CONFIGURACIÓN ────────────────────────────────────────────────────────
 const ConfigurationView = ({ userContext, onForceSync, syncStatus, lastSync, onRefreshClients, showToast }) => {
   const [updatingClient, setUpdatingClient] = useState(null);
+  const [clientSearch, setClientSearch] = useState("");
 
   const handleToggleForced = async (clientId, currentVal) => {
     setUpdatingClient(clientId);
@@ -1543,16 +1544,34 @@ const ConfigurationView = ({ userContext, onForceSync, syncStatus, lastSync, onR
             </div>
           </div>
 
-          <div className="overflow-hidden border border-gray-100 rounded-xl">
+          <div className="mb-4 relative">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><Icon name="Search" size={14}/></div>
+            <input
+              type="text"
+              placeholder="Buscar cliente por nombre o ID..."
+              className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-xs focus:ring-1 focus:ring-appBlue outline-none"
+              value={clientSearch}
+              onChange={(e) => setClientSearch(e.target.value)}
+            />
+          </div>
+
+          <div className="overflow-hidden border border-gray-100 rounded-xl max-h-[400px] overflow-y-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-gray-50 text-gray-400 font-bold uppercase tracking-wider border-b border-gray-100">
+              <thead className="bg-gray-50 text-gray-400 font-bold uppercase tracking-wider border-b border-gray-100 sticky top-0 z-10">
                 <tr>
                   <th className="px-4 py-3">ID / Cliente</th>
                   <th className="px-4 py-3 text-center">Mis Solicitudes (Forzado)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {(Object.keys(userContext?.clientData || {})).sort().map(id => {
+                {(Object.keys(userContext?.clientData || {}))
+                  .filter(id => {
+                    const name = userContext.clientNames[id] || "";
+                    const search = clientSearch.toLowerCase();
+                    return id.toLowerCase().includes(search) || name.toLowerCase().includes(search);
+                  })
+                  .sort((a, b) => (userContext.clientNames[a] || "").localeCompare(userContext.clientNames[b] || ""))
+                  .map(id => {
                   const cd = userContext?.clientData?.[id];
                   if (!cd) return null;
                   return (
