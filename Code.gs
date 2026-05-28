@@ -112,7 +112,8 @@ function getUserContext(email) {
       const details = bq.query(sqlDetails);
       details.forEach(row => {
         const id = row.ID_ClientesConfiabilidad;
-        context.clientNames[id]  = row.RazonSocial || row.Nombre || row.ID_Cliente || id;
+        const descriptiveName = String(row.RazonSocial || row.Nombre || row.ID_Cliente || id).trim();
+        context.clientNames[id]  = descriptiveName;
         context.clientTypes[id]  = row.TipodeCliente || 'Externo';
         context.clientData[id]   = { 
           nit: row.NIT, 
