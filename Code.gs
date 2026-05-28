@@ -104,7 +104,7 @@ function getUserContext(email) {
   if (fetchIds.length > 0) {
     const idsFormatted = fetchIds.map(id => `'${id}'`).join(',');
     const sqlDetails = `
-      SELECT ID_ClientesConfiabilidad, RazonSocial, TipodeCliente, NIT, ForcedMyRequests
+      SELECT *
       FROM \`${projectId}.${DATASET_ID}.${TABLES.CLIENT_CONF}\`
       WHERE ID_ClientesConfiabilidad IN (${idsFormatted})
     `;
@@ -112,7 +112,7 @@ function getUserContext(email) {
       const details = bq.query(sqlDetails);
       details.forEach(row => {
         const id = row.ID_ClientesConfiabilidad;
-        context.clientNames[id]  = row.RazonSocial || `Cliente ${id}`;
+        context.clientNames[id]  = row.RazonSocial || row.Nombre || row.ID_Cliente || id;
         context.clientTypes[id]  = row.TipodeCliente || 'Externo';
         context.clientData[id]   = { 
           nit: row.NIT, 
@@ -123,7 +123,7 @@ function getUserContext(email) {
       });
     } catch (e) {
       console.warn("Error cargando detalles de clientes:", e.message);
-      context.allowedClientIds.forEach(id => { if (!context.clientNames[id]) context.clientNames[id] = `Cliente ${id}`; });
+      context.allowedClientIds.forEach(id => { if (!context.clientNames[id]) context.clientNames[id] = id; });
     }
   }
   return context;
