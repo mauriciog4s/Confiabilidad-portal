@@ -186,12 +186,11 @@ function getRequests(email, { period = 'today', clientId = null } = {}) {
   };
 
   // 1. Vista principal (Optimization & Mapping fix)
-  // Usamos SELECT * para asegurar que no falte ninguna columna (como 'Estado'),
-  // pero añadimos los alias requeridos por el frontend para las fechas y estados.
+  // Usamos SELECT * para asegurar que todas las columnas originales (incluyendo 'Estado') estén disponibles.
+  // Añadimos los alias necesarios para el mapeo del frontend.
   const sqlColumns = `
     *,
     EstadoActual AS EstadoSol,
-    EstadoActual AS Estado,
     Fecha_Programacion_Visita AS ProgramacionVisita,
     Fecha_Programacion_Poligrafia AS ProgramacionPoligrafia,
     Fecha_Entrega_ECP AS FechaEntregaECP,
@@ -257,7 +256,7 @@ function getMasterData(email) {
     LineaCC:               `SELECT Linea, LN_Nombre, CC_Nombre FROM \`${projectId}.${ds}.conLineaCC\``,
     conClientesSecundarios:`SELECT ClientePrincipal, ClienteSecundarioNombre FROM \`${projectId}.${ds}.conClientesSecundarios\``,
     conEstados:            `
-      SELECT DISTINCT EstadoActual AS EstadoSol FROM \`${projectId}.${ds}.${TABLES.READ_VIEW}\` WHERE EstadoActual IS NOT NULL
+      SELECT DISTINCT Estado AS EstadoSol FROM \`${projectId}.${ds}.${TABLES.READ_VIEW}\` WHERE Estado IS NOT NULL
       UNION DISTINCT
       SELECT DISTINCT EstadoSol FROM \`${projectId}.${ds}.conHistoricoEstSolicitud\` WHERE EstadoSol != 'Depurada' AND EstadoSol IS NOT NULL
       ORDER BY EstadoSol ASC

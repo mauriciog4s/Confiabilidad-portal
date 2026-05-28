@@ -164,7 +164,7 @@ const RequestRow = React.memo(({ req, onClick }) => (
       <span className="truncate font-medium text-gray-700">{req.NombreCompleto}</span>
       {req.Cargo && <span className="text-[9px] text-gray-400 uppercase truncate">{req.Cargo}</span>}
     </div>
-    <div className="col-span-1 text-center"><span className={`inline-flex items-center justify-center w-20 h-[22px] rounded text-[9px] font-bold uppercase ${getStatusBadgeColor(req.EstadoActual)}`}>{req.EstadoActual}</span></div>
+    <div className="col-span-1 text-center"><span className={`inline-flex items-center justify-center w-20 h-[22px] rounded text-[9px] font-bold uppercase ${getStatusBadgeColor(req.Estado || req.EstadoActual)}`}>{req.Estado || req.EstadoActual}</span></div>
     <div className="col-span-1 text-center">{req.EstadoActualEP ? <span className="inline-flex items-center justify-center w-20 h-[22px] rounded text-[9px] font-bold uppercase bg-purple-100 text-purple-700 border border-purple-200 truncate">{req.EstadoActualEP}</span> : <span className="text-gray-300">-</span>}</div>
     <div className="col-span-1 text-center text-gray-500">{formatDateCO(req.ProgramacionVisita, false) || '-'}</div>
     <div className="col-span-1 text-center text-gray-500">{formatDateCO(req.ProgramacionPoligrafia, false) || '-'}</div>
@@ -424,14 +424,14 @@ const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onCh
 
   const statusTabs = useMemo(() => {
     const counts = { 'Todo': requests.length };
-    // Mapeo robusto de conteos para todos los posibles nombres de campo
+    // Mapeo robusto de conteos privilegiando 'Estado' como pidió el usuario
     requests.forEach(r => {
-      const s = (r.EstadoActual || r.Estado || r.EstadoSol || 'Sin Estado').toString().trim().toUpperCase();
+      const s = (r.Estado || r.EstadoActual || r.EstadoSol || 'Sin Estado').toString().trim().toUpperCase();
       counts[s] = (counts[s] || 0) + 1;
     });
 
-    // Obtener estados maestros normalizados
-    const masterStatuses = masterData?.conEstados?.map(i => i.EstadoSol.trim().toUpperCase()) || [];
+    // Obtener estados maestros normalizados (ya vienen de 'Estado' en Code.gs)
+    const masterStatuses = masterData?.conEstados?.map(i => (i.EstadoSol || '').trim().toUpperCase()).filter(Boolean) || [];
     const uniqueMaster = [...new Set(masterStatuses)].sort();
 
     const displayStatuses = ['Todo', ...uniqueMaster];
@@ -448,7 +448,7 @@ const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onCh
     let result = requests;
     if (filter !== 'Todo') {
       result = result.filter(r => {
-        const s = (r.EstadoActual || r.Estado || r.EstadoSol || 'Sin Estado').toString().trim().toUpperCase();
+        const s = (r.Estado || r.EstadoActual || r.EstadoSol || 'Sin Estado').toString().trim().toUpperCase();
         return s === filter.trim().toUpperCase();
       });
     }
