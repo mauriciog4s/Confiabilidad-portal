@@ -167,13 +167,13 @@ function getRequests(email, { period = 'today', clientId = null } = {}) {
       const forcedIdsStr = forcedClientIds.map(id => `'${id}'`).join(',');
       if (clientId) {
         if (forcedClientIds.includes(clientId)) {
-          securityClause = `usuarioActualizacion = @userEmail`;
-          clientParams.userEmail = email;
+          securityClause = `LOWER(TRIM(usuarioActualizacion)) = @userEmail`;
+          clientParams.userEmail = email.toLowerCase().trim();
         }
       } else {
         // Si no hay clientId, filtramos: (Si el cliente es de los forzados, debe ser mi solicitud; si no, ver todo lo permitido)
-        securityClause = `(ID_Cliente NOT IN (${forcedIdsStr}) OR usuarioActualizacion = @userEmail)`;
-        clientParams.userEmail = email;
+        securityClause = `(ID_Cliente NOT IN (${forcedIdsStr}) OR LOWER(TRIM(usuarioActualizacion)) = @userEmail)`;
+        clientParams.userEmail = email.toLowerCase().trim();
       }
     }
   }
@@ -655,10 +655,19 @@ function updateClientConfig(email, { clientId, forcedMyRequests }) {
 function getAdminSchema(email) {
   const bq = new BigQueryClient();
   const projectId = BQ_CREDENTIALS.project_id;
-  const sql = `SELECT * FROM \`${projectId}.${DATASET_ID}.${TABLES.CLIENT_CONF}\` LIMIT 1`;
-  const res = bq.query(sql);
-  if (res.length === 0) return { columns: [] };
-  return { columns: Object.keys(res[0]) };
+  const ds = DATASET_ID;
+
+  const tables = [TABLES.CLIENT_CONF, TABLES.READ_VIEW, TABLES.WRITE_TABLE];
+  const result = {};
+
+  tables.forEach(t => {
+    try {
+      const res = bq.query(`SELECT * FROM \`${projectId}.${ds}.${t}\` LIMIT 1`);
+      result[t] = res.length > 0 ? Object.keys(res[0]) : [];
+    } catch(e) { result[t] = "Error: " + e.message; }
+  });
+
+  return result;
 }
 
 // ─── UTILIDADES ──────────────────────────────────────────────────────────

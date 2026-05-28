@@ -452,7 +452,13 @@ const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onCh
         return s === filter.trim().toUpperCase();
       });
     }
-    if (onlyMine && userContext?.email) result = result.filter(r => r.usuarioActualizacion === userContext.email);
+    if (onlyMine && userContext?.email) {
+      const myEmail = userContext.email.toLowerCase().trim();
+      result = result.filter(r => {
+        const creator = (r.usuarioActualizacion || r.UsuarioActualizacion || r.usuario_actualizacion || r.email || r.Email || "").toLowerCase().trim();
+        return creator === myEmail;
+      });
+    }
     if (search) {
       const q = search.toLowerCase();
       result = result.filter(r => (String(r.NSolicitud || r.ID_SolicitudesConfiabilidad) + r.Identificacion + r.NombreCompleto).toLowerCase().includes(q));
