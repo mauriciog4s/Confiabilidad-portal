@@ -188,7 +188,7 @@ const Toast = ({ message, type = 'info', onClose }) => {
 };
 
 const getStatusBadgeColor = (status) => {
-  if (!status) return 'bg-gray-100 text-gray-600 border border-gray-200';
+  if (!status || status === 'None') return 'bg-gray-100 text-gray-600 border border-gray-200';
   const s = status.toString().toLowerCase();
   if (s.includes('confiable'))    return 'bg-green-100 text-green-700 border border-green-200';
   if (s.includes('proceso') || s.includes('en proceso')) return 'bg-blue-100 text-blue-700 border border-blue-200';
@@ -423,18 +423,27 @@ const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onCh
   const requests = useMemo(() => (initialData && Array.isArray(initialData.data)) ? initialData.data : [], [initialData]);
 
   const statusTabs = useMemo(() => {
+    const displayStatuses = ['Todo', 'Cancelado', 'Confiable', 'Confiable preliminar', 'En proceso', 'Ingresada', 'No confiable', 'None'];
     const counts = { 'Todo': requests.length };
-    requests.forEach(r => { const s = r.EstadoActual || 'Sin Estado'; counts[s] = (counts[s] || 0) + 1; });
     
-    const masterStatuses = masterData?.conEstados?.map(i => i.EstadoSol) || [];
-    const displayStatuses = ['Todo', ...masterStatuses];
-    
+    requests.forEach(r => {
+      let s = r.EstadoActual;
+      if (!s || s.trim() === '') s = 'None';
+      counts[s] = (counts[s] || 0) + 1;
+    });
+
     return displayStatuses.map(s => ({ name: s, count: counts[s] || 0 }));
-  }, [requests, masterData]);
+  }, [requests]);
 
   const filteredRequests = useMemo(() => {
     let result = requests;
-    if (filter !== 'Todo')  result = result.filter(r => (r.EstadoActual || 'Sin Estado') === filter);
+    if (filter !== 'Todo') {
+      if (filter === 'None') {
+        result = result.filter(r => !r.EstadoActual || r.EstadoActual.trim() === '' || r.EstadoActual === 'None');
+      } else {
+        result = result.filter(r => r.EstadoActual === filter);
+      }
+    }
     if (onlyMine && userContext?.email) result = result.filter(r => r.usuarioActualizacion === userContext.email);
     if (search) {
       const q = search.toLowerCase();
