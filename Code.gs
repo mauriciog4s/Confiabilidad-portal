@@ -37,6 +37,8 @@ function apiHandler(request) {
       case 'processBulkUpload': return processBulkUpload(userEmail, payload);
       case 'registerTempDocument': return registerTempDocument(userEmail, payload);
       case 'updateClientConfig': return updateClientConfig(userEmail, payload);
+      case 'getClientUsers':    return getClientUsers(userEmail, payload);
+      case 'updateUserConfig':  return updateUserConfig(userEmail, payload);
       default: throw new Error(`Endpoint desconocido: ${endpoint}`);
     }
   } catch (err) {
@@ -67,21 +69,40 @@ function getUserContext(email) {
   if (userResult.length === 0) return context;
 
   context.isValidUser = true;
-  if (String(userResult[0].Rol_Asignado).trim().toLowerCase() === 'administrador') {
-    context.role = 'Administrador';
+  context.role = String(userResult[0].Rol_Asignado).trim();
+  if (context.role.toLowerCase() === 'administrador') {
     context.isAdmin = true;
   }
 
-  const sqlRel = `SELECT ID_ClientesConfiabilidad FROM \`${projectId}.${DATASET_ID}.${TABLES.REL_CLIENTS}\` WHERE Correo = @email`;
-  const relResult = bq.query(sqlRel, { email });
-  context.allowedClientIds = relResult.map(r => r.ID_ClientesConfiabilidad);
+  context.userClientConfig = {};
+  if (context.isAdmin) {
+    const sqlAllClients = `SELECT ID_ClientesConfiabilidad FROM \`${projectId}.${DATASET_ID}.${TABLES.CLIENT_CONF}\``;
+    const allRes = bq.query(sqlAllClients);
+    context.allowedClientIds = allRes.map(r => r.ID_ClientesConfiabilidad);
+  } else {
+    // Intentar leer ForcedMyRequests a nivel de usuario si la columna existe
+    let relResult = [];
+    try {
+      const sqlRel = `SELECT ID_ClientesConfiabilidad, ForcedMyRequests FROM \`${projectId}.${DATASET_ID}.${TABLES.REL_CLIENTS}\` WHERE Correo = @email`;
+      relResult = bq.query(sqlRel, { email });
+    } catch (e) {
+      const sqlRelFallback = `SELECT ID_ClientesConfiabilidad FROM \`${projectId}.${DATASET_ID}.${TABLES.REL_CLIENTS}\` WHERE Correo = @email`;
+      relResult = bq.query(sqlRelFallback, { email });
+    }
+    context.allowedClientIds = relResult.map(r => r.ID_ClientesConfiabilidad);
+    relResult.forEach(r => {
+      context.userClientConfig[r.ID_ClientesConfiabilidad] = {
+        forcedMyRequests: r.ForcedMyRequests === 'SI' || r.ForcedMyRequests === true
+      };
+    });
+  }
 
   if (context.allowedClientIds.length > 0) {
     const idsFormatted = context.allowedClientIds.map(id => `'${id}'`).join(',');
     const sqlDetails = `
       SELECT ID_ClientesConfiabilidad, RazonSocial, TipodeCliente, NIT, ForcedMyRequests
       FROM \`${projectId}.${DATASET_ID}.${TABLES.CLIENT_CONF}\`
-      WHERE ID_ClientesConfiabilidad IN (${idsFormatted})
+      ${context.isAdmin ? '' : `WHERE ID_ClientesConfiabilidad IN (${idsFormatted})`}
     `;
     try {
       const details = bq.query(sqlDetails);
@@ -142,17 +163,19 @@ function getRequests(email, { period = 'today', clientId = null } = {}) {
   // Tarea 8: Forzar "Mis Solicitudes" (Seguridad robusta)
   let securityClause = '';
   if (!context.isAdmin) {
-    const forcedClientIds = context.allowedClientIds.filter(id => context.clientData[id]?.forcedMyRequests);
+    const forcedClientIds = context.allowedClientIds.filter(id =>
+      context.clientData[id]?.forcedMyRequests || context.userClientConfig[id]?.forcedMyRequests
+    );
     if (forcedClientIds.length > 0) {
       const forcedIdsStr = forcedClientIds.map(id => `'${id}'`).join(',');
       if (clientId) {
         if (forcedClientIds.includes(clientId)) {
-          securityClause = `usuarioActualizacion = @userEmail`;
+          securityClause = `UsuarioCreación = @userEmail`;
           clientParams.userEmail = email;
         }
       } else {
         // Si no hay clientId, filtramos: (Si el cliente es de los forzados, debe ser mi solicitud; si no, ver todo lo permitido)
-        securityClause = `(ID_Cliente NOT IN (${forcedIdsStr}) OR usuarioActualizacion = @userEmail)`;
+        securityClause = `(ID_Cliente NOT IN (${forcedIdsStr}) OR UsuarioCreación = @userEmail)`;
         clientParams.userEmail = email;
       }
     }
@@ -176,7 +199,7 @@ function getRequests(email, { period = 'today', clientId = null } = {}) {
     Fecha_Programacion_Poligrafia AS ProgramacionPoligrafia, 
     Fecha_Entrega_ECP AS FechaEntregaECP, 
     Fecha_Entrega_EP AS FechaEntregaEP, 
-    ID_Cliente, usuarioActualizacion
+    ID_Cliente, usuarioActualizacion, UsuarioCreación
   `;
   const sqlView = `SELECT ${sqlColumns} FROM \`${tableView}\` ${buildWhere()} ORDER BY FechaSolicitud DESC LIMIT 500`;
   let rowsView = [];
@@ -329,7 +352,7 @@ function createRequest(email, payload) {
   const insertSql = `
     INSERT INTO \`${tableWrite}\`
     (
-      ID_SolicitudesConfiabilidad, usuarioActualizacion, ID_Cliente, Identificacion, NombreCompleto,
+      ID_SolicitudesConfiabilidad, usuarioActualizacion, UsuarioCreación, ID_Cliente, Identificacion, NombreCompleto,
       CentroCostos, TipoTrabajador, EstadoActual, FechaSolicitud,
       TipoIdentificacion, FechaExpedicion, Cargo, Correo, Celular,
       Ciudad, Barrio, Direccion,
@@ -341,7 +364,7 @@ function createRequest(email, payload) {
       ClienteClientesSecundarios, NITClienteSecundario, ConvenioClienteSecundario, TipoCostoClienteSecundario, CentroCostosExterno
     )
     VALUES (
-      @id, @usuarioActualizacion, @cliente, @identificacion, @nombre,
+      @id, @usuarioActualizacion, @usuarioCreacion, @cliente, @identificacion, @nombre,
       @cc, @tipo, @estado, CAST(CURRENT_TIMESTAMP() AS STRING),
       @tipoId, @fechaExp, @cargo, @correo, @celular,
       @ciudad, @barrio, @direccion,
@@ -355,7 +378,7 @@ function createRequest(email, payload) {
   `;
 
   bq.query(insertSql, {
-    id: newId, usuarioActualizacion: emailFinal, cliente: payload.clientId,
+    id: newId, usuarioActualizacion: emailFinal, usuarioCreacion: emailFinal, cliente: payload.clientId,
     identificacion: payload.identificacion, nombre: payload.nombre,
     cc: payload.centroCostos || 'N/A', tipo: payload.tipoTrabajador, estado: "Creada",
     tipoId: payload.tipoIdentificacion || '', fechaExp: payload.fechaExpedicion || '',
@@ -533,7 +556,7 @@ function processBulkUpload(email, { csvContent, clientId }) {
       const insertSql = `
         INSERT INTO \`${tableWrite}\`
         (
-          ID_SolicitudesConfiabilidad, usuarioActualizacion, ID_Cliente, Identificacion, NombreCompleto,
+          ID_SolicitudesConfiabilidad, usuarioActualizacion, UsuarioCreación, ID_Cliente, Identificacion, NombreCompleto,
           CentroCostos, TipoTrabajador, EstadoActual, FechaSolicitud,
           TipoIdentificacion, FechaExpedicion, Cargo, Correo, Celular,
           Ciudad, Barrio, Direccion,
@@ -544,7 +567,7 @@ function processBulkUpload(email, { csvContent, clientId }) {
           Linea, LineaNegocio, ClienteProyectoInterno, CentroCostosExterno
         )
         VALUES (
-          @id, @usuarioActualizacion, @cliente, @ident, @nombre,
+          @id, @usuarioActualizacion, @usuarioCreacion, @cliente, @ident, @nombre,
           @cc, @tipo, @estado, CAST(CURRENT_TIMESTAMP() AS STRING),
           @tipoId, @fechaExp, @cargo, @correo, @celular,
           @ciudad, @barrio, @dir,
@@ -556,7 +579,7 @@ function processBulkUpload(email, { csvContent, clientId }) {
         )
       `;
       bq.query(insertSql, {
-        id: generateUniqueId(), usuarioActualizacion: email, cliente: clientId,
+        id: generateUniqueId(), usuarioActualizacion: email, usuarioCreacion: email, cliente: clientId,
         ident: rowData.Identificacion || '', nombre: rowData.NombreCompleto || '',
         cc: rowData.CentroCostos || '', tipo: rowData.TipoTrabajador || 'Nuevo', estado: "Creada",
         tipoId: rowData.TipoIdentificacion || '', fechaExp: rowData.FechaExpedicion || '',
@@ -613,6 +636,52 @@ function updateClientConfig(email, { clientId, forcedMyRequests }) {
   const sql = `UPDATE \`${projectId}.${DATASET_ID}.${TABLES.CLIENT_CONF}\` SET ForcedMyRequests = @val WHERE ID_ClientesConfiabilidad = @id`;
   bq.query(sql, { val: forcedMyRequests ? 'SI' : 'NO', id: clientId });
   return { success: true, message: "Configuración actualizada." };
+}
+
+function getClientUsers(email, { clientId }) {
+  const context = getUserContext(email);
+  if (!context.isAdmin) throw new Error("Acceso Denegado");
+  const bq = new BigQueryClient();
+  const projectId = BQ_CREDENTIALS.project_id;
+
+  // Join para obtener usuarios y sus roles, filtrados por cliente
+  // Se intenta leer ForcedMyRequests de la tabla de relación (conUsuariosCliente)
+  const sql = `
+    SELECT u.Email, u.Rol_Asignado, rc.ForcedMyRequests as userForced
+    FROM \`${projectId}.${DATASET_ID}.${TABLES.REL_CLIENTS}\` rc
+    JOIN \`${projectId}.${DATASET_ID}.${TABLES.USERS}\` u ON rc.Correo = u.Email
+    WHERE rc.ID_ClientesConfiabilidad = @clientId
+  `;
+  try {
+    return bq.query(sql, { clientId });
+  } catch (e) {
+    const sqlFallback = `
+      SELECT u.Email, u.Rol_Asignado, 'NO' as userForced
+      FROM \`${projectId}.${DATASET_ID}.${TABLES.REL_CLIENTS}\` rc
+      JOIN \`${projectId}.${DATASET_ID}.${TABLES.USERS}\` u ON rc.Correo = u.Email
+      WHERE rc.ID_ClientesConfiabilidad = @clientId
+    `;
+    return bq.query(sqlFallback, { clientId });
+  }
+}
+
+function updateUserConfig(email, { targetEmail, clientId, role, userForced }) {
+  const context = getUserContext(email);
+  if (!context.isAdmin) throw new Error("Acceso Denegado");
+  const bq = new BigQueryClient();
+  const projectId = BQ_CREDENTIALS.project_id;
+
+  if (role) {
+    bq.query(`UPDATE \`${projectId}.${DATASET_ID}.${TABLES.USERS}\` SET Rol_Asignado = @role WHERE Email = @targetEmail`, { role, targetEmail });
+  }
+
+  try {
+    bq.query(`UPDATE \`${projectId}.${DATASET_ID}.${TABLES.REL_CLIENTS}\` SET ForcedMyRequests = @val WHERE Correo = @targetEmail AND ID_ClientesConfiabilidad = @clientId`, { val: userForced ? 'SI' : 'NO', targetEmail, clientId });
+  } catch (e) {
+    console.warn("No se pudo actualizar ForcedMyRequests a nivel de usuario:", e.message);
+  }
+
+  return { success: true };
 }
 
 // ─── UTILIDADES ──────────────────────────────────────────────────────────
