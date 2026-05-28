@@ -424,20 +424,32 @@ const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onCh
 
   const statusTabs = useMemo(() => {
     const counts = { 'Todo': requests.length };
-    requests.forEach(r => { const s = r.EstadoActual || 'Sin Estado'; counts[s] = (counts[s] || 0) + 1; });
+    // Mapeo robusto de conteos para todos los posibles nombres de campo
+    requests.forEach(r => {
+      const s = (r.EstadoActual || r.Estado || r.EstadoSol || 'Sin Estado').toString().trim().toUpperCase();
+      counts[s] = (counts[s] || 0) + 1;
+    });
 
-    const masterStatuses = masterData?.conEstados?.map(i => i.EstadoSol) || [];
-    const displayStatuses = ['Todo', ...masterStatuses];
+    // Obtener estados maestros normalizados
+    const masterStatuses = masterData?.conEstados?.map(i => i.EstadoSol.trim().toUpperCase()) || [];
+    const uniqueMaster = [...new Set(masterStatuses)].sort();
 
-    return displayStatuses.map(s => ({ name: s, count: counts[s] || 0 }));
+    const displayStatuses = ['Todo', ...uniqueMaster];
+
+    return displayStatuses.map(s => {
+      // Para 'Todo', mostrar el conteo total
+      if (s === 'Todo') return { name: 'Todo', count: counts['Todo'] };
+      // Para los demás, buscar el conteo normalizado
+      return { name: s, count: counts[s] || 0 };
+    });
   }, [requests, masterData]);
 
   const filteredRequests = useMemo(() => {
     let result = requests;
     if (filter !== 'Todo') {
       result = result.filter(r => {
-        const s = (r.EstadoActual || r.Estado || r.EstadoSol || 'Sin Estado').toString().trim().toLowerCase();
-        return s === filter.toLowerCase().trim();
+        const s = (r.EstadoActual || r.Estado || r.EstadoSol || 'Sin Estado').toString().trim().toUpperCase();
+        return s === filter.trim().toUpperCase();
       });
     }
     if (onlyMine && userContext?.email) result = result.filter(r => r.usuarioActualizacion === userContext.email);
@@ -1541,7 +1553,7 @@ const ConfigurationView = ({ userContext, onForceSync, syncStatus, lastSync, onR
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {(Object.keys(userContext?.clientData || {})).sort().map(id => {
-                  const cd = userContext.clientData[id];
+                  const cd = userContext?.clientData?.[id];
                   if (!cd) return null;
                   return (
                     <tr key={id} className="hover:bg-gray-50 transition-colors">

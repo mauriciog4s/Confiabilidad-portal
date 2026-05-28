@@ -79,14 +79,10 @@ function getUserContext(email) {
   // Si es admin, cargar TODOS los clientes para la vista de configuración
   let sqlDetails = "";
   if (context.isAdmin) {
-    sqlDetails = `SELECT ID_ClientesConfiabilidad, RazonSocial, TipodeCliente, NIT, ForcedMyRequests FROM \`${projectId}.${DATASET_ID}.${TABLES.CLIENT_CONF}\``;
+    sqlDetails = `SELECT * FROM \`${projectId}.${DATASET_ID}.${TABLES.CLIENT_CONF}\``;
   } else if (context.allowedClientIds.length > 0) {
     const idsFormatted = context.allowedClientIds.map(id => `'${id}'`).join(',');
-    sqlDetails = `
-      SELECT ID_ClientesConfiabilidad, RazonSocial, TipodeCliente, NIT, ForcedMyRequests
-      FROM \`${projectId}.${DATASET_ID}.${TABLES.CLIENT_CONF}\`
-      WHERE ID_ClientesConfiabilidad IN (${idsFormatted})
-    `;
+    sqlDetails = `SELECT * FROM \`${projectId}.${DATASET_ID}.${TABLES.CLIENT_CONF}\` WHERE ID_ClientesConfiabilidad IN (${idsFormatted})`;
   }
 
   if (sqlDetails) {
@@ -94,13 +90,14 @@ function getUserContext(email) {
       const details = bq.query(sqlDetails);
       details.forEach(row => {
         const id = row.ID_ClientesConfiabilidad;
+        if (!id) return;
         context.clientNames[id]  = row.RazonSocial || `Cliente ${id}`;
         context.clientTypes[id]  = row.TipodeCliente || 'Externo';
         context.clientData[id]   = {
           nit: row.NIT,
           razonSocial: row.RazonSocial,
           tipo: row.TipodeCliente,
-          forcedMyRequests: row.ForcedMyRequests === 'SI' || row.ForcedMyRequests === true
+          forcedMyRequests: String(row.ForcedMyRequests || '').toUpperCase() === 'SI'
         };
       });
       // Para admins que no tengan clientes asignados específicamente en REL_CLIENTS,
@@ -259,7 +256,12 @@ function getMasterData(email) {
     ClienteProyecto:       `SELECT Descripcion FROM \`${projectId}.${ds}.conClienteProyecto\` ORDER BY Descripcion ASC`,
     LineaCC:               `SELECT Linea, LN_Nombre, CC_Nombre FROM \`${projectId}.${ds}.conLineaCC\``,
     conClientesSecundarios:`SELECT ClientePrincipal, ClienteSecundarioNombre FROM \`${projectId}.${ds}.conClientesSecundarios\``,
-    conEstados:            `SELECT DISTINCT EstadoSol FROM \`${projectId}.${ds}.conHistoricoEstSolicitud\` WHERE EstadoSol != 'Depurada' AND EstadoSol IS NOT NULL ORDER BY EstadoSol ASC`
+    conEstados:            `
+      SELECT DISTINCT EstadoActual AS EstadoSol FROM \`${projectId}.${ds}.${TABLES.READ_VIEW}\` WHERE EstadoActual IS NOT NULL
+      UNION DISTINCT
+      SELECT DISTINCT EstadoSol FROM \`${projectId}.${ds}.conHistoricoEstSolicitud\` WHERE EstadoSol != 'Depurada' AND EstadoSol IS NOT NULL
+      ORDER BY EstadoSol ASC
+    `
   };
 
   Object.entries(queries).forEach(([key, sql]) => {
