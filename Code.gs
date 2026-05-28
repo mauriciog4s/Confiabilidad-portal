@@ -56,6 +56,7 @@ function getUserContext(email) {
     email: email,
     role: 'Cliente',
     allowedClientIds: [],
+    adminClientIds: [],
     clientNames: {},
     clientTypes: {},
     clientData: {},
@@ -75,34 +76,37 @@ function getUserContext(email) {
   }
 
   context.userClientConfig = {};
+
+  // Siempre obtener clientes asignados
+  let relResult = [];
+  try {
+    const sqlRel = `SELECT ID_ClientesConfiabilidad, ForcedMyRequests FROM \`${projectId}.${DATASET_ID}.${TABLES.REL_CLIENTS}\` WHERE Correo = @email`;
+    relResult = bq.query(sqlRel, { email });
+  } catch (e) {
+    const sqlRelFallback = `SELECT ID_ClientesConfiabilidad FROM \`${projectId}.${DATASET_ID}.${TABLES.REL_CLIENTS}\` WHERE Correo = @email`;
+    relResult = bq.query(sqlRelFallback, { email });
+  }
+  context.allowedClientIds = relResult.map(r => r.ID_ClientesConfiabilidad);
+  relResult.forEach(r => {
+    context.userClientConfig[r.ID_ClientesConfiabilidad] = {
+      forcedMyRequests: r.ForcedMyRequests === 'SI' || r.ForcedMyRequests === true
+    };
+  });
+
   if (context.isAdmin) {
     const sqlAllClients = `SELECT ID_ClientesConfiabilidad FROM \`${projectId}.${DATASET_ID}.${TABLES.CLIENT_CONF}\``;
     const allRes = bq.query(sqlAllClients);
-    context.allowedClientIds = allRes.map(r => r.ID_ClientesConfiabilidad);
-  } else {
-    // Intentar leer ForcedMyRequests a nivel de usuario si la columna existe
-    let relResult = [];
-    try {
-      const sqlRel = `SELECT ID_ClientesConfiabilidad, ForcedMyRequests FROM \`${projectId}.${DATASET_ID}.${TABLES.REL_CLIENTS}\` WHERE Correo = @email`;
-      relResult = bq.query(sqlRel, { email });
-    } catch (e) {
-      const sqlRelFallback = `SELECT ID_ClientesConfiabilidad FROM \`${projectId}.${DATASET_ID}.${TABLES.REL_CLIENTS}\` WHERE Correo = @email`;
-      relResult = bq.query(sqlRelFallback, { email });
-    }
-    context.allowedClientIds = relResult.map(r => r.ID_ClientesConfiabilidad);
-    relResult.forEach(r => {
-      context.userClientConfig[r.ID_ClientesConfiabilidad] = {
-        forcedMyRequests: r.ForcedMyRequests === 'SI' || r.ForcedMyRequests === true
-      };
-    });
+    context.adminClientIds = allRes.map(r => r.ID_ClientesConfiabilidad);
   }
 
-  if (context.allowedClientIds.length > 0) {
-    const idsFormatted = context.allowedClientIds.map(id => `'${id}'`).join(',');
+  const fetchIds = context.isAdmin ? context.adminClientIds : context.allowedClientIds;
+
+  if (fetchIds.length > 0) {
+    const idsFormatted = fetchIds.map(id => `'${id}'`).join(',');
     const sqlDetails = `
       SELECT ID_ClientesConfiabilidad, RazonSocial, TipodeCliente, NIT, ForcedMyRequests
       FROM \`${projectId}.${DATASET_ID}.${TABLES.CLIENT_CONF}\`
-      ${context.isAdmin ? '' : `WHERE ID_ClientesConfiabilidad IN (${idsFormatted})`}
+      WHERE ID_ClientesConfiabilidad IN (${idsFormatted})
     `;
     try {
       const details = bq.query(sqlDetails);
@@ -150,10 +154,10 @@ function getRequests(email, { period = 'today', clientId = null } = {}) {
   let clientClause = '';
 
   if (clientId) {
-    if (!context.isAdmin && !context.allowedClientIds.includes(clientId)) throw new Error("Acceso denegado a este cliente.");
+    if (!context.allowedClientIds.includes(clientId)) throw new Error("Acceso denegado a este cliente.");
     clientClause = `ID_Cliente = @clientId`;
     clientParams.clientId = clientId;
-  } else if (!context.isAdmin) {
+  } else {
     if (context.allowedClientIds.length === 0) return { data: [], total: 0 };
     const paramKeys = context.allowedClientIds.map((_, i) => `id${i}`);
     clientClause = `ID_Cliente IN (${paramKeys.map(k => `@${k}`).join(', ')})`;
@@ -170,12 +174,12 @@ function getRequests(email, { period = 'today', clientId = null } = {}) {
       const forcedIdsStr = forcedClientIds.map(id => `'${id}'`).join(',');
       if (clientId) {
         if (forcedClientIds.includes(clientId)) {
-          securityClause = `UsuarioCreación = @userEmail`;
+          securityClause = `\`UsuarioCreación\` = @userEmail`;
           clientParams.userEmail = email;
         }
       } else {
         // Si no hay clientId, filtramos: (Si el cliente es de los forzados, debe ser mi solicitud; si no, ver todo lo permitido)
-        securityClause = `(ID_Cliente NOT IN (${forcedIdsStr}) OR UsuarioCreación = @userEmail)`;
+        securityClause = `(ID_Cliente NOT IN (${forcedIdsStr}) OR \`UsuarioCreación\` = @userEmail)`;
         clientParams.userEmail = email;
       }
     }
@@ -199,7 +203,7 @@ function getRequests(email, { period = 'today', clientId = null } = {}) {
     Fecha_Programacion_Poligrafia AS ProgramacionPoligrafia, 
     Fecha_Entrega_ECP AS FechaEntregaECP, 
     Fecha_Entrega_EP AS FechaEntregaEP, 
-    ID_Cliente, usuarioActualizacion, UsuarioCreación
+    ID_Cliente, usuarioActualizacion, \`UsuarioCreación\`
   `;
   const sqlView = `SELECT ${sqlColumns} FROM \`${tableView}\` ${buildWhere()} ORDER BY FechaSolicitud DESC LIMIT 500`;
   let rowsView = [];
@@ -352,7 +356,7 @@ function createRequest(email, payload) {
   const insertSql = `
     INSERT INTO \`${tableWrite}\`
     (
-      ID_SolicitudesConfiabilidad, usuarioActualizacion, UsuarioCreación, ID_Cliente, Identificacion, NombreCompleto,
+      ID_SolicitudesConfiabilidad, usuarioActualizacion, \`UsuarioCreación\`, ID_Cliente, Identificacion, NombreCompleto,
       CentroCostos, TipoTrabajador, EstadoActual, FechaSolicitud,
       TipoIdentificacion, FechaExpedicion, Cargo, Correo, Celular,
       Ciudad, Barrio, Direccion,
@@ -556,7 +560,7 @@ function processBulkUpload(email, { csvContent, clientId }) {
       const insertSql = `
         INSERT INTO \`${tableWrite}\`
         (
-          ID_SolicitudesConfiabilidad, usuarioActualizacion, UsuarioCreación, ID_Cliente, Identificacion, NombreCompleto,
+          ID_SolicitudesConfiabilidad, usuarioActualizacion, \`UsuarioCreación\`, ID_Cliente, Identificacion, NombreCompleto,
           CentroCostos, TipoTrabajador, EstadoActual, FechaSolicitud,
           TipoIdentificacion, FechaExpedicion, Cargo, Correo, Celular,
           Ciudad, Barrio, Direccion,

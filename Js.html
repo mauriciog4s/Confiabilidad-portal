@@ -1609,34 +1609,18 @@ const AdminClientModal = ({ clientId, clientName, onClose, showToast }) => {
 };
 
 const ConfigurationView = ({ userContext, onForceSync, syncStatus, lastSync, onRefreshClients, showToast }) => {
-  const [updatingClient, setUpdatingClient] = useState(null);
   const [clientSearch, setClientSearch] = useState('');
   const [selectedAdminClient, setSelectedAdminClient] = useState(null);
 
   const filteredClientIds = useMemo(() => {
-    if (!userContext?.allowedClientIds) return [];
-    if (!clientSearch) return userContext.allowedClientIds;
+    const ids = userContext?.adminClientIds || [];
+    if (!clientSearch) return ids;
     const q = clientSearch.toLowerCase();
-    return userContext.allowedClientIds.filter(id => {
+    return ids.filter(id => {
       const name = (userContext.clientNames?.[id] || '').toLowerCase();
       return name.includes(q) || id.toLowerCase().includes(q);
     });
   }, [userContext, clientSearch]);
-
-  const handleToggleForced = async (clientId, currentVal) => {
-    setUpdatingClient(clientId);
-    try {
-      const res = await runServer('updateClientConfig', { clientId, forcedMyRequests: !currentVal });
-      if (res.success) {
-        showToast("Configuración de cliente actualizada.", "success");
-        onRefreshClients(); // Para recargar el contexto de usuario localmente
-      }
-    } catch (e) {
-      showToast("Error al actualizar: " + e.message, "error");
-    } finally {
-      setUpdatingClient(null);
-    }
-  };
 
   return (
     <div className="p-6 md:p-8 max-w-4xl mx-auto animate-fade-in pb-20">
@@ -1677,35 +1661,21 @@ const ConfigurationView = ({ userContext, onForceSync, syncStatus, lastSync, onR
               <thead className="bg-gray-50 text-gray-400 font-bold uppercase tracking-wider border-b border-gray-100">
                 <tr>
                   <th className="px-4 py-3">ID / Cliente</th>
-                  <th className="px-4 py-3 text-center">Mis Solicitudes (Forzado)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {filteredClientIds.length === 0 ? (
-                  <tr><td colSpan="2" className="px-4 py-8 text-center text-gray-400 italic">No se encontraron clientes.</td></tr>
+                  <tr><td className="px-4 py-8 text-center text-gray-400 italic">No se encontraron clientes.</td></tr>
                 ) : filteredClientIds.map(id => {
-                  const cd = userContext?.clientData?.[id] || {};
-                  const isForced = !!cd.forcedMyRequests;
                   return (
                     <tr key={id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3 cursor-pointer" onClick={() => setSelectedAdminClient(id)}>
-                        <div className="font-bold text-gray-700 hover:text-appBlue transition-colors flex items-center gap-2">
-                          {userContext?.clientNames?.[id] || id}
-                          <Icon name="ChevronRight" size={12}/>
-                        </div>
-                        <div className="text-[10px] text-gray-400 font-mono">{id}</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex justify-center">
-                          <button 
-                            disabled={updatingClient === id}
-                            onClick={() => handleToggleForced(id, isForced)}
-                            className={`w-12 h-6 rounded-full transition-all duration-300 flex items-center px-1 ${isForced ? 'bg-appBlue' : 'bg-gray-200'} ${updatingClient === id ? 'opacity-50 cursor-not-allowed' : ''}`}
-                          >
-                            <div className={`w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-300 ${isForced ? 'translate-x-6' : 'translate-x-0'} flex items-center justify-center`}>
-                              {updatingClient === id && <div className="w-2 h-2 border border-appBlue border-t-transparent rounded-full animate-spin"></div>}
-                            </div>
-                          </button>
+                        <div className="font-bold text-gray-700 hover:text-appBlue transition-colors flex items-center justify-between">
+                          <div className="flex flex-col">
+                            <span className="text-sm">{userContext?.clientNames?.[id] || id}</span>
+                            <span className="text-[10px] text-gray-400 font-mono">{id}</span>
+                          </div>
+                          <Icon name="ChevronRight" size={16} className="text-gray-300"/>
                         </div>
                       </td>
                     </tr>
