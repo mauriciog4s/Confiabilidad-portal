@@ -675,10 +675,12 @@ function updateUserConfig(email, { targetEmail, clientId, role, userForced }) {
     bq.query(`UPDATE \`${projectId}.${DATASET_ID}.${TABLES.USERS}\` SET Rol_Asignado = @role WHERE Email = @targetEmail`, { role, targetEmail });
   }
 
-  try {
-    bq.query(`UPDATE \`${projectId}.${DATASET_ID}.${TABLES.REL_CLIENTS}\` SET ForcedMyRequests = @val WHERE Correo = @targetEmail AND ID_ClientesConfiabilidad = @clientId`, { val: userForced ? 'SI' : 'NO', targetEmail, clientId });
-  } catch (e) {
-    console.warn("No se pudo actualizar ForcedMyRequests a nivel de usuario:", e.message);
+  if (userForced !== undefined) {
+    try {
+      bq.query(`UPDATE \`${projectId}.${DATASET_ID}.${TABLES.REL_CLIENTS}\` SET ForcedMyRequests = @val WHERE Correo = @targetEmail AND ID_ClientesConfiabilidad = @clientId`, { val: userForced ? 'SI' : 'NO', targetEmail, clientId });
+    } catch (e) {
+      console.warn("No se pudo actualizar ForcedMyRequests a nivel de usuario:", e.message);
+    }
   }
 
   return { success: true };
