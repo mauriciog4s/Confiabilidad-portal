@@ -203,7 +203,7 @@ function getRequests(email, { period = 'today', clientId = null } = {}) {
     Fecha_Programacion_Poligrafia AS ProgramacionPoligrafia, 
     Fecha_Entrega_ECP AS FechaEntregaECP, 
     Fecha_Entrega_EP AS FechaEntregaEP, 
-    ID_Cliente, usuarioActualizacion, \`UsuarioCreación\`
+    ID_Cliente, UsuarioActualizacion, \`UsuarioCreación\`
   `;
   const sqlView = `SELECT ${sqlColumns} FROM \`${tableView}\` ${buildWhere()} ORDER BY FechaSolicitud DESC LIMIT 500`;
   let rowsView = [];
@@ -356,7 +356,7 @@ function createRequest(email, payload) {
   const insertSql = `
     INSERT INTO \`${tableWrite}\`
     (
-      ID_SolicitudesConfiabilidad, usuarioActualizacion, \`UsuarioCreación\`, ID_Cliente, Identificacion, NombreCompleto,
+      ID_SolicitudesConfiabilidad, UsuarioActualizacion, \`UsuarioCreación\`, ID_Cliente, Identificacion, NombreCompleto,
       CentroCostos, TipoTrabajador, EstadoActual, FechaSolicitud,
       TipoIdentificacion, FechaExpedicion, Cargo, Correo, Celular,
       Ciudad, Barrio, Direccion,
@@ -560,7 +560,7 @@ function processBulkUpload(email, { csvContent, clientId }) {
       const insertSql = `
         INSERT INTO \`${tableWrite}\`
         (
-          ID_SolicitudesConfiabilidad, usuarioActualizacion, \`UsuarioCreación\`, ID_Cliente, Identificacion, NombreCompleto,
+          ID_SolicitudesConfiabilidad, UsuarioActualizacion, \`UsuarioCreación\`, ID_Cliente, Identificacion, NombreCompleto,
           CentroCostos, TipoTrabajador, EstadoActual, FechaSolicitud,
           TipoIdentificacion, FechaExpedicion, Cargo, Correo, Celular,
           Ciudad, Barrio, Direccion,
@@ -624,8 +624,8 @@ function registerTempDocument(email, { requestId, docName, fileName }) {
   const docId = generateUniqueId();
   const insertSql = `
     INSERT INTO \`${tableId}\`
-    (ID_DocumentosSolicitud, ID_SolicitudesConfiabilidad, NombreDocumento, Documento, UsuarioActualziacion, FechaActualizacion, EstadoActual)
-    VALUES (@docId, @reqId, @docName, @fileAlias, @user, CAST(CURRENT_TIMESTAMP() AS STRING), 'Creada')
+    (ID_DocumentosSolicitud, ID_SolicitudesConfiabilidad, NombreDocumento, Documento, UsuarioActualizacion, \`UsuarioCreación\`, FechaActualizacion, EstadoActual)
+    VALUES (@docId, @reqId, @docName, @fileAlias, @user, @user, CAST(CURRENT_TIMESTAMP() AS STRING), 'Creada')
   `;
   bq.query(insertSql, { docId, reqId: requestId, docName, fileAlias: fileName, user: email });
   return { success: true, message: "Metadatos registrados." };

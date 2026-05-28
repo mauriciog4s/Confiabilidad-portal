@@ -281,7 +281,7 @@ const Sidebar = ({ currentView, setView, onLogout, userContext, syncStatus, last
     ];
     const role = userContext?.role || '';
     if (role === 'Cliente Creación') return all.filter(i => ['home', 'create', 'bulk'].includes(i.id));
-    if (role === 'Cliente Consulta') return all.filter(i => ['home', 'history'].includes(i.id));
+    if (role === 'Cliente Consulta') return all.filter(i => ['history'].includes(i.id));
     return all;
   }, [userContext]);
   const handleNav = (id) => {
@@ -395,17 +395,21 @@ const HomeDashboard = ({ userContext, requests, setView, syncStatus }) => {
           </div>
         ))}
       </div>
-      <h2 className="text-xl font-bold text-gray-800 mb-4">¿Qué deseas hacer hoy?</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <button onClick={() => setView('create')} className="flex items-center gap-4 p-6 bg-gradient-to-r from-appRed to-red-700 text-white rounded-xl shadow hover:shadow-lg transition text-left btn-action">
-          <div className="bg-white/20 p-3 rounded-full"><Icon name="ClipboardList" size={32}/></div>
-          <div><div className="text-lg font-bold">Nueva Solicitud</div><div className="text-white/80 text-sm">Registrar un estudio individual.</div></div>
-        </button>
-        <button onClick={() => setView('bulk')} className="flex items-center gap-4 p-6 bg-white border border-gray-200 text-gray-700 rounded-xl shadow-sm hover:bg-gray-50 transition text-left btn-action">
-          <div className="bg-blue-50 text-blue-600 p-3 rounded-full"><Icon name="Upload" size={32}/></div>
-          <div><div className="text-lg font-bold">Carga Masiva</div><div className="text-gray-500 text-sm">Subir múltiples registros desde CSV.</div></div>
-        </button>
-      </div>
+      {userContext.role !== 'Cliente Consulta' && (
+        <>
+          <h2 className="text-xl font-bold text-gray-800 mb-4">¿Qué deseas hacer hoy?</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <button onClick={() => setView('create')} className="flex items-center gap-4 p-6 bg-gradient-to-r from-appRed to-red-700 text-white rounded-xl shadow hover:shadow-lg transition text-left btn-action">
+              <div className="bg-white/20 p-3 rounded-full"><Icon name="ClipboardList" size={32}/></div>
+              <div><div className="text-lg font-bold">Nueva Solicitud</div><div className="text-white/80 text-sm">Registrar un estudio individual.</div></div>
+            </button>
+            <button onClick={() => setView('bulk')} className="flex items-center gap-4 p-6 bg-white border border-gray-200 text-gray-700 rounded-xl shadow-sm hover:bg-gray-50 transition text-left btn-action">
+              <div className="bg-blue-50 text-blue-600 p-3 rounded-full"><Icon name="Upload" size={32}/></div>
+              <div><div className="text-lg font-bold">Carga Masiva</div><div className="text-gray-500 text-sm">Subir múltiples registros desde CSV.</div></div>
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 };
@@ -1508,6 +1512,13 @@ const AdminClientModal = ({ clientId, clientName, onClose, showToast }) => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(null);
+  const [search, setSearch] = useState('');
+
+  const filteredUsers = useMemo(() => {
+    if (!search) return users;
+    const q = search.toLowerCase();
+    return users.filter(u => u.Email.toLowerCase().includes(q) || u.Rol_Asignado.toLowerCase().includes(q));
+  }, [users, search]);
 
   useEffect(() => {
     runServer('getClientUsers', { clientId })
@@ -1538,11 +1549,18 @@ const AdminClientModal = ({ clientId, clientName, onClose, showToast }) => {
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col transform animate-scale-in">
         <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-          <div>
+          <div className="flex-1">
             <h3 className="text-xl font-bold text-gray-800">{clientName || 'Cliente'}</h3>
             <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">Gestión de Usuarios / {clientId}</p>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors"><Icon name="X" size={24}/></button>
+          <div className="flex items-center gap-4">
+            <div className="relative hidden md:block">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><Icon name="Search" size={14}/></div>
+              <input type="text" placeholder="Filtrar usuarios..." value={search} onChange={e => setSearch(e.target.value)}
+                className="pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-appBlue/20 outline-none w-64"/>
+            </div>
+            <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors"><Icon name="X" size={24}/></button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
@@ -1551,11 +1569,11 @@ const AdminClientModal = ({ clientId, clientName, onClose, showToast }) => {
               <div className="w-10 h-10 border-4 border-appBlue border-t-transparent rounded-full animate-spin"></div>
               <p className="text-gray-400 text-sm">Cargando usuarios...</p>
             </div>
-          ) : users.length === 0 ? (
-            <div className="text-center py-20 text-gray-400 italic">No hay usuarios asociados a este cliente.</div>
+          ) : filteredUsers.length === 0 ? (
+            <div className="text-center py-20 text-gray-400 italic">No se encontraron usuarios.</div>
           ) : (
             <div className="space-y-4">
-              {users.map(u => (
+              {filteredUsers.map(u => (
                 <div key={u.Email} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
                   <div className="flex flex-wrap items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
@@ -1656,7 +1674,7 @@ const ConfigurationView = ({ userContext, onForceSync, syncStatus, lastSync, onR
             </div>
           </div>
           
-          <div className="overflow-hidden border border-gray-100 rounded-xl">
+          <div className="max-h-96 overflow-y-auto border border-gray-100 rounded-xl shadow-inner bg-gray-50/30">
             <table className="w-full text-left text-xs">
               <thead className="bg-gray-50 text-gray-400 font-bold uppercase tracking-wider border-b border-gray-100">
                 <tr>
@@ -1830,7 +1848,7 @@ const App = () => {
       const ctx = await runServer('getUserContext', {});
       setUserCtx(ctx);
       if (ctx.isValidUser) {
-        setView('home');
+        setView(ctx.role === 'Cliente Consulta' ? 'history' : 'home');
         // Cargar datos en paralelo
         Promise.all([
           runServer('getRequests', { period: 'today' }).then(r => { setInitialData(r); }),
@@ -1877,7 +1895,9 @@ const App = () => {
   const renderView = () => {
     const role = userCtx?.role || '';
     switch (view) {
-      case 'home':    return <HomeDashboard userContext={userCtx} requests={initialData?.data||[]} setView={setView} syncStatus={syncStatus}/>;
+      case 'home':
+        if (role === 'Cliente Consulta') return <RequestList setView={setView} setSelectedRequest={setSelectedRequest} initialData={initialData} onRefresh={() => refreshAll(true)} onChangePeriod={handleChangePeriod} currentPeriod={period} refreshing={syncStatus !== 'idle'} userContext={userCtx} masterData={masterData}/>;
+        return <HomeDashboard userContext={userCtx} requests={initialData?.data||[]} setView={setView} syncStatus={syncStatus}/>;
       case 'history':
         if (role === 'Cliente Creación') return <HomeDashboard userContext={userCtx} requests={initialData?.data||[]} setView={setView} syncStatus={syncStatus}/>;
         return <RequestList setView={setView} setSelectedRequest={setSelectedRequest} initialData={initialData} onRefresh={() => refreshAll(true)} onChangePeriod={handleChangePeriod} currentPeriod={period} refreshing={syncStatus !== 'idle'} userContext={userCtx} masterData={masterData}/>;
@@ -1885,13 +1905,15 @@ const App = () => {
         if (role === 'Cliente Creación') return <HomeDashboard userContext={userCtx} requests={initialData?.data||[]} setView={setView} syncStatus={syncStatus}/>;
         return selectedRequest ? <RequestDetail requestId={selectedRequest.ID_SolicitudesConfiabilidad || selectedRequest.NSolicitud} preloadedData={selectedRequest} onBack={() => setView('history')}/> : null;
       case 'create':
-        if (role === 'Cliente Consulta') return <HomeDashboard userContext={userCtx} requests={initialData?.data||[]} setView={setView} syncStatus={syncStatus}/>;
+        if (role === 'Cliente Consulta') return <RequestList setView={setView} setSelectedRequest={setSelectedRequest} initialData={initialData} onRefresh={() => refreshAll(true)} onChangePeriod={handleChangePeriod} currentPeriod={period} refreshing={syncStatus !== 'idle'} userContext={userCtx} masterData={masterData}/>;
         return <CreateRequest userContext={userCtx} setView={setView} onReload={() => loadRequests()} masterData={masterData}/>;
       case 'bulk':
-        if (role === 'Cliente Consulta') return <HomeDashboard userContext={userCtx} requests={initialData?.data||[]} setView={setView} syncStatus={syncStatus}/>;
+        if (role === 'Cliente Consulta') return <RequestList setView={setView} setSelectedRequest={setSelectedRequest} initialData={initialData} onRefresh={() => refreshAll(true)} onChangePeriod={handleChangePeriod} currentPeriod={period} refreshing={syncStatus !== 'idle'} userContext={userCtx} masterData={masterData}/>;
         return <BulkUpload userContext={userCtx} setView={setView} onReload={() => loadRequests()}/>;
       case 'config':  return <ConfigurationView userContext={userCtx} onForceSync={() => refreshAll(true)} syncStatus={syncStatus} lastSync={lastSync} onRefreshClients={handleRefreshClients} showToast={showToast}/>;
-      default:        return <HomeDashboard userContext={userCtx} requests={initialData?.data||[]} setView={setView} syncStatus={syncStatus}/>;
+      default:
+        if (role === 'Cliente Consulta') return <RequestList setView={setView} setSelectedRequest={setSelectedRequest} initialData={initialData} onRefresh={() => refreshAll(true)} onChangePeriod={handleChangePeriod} currentPeriod={period} refreshing={syncStatus !== 'idle'} userContext={userCtx} masterData={masterData}/>;
+        return <HomeDashboard userContext={userCtx} requests={initialData?.data||[]} setView={setView} syncStatus={syncStatus}/>;
     }
   };
 
