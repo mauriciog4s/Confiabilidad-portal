@@ -522,24 +522,65 @@ function processBulkUpload(email, { csvContent, clientId }) {
         if (val) hasData = true;
       }
     });
-    if (!hasData) continue;
+if (!hasData) continue;
     const rowNum = i + 1;
 
-    if (!rowData.NombreCompleto)    validationErrors.push(`Fila ${rowNum}: NombreCompleto es obligatorio`);
-    if (!rowData.Identificacion)    validationErrors.push(`Fila ${rowNum}: Identificacion es obligatoria`);
+    // 1. Información General Obligatoria
+    if (!rowData.NombreCompleto) {
+      validationErrors.push(`Fila ${rowNum}: NombreCompleto es obligatorio`);
+    }
+
     if (!rowData.TipoIdentificacion) {
       validationErrors.push(`Fila ${rowNum}: TipoIdentificacion es obligatorio`);
     } else if (!validTiposID.has(normalizeStr(rowData.TipoIdentificacion))) {
       validationErrors.push(`Fila ${rowNum}: TipoIdentificacion "${rowData.TipoIdentificacion}" no es válido`);
     }
-    if (rowData.Ciudad && !validCiudades.has(normalizeStr(rowData.Ciudad))) {
+
+    if (!rowData.Identificacion) {
+      validationErrors.push(`Fila ${rowNum}: Identificacion es obligatoria`);
+    } else if (rowData.Identificacion.length < 5 || rowData.Identificacion.length > 15) {
+      validationErrors.push(`Fila ${rowNum}: Identificacion debe tener entre 5 y 15 caracteres`);
+    }
+
+    if (!rowData.Cargo) validationErrors.push(`Fila ${rowNum}: Cargo es obligatorio`);
+    if (!rowData.Celular) validationErrors.push(`Fila ${rowNum}: Celular es obligatorio`);
+    
+    if (!rowData.Ciudad) {
+      validationErrors.push(`Fila ${rowNum}: Ciudad es obligatoria`);
+    } else if (!validCiudades.has(normalizeStr(rowData.Ciudad))) {
       validationErrors.push(`Fila ${rowNum}: Ciudad "${rowData.Ciudad}" no existe en el maestro`);
     }
+
+    if (!rowData.Direccion) validationErrors.push(`Fila ${rowNum}: Direccion es obligatoria`);
+    if (!rowData.TipoTrabajador) validationErrors.push(`Fila ${rowNum}: TipoTrabajador es obligatorio`);
+
+    // 2. Lógica para Cliente Interno
     if (isInternal) {
-      if (!rowData.Linea)        validationErrors.push(`Fila ${rowNum}: Linea obligatoria para Cliente Interno`);
+      if (!rowData.Linea) validationErrors.push(`Fila ${rowNum}: Linea obligatoria para Cliente Interno`);
       if (!rowData.LineaNegocio) validationErrors.push(`Fila ${rowNum}: LineaNegocio obligatoria para Cliente Interno`);
       if (!rowData.CentroCostos) validationErrors.push(`Fila ${rowNum}: CentroCostos obligatorio para Cliente Interno`);
     }
+
+    // 3. Lógica de Servicios a Aplicar (Debe existir al menos 1 servicio)
+    const hasService = ['VisitaDomiciliaria', 'ConsultaAntecedentes', 'Referenciacion', 'EstudiosPoligrafia', 'ConsultaDatacredito', 'ComparativoOEA'].some(s => rowData[s] === 'SI');
+    if (!hasService) {
+      validationErrors.push(`Fila ${rowNum}: Debe seleccionar al menos un servicio a aplicar (escribir "SI" en alguna de las columnas de servicios)`);
+    }
+
+    // 4. Dependencias obligatorias internas por Servicio
+    if (rowData.VisitaDomiciliaria === 'SI' && !rowData.ModalidadVisita) {
+      validationErrors.push(`Fila ${rowNum}: ModalidadVisita es obligatoria cuando aplica VisitaDomiciliaria`);
+    }
+    if (rowData.Referenciacion === 'SI') {
+      if (!rowData.ReferenciaAcademica) validationErrors.push(`Fila ${rowNum}: ReferenciaAcademica (SI/NO) es obligatoria al aplicar Referenciacion`);
+      if (!rowData.ReferenciaLaboral) validationErrors.push(`Fila ${rowNum}: ReferenciaLaboral (SI/NO) es obligatoria al aplicar Referenciacion`);
+      if (!rowData.ReferenciaPersonal) validationErrors.push(`Fila ${rowNum}: ReferenciaPersonal (SI/NO) es obligatoria al aplicar Referenciacion`);
+    }
+    if (rowData.EstudiosPoligrafia === 'SI') {
+      if (!rowData.TipoPoligrafia) validationErrors.push(`Fila ${rowNum}: TipoPoligrafia es obligatorio cuando aplica EstudiosPoligrafia`);
+      if (!rowData.CiudadP) validationErrors.push(`Fila ${rowNum}: CiudadP es obligatoria cuando aplica EstudiosPoligrafia`);
+    }
+
     parsedRows.push(rowData);
   }
 
