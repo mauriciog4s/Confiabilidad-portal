@@ -173,20 +173,25 @@ function getRequests(email, { period = 'today', clientId = null } = {}) {
   // Tarea 8: Forzar "Mis Solicitudes" (Seguridad robusta)
   let securityClause = '';
   if (!context.isAdmin) {
-    const forcedClientIds = context.allowedClientIds.filter(id =>
-      context.clientData[id]?.forcedMyRequests || context.userClientConfig[id]?.forcedMyRequests
-    );
-    if (forcedClientIds.length > 0) {
-      const forcedIdsStr = forcedClientIds.map(id => `'${id}'`).join(',');
-      if (clientId) {
-        if (forcedClientIds.includes(clientId)) {
-          securityClause = `\`UsuarioCreación\` = @userEmail`;
+    if (context.role === 'Cliente Perfilado') {
+      securityClause = `\`UsuarioCreación\` = @userEmail`;
+      clientParams.userEmail = email;
+    } else {
+      const forcedClientIds = context.allowedClientIds.filter(id =>
+        context.clientData[id]?.forcedMyRequests || context.userClientConfig[id]?.forcedMyRequests
+      );
+      if (forcedClientIds.length > 0) {
+        const forcedIdsStr = forcedClientIds.map(id => `'${id}'`).join(',');
+        if (clientId) {
+          if (forcedClientIds.includes(clientId)) {
+            securityClause = `\`UsuarioCreación\` = @userEmail`;
+            clientParams.userEmail = email;
+          }
+        } else {
+          // Si no hay clientId, filtramos: (Si el cliente es de los forzados, debe ser mi solicitud; si no, ver todo lo permitido)
+          securityClause = `(ID_Cliente NOT IN (${forcedIdsStr}) OR \`UsuarioCreación\` = @userEmail)`;
           clientParams.userEmail = email;
         }
-      } else {
-        // Si no hay clientId, filtramos: (Si el cliente es de los forzados, debe ser mi solicitud; si no, ver todo lo permitido)
-        securityClause = `(ID_Cliente NOT IN (${forcedIdsStr}) OR \`UsuarioCreación\` = @userEmail)`;
-        clientParams.userEmail = email;
       }
     }
   }
@@ -722,7 +727,7 @@ function updateUserConfig(email, { targetEmail, clientId, role, userForced }) {
   const bq = new BigQueryClient();
   const projectId = BQ_CREDENTIALS.project_id;
 
-  const VALID_ROLES = ['Cliente Completo', 'Cliente Creación', 'Cliente Consulta', 'Administrador'];
+  const VALID_ROLES = ['Cliente Completo', 'Cliente Creación', 'Cliente Consulta', 'Cliente Perfilado', 'Administrador'];
 
   // 1. Actualizar Rol_Asignado en conUsuarios
   if (role) {
@@ -739,6 +744,14 @@ function updateUserConfig(email, { targetEmail, clientId, role, userForced }) {
       { role, targetEmail }
     );
 
+    // Sincronizar ForcedMyRequests si es Perfilado
+    try {
+      bq.query(
+        `UPDATE \`${projectId}.${DATASET_ID}.${TABLES.REL_CLIENTS}\` SET ForcedMyRequests = @val WHERE Correo = @targetEmail AND ID_ClientesConfiabilidad = @clientId`,
+        { val: role === 'Cliente Perfilado' ? 'SI' : 'NO', targetEmail, clientId }
+      );
+    } catch (e) { console.warn("Error sincronizando ForcedMyRequests:", e.message); }
+
     // Verificar que el cambio se aplicó
     const verify = bq.query(
       `SELECT Rol_Asignado FROM \`${projectId}.${DATASET_ID}.${TABLES.USERS}\` WHERE Email = @targetEmail LIMIT 1`,
@@ -752,7 +765,7 @@ function updateUserConfig(email, { targetEmail, clientId, role, userForced }) {
     console.log(`✅ [updateUserConfig] Rol de ${targetEmail} cambiado a: ${role}`);
   }
 
-  // 2. Actualizar ForcedMyRequests en conUsuariosCliente (toggle Mis Solicitudes)
+  // 2. Actualizar ForcedMyRequests manualmente (si aplica fuera de cambio de rol)
   if (userForced !== undefined) {
     try {
       bq.query(
@@ -762,7 +775,6 @@ function updateUserConfig(email, { targetEmail, clientId, role, userForced }) {
       console.log(`✅ [updateUserConfig] ForcedMyRequests de ${targetEmail} = ${userForced ? 'SI' : 'NO'}`);
     } catch (e) {
       console.warn("No se pudo actualizar ForcedMyRequests:", e.message);
-      // No lanzar error — ForcedMyRequests es opcional
     }
   }
 
