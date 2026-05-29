@@ -104,39 +104,32 @@ function getUserContext(email) {
 
   if (fetchIds.length > 0) {
     const idsFormatted = fetchIds.map(id => `'${id}'`).join(',');
-    // Intentamos buscar por ID_ClientesConfiabilidad o ID_Cliente
+    // ⚠️ Solo columnas que existen con certeza en conClienteConfiabilidad
+    // ForcedMyRequests va en conUsuariosCliente, NO aquí — agregar columnas extras rompe el query
     const sqlDetails = `
-      SELECT *
+      SELECT ID_ClientesConfiabilidad, RazonSocial, TipodeCliente, NIT
       FROM \`${projectId}.${DATASET_ID}.${TABLES.CLIENT_CONF}\`
       WHERE ID_ClientesConfiabilidad IN (${idsFormatted})
-         OR ID_Cliente IN (${idsFormatted})
     `;
     try {
       const details = bq.query(sqlDetails);
       details.forEach(row => {
-        // El ID puede venir en cualquiera de estas dos columnas
-        const id = row.ID_ClientesConfiabilidad || row.ID_Cliente;
+        const id = row.ID_ClientesConfiabilidad;
         if (!id) return;
-
-        // Búsqueda agresiva de un nombre descriptivo
-        const descriptiveName = String(
-          row.RazonSocial || row.Razon_Social || row.Nombre || row.Nombre_Cliente ||
-          row.Cliente || id
-        ).trim();
-
+        const descriptiveName = String(row.RazonSocial || id).trim();
         context.clientNames[id]  = descriptiveName;
-        context.clientTypes[id]  = row.TipodeCliente || row.TipoCliente || 'Externo';
-        context.clientData[id]   = { 
-          nit: row.NIT, 
-          razonSocial: row.RazonSocial || descriptiveName,
-          tipo: row.TipodeCliente || row.TipoCliente,
-          forcedMyRequests: row.ForcedMyRequests === 'SI' || row.ForcedMyRequests === true
+        context.clientTypes[id]  = row.TipodeCliente || 'Externo';
+        context.clientData[id]   = {
+          nit: row.NIT,
+          razonSocial: descriptiveName,
+          tipo: row.TipodeCliente,
+          forcedMyRequests: false  // Se maneja a nivel de usuario en conUsuariosCliente
         };
       });
     } catch (e) {
       console.warn("Error cargando detalles de clientes:", e.message);
     }
-    // Asegurar que todos los IDs tengan al menos un nombre (aunque sea el ID)
+    // Garantizar nombre fallback para TODOS los IDs (incluidos adminClientIds)
     fetchIds.forEach(id => { if (!context.clientNames[id]) context.clientNames[id] = id; });
   }
   return context;
@@ -688,19 +681,51 @@ function updateUserConfig(email, { targetEmail, clientId, role, userForced }) {
   const bq = new BigQueryClient();
   const projectId = BQ_CREDENTIALS.project_id;
 
+  const VALID_ROLES = ['Cliente Completo', 'Cliente Creación', 'Cliente Consulta', 'Administrador'];
+
+  // 1. Actualizar Rol_Asignado en conUsuarios
   if (role) {
-    bq.query(`UPDATE \`${projectId}.${DATASET_ID}.${TABLES.USERS}\` SET Rol_Asignado = @role WHERE Email = @targetEmail`, { role, targetEmail });
+    if (!VALID_ROLES.includes(role)) throw new Error(`Rol inválido: ${role}`);
+
+    // Verificar que el usuario exista antes de actualizar
+    const checkSql = `SELECT Email FROM \`${projectId}.${DATASET_ID}.${TABLES.USERS}\` WHERE Email = @targetEmail LIMIT 1`;
+    const exists = bq.query(checkSql, { targetEmail });
+    if (exists.length === 0) throw new Error(`Usuario no encontrado en el sistema: ${targetEmail}`);
+
+    // Ejecutar el UPDATE
+    bq.query(
+      `UPDATE \`${projectId}.${DATASET_ID}.${TABLES.USERS}\` SET Rol_Asignado = @role WHERE Email = @targetEmail`,
+      { role, targetEmail }
+    );
+
+    // Verificar que el cambio se aplicó
+    const verify = bq.query(
+      `SELECT Rol_Asignado FROM \`${projectId}.${DATASET_ID}.${TABLES.USERS}\` WHERE Email = @targetEmail LIMIT 1`,
+      { targetEmail }
+    );
+    const rolActual = verify[0]?.Rol_Asignado;
+    if (rolActual !== role) {
+      console.warn(`[updateUserConfig] El rol no se actualizó correctamente. Esperado: ${role}, Actual: ${rolActual}`);
+      throw new Error("El cambio no se pudo verificar en BigQuery. Intente de nuevo.");
+    }
+    console.log(`✅ [updateUserConfig] Rol de ${targetEmail} cambiado a: ${role}`);
   }
 
+  // 2. Actualizar ForcedMyRequests en conUsuariosCliente (toggle Mis Solicitudes)
   if (userForced !== undefined) {
     try {
-      bq.query(`UPDATE \`${projectId}.${DATASET_ID}.${TABLES.REL_CLIENTS}\` SET ForcedMyRequests = @val WHERE Correo = @targetEmail AND ID_ClientesConfiabilidad = @clientId`, { val: userForced ? 'SI' : 'NO', targetEmail, clientId });
+      bq.query(
+        `UPDATE \`${projectId}.${DATASET_ID}.${TABLES.REL_CLIENTS}\` SET ForcedMyRequests = @val WHERE Correo = @targetEmail AND ID_ClientesConfiabilidad = @clientId`,
+        { val: userForced ? 'SI' : 'NO', targetEmail, clientId }
+      );
+      console.log(`✅ [updateUserConfig] ForcedMyRequests de ${targetEmail} = ${userForced ? 'SI' : 'NO'}`);
     } catch (e) {
-      console.warn("No se pudo actualizar ForcedMyRequests a nivel de usuario:", e.message);
+      console.warn("No se pudo actualizar ForcedMyRequests:", e.message);
+      // No lanzar error — ForcedMyRequests es opcional
     }
   }
 
-  return { success: true };
+  return { success: true, message: role ? `Rol actualizado a: ${role}` : 'Configuración guardada.' };
 }
 
 // ─── UTILIDADES ──────────────────────────────────────────────────────────
