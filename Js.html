@@ -498,10 +498,18 @@ const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onCh
 
   const isForcedMyRequests = useMemo(() => {
     if (userContext?.isAdmin) return false;
-    if (!clientFilter) return false;
-    // Forzado a nivel de cliente O a nivel de relación usuario-cliente
-    return userContext?.clientData?.[clientFilter]?.forcedMyRequests ||
-           userContext?.userClientConfig?.[clientFilter]?.forcedMyRequests || false;
+
+    if (clientFilter) {
+      // Forzado a nivel de cliente O a nivel de relación usuario-cliente para el cliente seleccionado
+      return userContext?.clientData?.[clientFilter]?.forcedMyRequests ||
+             userContext?.userClientConfig?.[clientFilter]?.forcedMyRequests || false;
+    }
+
+    // Si no hay filtro de cliente (Vista Global), forzamos si al menos uno de sus clientes está forzado
+    return (userContext?.allowedClientIds || []).some(id =>
+      userContext?.clientData?.[id]?.forcedMyRequests ||
+      userContext?.userClientConfig?.[id]?.forcedMyRequests
+    );
   }, [clientFilter, userContext]);
 
   useEffect(() => {
@@ -549,8 +557,8 @@ const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onCh
             </div>
 
             <div className="flex items-center gap-4">
-               <label className={`flex items-center gap-3 p-2 px-4 rounded-xl border transition-all cursor-pointer select-none ${onlyMine ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200'}`}>
-                <div onClick={() => !isForcedMyRequests && setOnlyMine(!onlyMine)} className={`w-10 h-5 rounded-full transition-colors duration-200 flex items-center px-0.5 ${onlyMine ? 'bg-appBlue' : 'bg-gray-300'} ${isForcedMyRequests ? 'opacity-50 cursor-not-allowed' : ''}`}>
+               <label className={`flex items-center gap-3 p-2 px-4 rounded-xl border transition-all ${isForcedMyRequests ? 'cursor-default' : 'cursor-pointer'} select-none ${onlyMine ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200'}`}>
+                <div onClick={() => !isForcedMyRequests && setOnlyMine(!onlyMine)} className={`w-10 h-5 rounded-full transition-colors duration-200 flex items-center px-0.5 ${onlyMine ? 'bg-appBlue' : 'bg-gray-300'} ${isForcedMyRequests ? 'opacity-50' : ''}`}>
                   <div className={`w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-200 ${onlyMine ? 'translate-x-5' : 'translate-x-0'}`}></div>
                 </div>
                 <span className={`text-xs font-bold ${onlyMine ? 'text-appBlue' : 'text-gray-600'}`}>Mis Solicitudes</span>
