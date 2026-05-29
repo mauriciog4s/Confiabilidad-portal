@@ -364,12 +364,20 @@ function createRequest(email, payload) {
   const bq = new BigQueryClient();
   const projectId = BQ_CREDENTIALS.project_id;
   const tableWrite = `${projectId}.${DATASET_ID}.${TABLES.WRITE_TABLE}`;
+  const tableServices = `${projectId}.${DATASET_ID}.${TABLES.SERVICES}`;
   const newId = generateUniqueId();
+
+  // Normalización de campos críticos
+  const norm = (val) => String(val || '').trim().toUpperCase();
+  const nombreNorm = norm(payload.nombre);
+  const identNorm = norm(payload.identificacion);
+  const ciudadNorm = norm(payload.ciudad);
+  const razonSocialNorm = norm(context.clientNames[payload.clientId] || '');
 
   const insertSql = `
     INSERT INTO \`${tableWrite}\`
     (
-      ID_SolicitudesConfiabilidad, UsuarioActualizacion, \`UsuarioCreación\`, ID_Cliente, Identificacion, NombreCompleto,
+      ID_SolicitudesConfiabilidad, UsuarioActualizacion, \`UsuarioCreación\`, ID_Cliente, RazonSocial, Identificacion, NombreCompleto,
       CentroCostos, TipoTrabajador, EstadoActual, FechaSolicitud,
       TipoIdentificacion, FechaExpedicion, Cargo, Correo, Celular,
       Ciudad, Barrio, Direccion,
@@ -381,7 +389,7 @@ function createRequest(email, payload) {
       ClienteClientesSecundarios, NITClienteSecundario, ConvenioClienteSecundario, TipoCostoClienteSecundario, CentroCostosExterno
     )
     VALUES (
-      @id, @usuarioActualizacion, @usuarioCreacion, @cliente, @identificacion, @nombre,
+      @id, @usuarioActualizacion, @usuarioCreacion, @cliente, @razonSocial, @identificacion, @nombre,
       @cc, @tipo, @estado, CAST(CURRENT_TIMESTAMP() AS STRING),
       @tipoId, @fechaExp, @cargo, @correo, @celular,
       @ciudad, @barrio, @direccion,
@@ -396,11 +404,11 @@ function createRequest(email, payload) {
 
   bq.query(insertSql, {
     id: newId, usuarioActualizacion: emailFinal, usuarioCreacion: emailFinal, cliente: payload.clientId,
-    identificacion: payload.identificacion, nombre: payload.nombre,
+    razonSocial: razonSocialNorm, identificacion: identNorm, nombre: nombreNorm,
     cc: payload.centroCostos || 'N/A', tipo: payload.tipoTrabajador, estado: "Creada",
     tipoId: payload.tipoIdentificacion || '', fechaExp: payload.fechaExpedicion || '',
     cargo: payload.cargo || '', correo: payload.correo || '', celular: payload.celular || '',
-    ciudad: payload.ciudad || '', barrio: payload.barrio || '', direccion: payload.direccion || '',
+    ciudad: ciudadNorm, barrio: payload.barrio || '', direccion: payload.direccion || '',
     visita: payload.visitaDomiciliaria || 'NO', modalidad: payload.modalidadVisita || '',
     antecedentes: payload.consultaAntecedentes || 'NO', referencia: payload.referenciacion || 'NO',
     refAcad: payload.referenciaAcademica || 'NO', refLab: payload.referenciaLaboral || 'NO',
@@ -414,7 +422,34 @@ function createRequest(email, payload) {
     ccExterno: payload.centroCostosExterno || ''
   });
 
-  return { success: true, requestId: newId, message: "Solicitud creada correctamente." };
+  // Inicializar registros en conServiciosAplicar (Tarea: Activar automatizaciones de AppSheet)
+  const servicesToInit = [];
+  if (payload.visitaDomiciliaria === 'SI' || payload.visitaDomiciliaria === true) servicesToInit.push('Visita Domiciliaria');
+  if (payload.consultaAntecedentes === 'SI' || payload.consultaAntecedentes === true) servicesToInit.push('Consulta de Antecedentes');
+  if (payload.referenciacion === 'SI' || payload.referenciacion === true) servicesToInit.push('Referenciación');
+  if (payload.estudiosPoligrafia === 'SI' || payload.estudiosPoligrafia === true) servicesToInit.push('Estudio de Poligrafía');
+  if (payload.consultaDatacredito === 'SI' || payload.consultaDatacredito === true) servicesToInit.push('Consulta Datacrédito');
+  if (payload.comparativoOEA === 'SI' || payload.comparativoOEA === true) servicesToInit.push('Comparativo OEA');
+
+  for (const service of servicesToInit) {
+    try {
+      const sqlSrv = `
+        INSERT INTO \`${tableServices}\`
+        (ID_ServiciosAplicar, ID_SolicitudesConfiabilidad, TipoServicio, EstadoActual, FechaActualizacion, UsuarioActualizacion, \`UsuarioCreación\`)
+        VALUES (@srvId, @reqId, @tipo, 'Ingresada', CAST(CURRENT_TIMESTAMP() AS STRING), @user, @user)
+      `;
+      bq.query(sqlSrv, {
+        srvId: generateUniqueId(),
+        reqId: newId,
+        tipo: service,
+        user: emailFinal
+      });
+    } catch (e) {
+      console.error(`Error inicializando servicio ${service}: ${e.message}`);
+    }
+  }
+
+  return { success: true, requestId: newId, message: "Solicitud creada correctamente e inicializada." };
 }
 
 // ─── CARGA MASIVA ───────────────────────────────────────────────────────
@@ -444,11 +479,13 @@ function processBulkUpload(email, { csvContent, clientId }) {
   const bq = new BigQueryClient();
   const projectId = BQ_CREDENTIALS.project_id;
   const tableWrite = `${projectId}.${DATASET_ID}.${TABLES.WRITE_TABLE}`;
+  const tableServices = `${projectId}.${DATASET_ID}.${TABLES.SERVICES}`;
 
   const normalizeStr = (str) => {
     if (!str) return "";
     return String(str).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
   };
+  const razonSocialNorm = normalizeStr(context.clientNames[clientId] || '');
 
   // Verificar tipo de cliente
   let clientTypeRaw = context.clientTypes[clientId];
@@ -570,10 +607,11 @@ function processBulkUpload(email, { csvContent, clientId }) {
 
   for (const rowData of parsedRows) {
     try {
+      const newReqId = generateUniqueId();
       const insertSql = `
         INSERT INTO \`${tableWrite}\`
         (
-          ID_SolicitudesConfiabilidad, UsuarioActualizacion, \`UsuarioCreación\`, ID_Cliente, Identificacion, NombreCompleto,
+          ID_SolicitudesConfiabilidad, UsuarioActualizacion, \`UsuarioCreación\`, ID_Cliente, RazonSocial, Identificacion, NombreCompleto,
           CentroCostos, TipoTrabajador, EstadoActual, FechaSolicitud,
           TipoIdentificacion, FechaExpedicion, Cargo, Correo, Celular,
           Ciudad, Barrio, Direccion,
@@ -584,7 +622,7 @@ function processBulkUpload(email, { csvContent, clientId }) {
           Linea, LineaNegocio, ClienteProyectoInterno, CentroCostosExterno
         )
         VALUES (
-          @id, @usuarioActualizacion, @usuarioCreacion, @cliente, @ident, @nombre,
+          @id, @usuarioActualizacion, @usuarioCreacion, @cliente, @razonSocial, @ident, @nombre,
           @cc, @tipo, @estado, CAST(CURRENT_TIMESTAMP() AS STRING),
           @tipoId, @fechaExp, @cargo, @correo, @celular,
           @ciudad, @barrio, @dir,
@@ -596,8 +634,9 @@ function processBulkUpload(email, { csvContent, clientId }) {
         )
       `;
       bq.query(insertSql, {
-        id: generateUniqueId(), usuarioActualizacion: email, usuarioCreacion: email, cliente: clientId,
-        ident: rowData.Identificacion || '', nombre: rowData.NombreCompleto || '',
+        id: newReqId, usuarioActualizacion: email, usuarioCreacion: email, cliente: clientId,
+        razonSocial: razonSocialNorm,
+        ident: normalizeStr(rowData.Identificacion), nombre: normalizeStr(rowData.NombreCompleto),
         cc: rowData.CentroCostos || '', tipo: rowData.TipoTrabajador || 'Nuevo', estado: "Creada",
         tipoId: rowData.TipoIdentificacion || '', fechaExp: rowData.FechaExpedicion || '',
         cargo: rowData.Cargo || '', correo: rowData.Correo || '', celular: rowData.Celular || '',
@@ -611,6 +650,36 @@ function processBulkUpload(email, { csvContent, clientId }) {
         notas: rowData.Notas || '', linea: rowData.Linea || '', lineaNeg: rowData.LineaNegocio || '',
         proyInt: rowData.ClienteProyectoInterno || '', ccExt: rowData.CentroCostosExterno || ''
       });
+
+      // Inicializar registros en conServiciosAplicar (Masivo)
+      const servicesToInit = [];
+      const isSi = (val) => val === 'SI' || val === true || String(val).toUpperCase() === 'SI' || String(val).toUpperCase() === 'TRUE';
+
+      if (isSi(rowData.VisitaDomiciliaria))   servicesToInit.push('Visita Domiciliaria');
+      if (isSi(rowData.ConsultaAntecedentes)) servicesToInit.push('Consulta de Antecedentes');
+      if (isSi(rowData.Referenciacion))        servicesToInit.push('Referenciación');
+      if (isSi(rowData.EstudiosPoligrafia))   servicesToInit.push('Estudio de Poligrafía');
+      if (isSi(rowData.ConsultaDatacredito))  servicesToInit.push('Consulta Datacrédito');
+      if (isSi(rowData.ComparativoOEA))      servicesToInit.push('Comparativo OEA');
+
+      for (const service of servicesToInit) {
+        try {
+          const sqlSrv = `
+            INSERT INTO \`${tableServices}\`
+            (ID_ServiciosAplicar, ID_SolicitudesConfiabilidad, TipoServicio, EstadoActual, FechaActualizacion, UsuarioActualizacion, \`UsuarioCreación\`)
+            VALUES (@srvId, @reqId, @tipo, 'Ingresada', CAST(CURRENT_TIMESTAMP() AS STRING), @user, @user)
+          `;
+          bq.query(sqlSrv, {
+            srvId: generateUniqueId(),
+            reqId: newReqId,
+            tipo: service,
+            user: email
+          });
+        } catch (srvErr) {
+          console.error(`Error inicializando servicio masivo ${service}: ${srvErr.message}`);
+        }
+      }
+
       successCount++;
     } catch (e) {
       insertErrors++;
