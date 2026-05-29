@@ -427,7 +427,6 @@ const PERIODS = [
   { key: 'week',  label: 'Semana'  },
   { key: 'month', label: 'Mes'     },
   { key: 'year',  label: 'Año'     },
-  { key: 'all',   label: 'Histórico' },
 ];
 
 const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onChangePeriod, currentPeriod, refreshing, userContext, masterData }) => {
@@ -1861,7 +1860,7 @@ const App = () => {
       setUserCtx(ctx);
       if (ctx.isValidUser) {
         const isHistoryDefault = ['Cliente Consulta', 'Cliente Perfilado'].includes(ctx.role);
-        const defaultPeriod = isHistoryDefault ? 'all' : 'today';
+        const defaultPeriod = isHistoryDefault ? 'year' : 'today';
         setPeriod(defaultPeriod);
         setView(ctx.role === 'Cliente Consulta' ? 'history' : 'home');
         // Cargar datos en paralelo
