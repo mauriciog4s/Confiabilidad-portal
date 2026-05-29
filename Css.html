@@ -42,11 +42,40 @@
     @apply transition-all duration-150 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
+  /* Estilos 3D y Modernos */
+  .btn-3d {
+    @apply relative transition-all duration-150 shadow-3d active:shadow-3d-active active:translate-y-[3px] disabled:opacity-50 disabled:translate-y-0 disabled:shadow-none;
+  }
+
+  .btn-3d-blue { @apply btn-3d bg-vividBlue hover:bg-blue-600 text-white shadow-blue-800/40 hover:shadow-glow-blue; }
+  .btn-3d-red  { @apply btn-3d bg-vividRed  hover:bg-red-600  text-white shadow-red-800/40  hover:shadow-glow-red;  }
+  .btn-3d-gray { @apply btn-3d bg-white     hover:bg-gray-50  text-gray-700 shadow-gray-300; }
+
+  .card-3d {
+    @apply bg-white rounded-3xl border border-gray-100 shadow-card-3d transition-all duration-300 hover:shadow-xl hover:-translate-y-1;
+  }
+
+  .glow-pulse-blue { animation: glowPulseBlue 2s infinite; }
+  .glow-pulse-red  { animation: glowPulseRed 2s infinite; }
+
+  @keyframes glowPulseBlue {
+    0% { box-shadow: 0 0 5px rgba(0, 85, 255, 0.2); }
+    50% { box-shadow: 0 0 20px rgba(0, 85, 255, 0.5); }
+    100% { box-shadow: 0 0 5px rgba(0, 85, 255, 0.2); }
+  }
+
+  @keyframes glowPulseRed {
+    0% { box-shadow: 0 0 5px rgba(211, 47, 47, 0.2); }
+    50% { box-shadow: 0 0 20px rgba(211, 47, 47, 0.5); }
+    100% { box-shadow: 0 0 5px rgba(211, 47, 47, 0.2); }
+  }
+
   /* Periodo filter pill */
   .period-pill        { @apply px-3 py-1.5 rounded-full text-xs font-bold border transition-all duration-150 whitespace-nowrap; }
   .period-pill-active { @apply bg-appBlue text-white border-appBlue shadow-sm; }
   .period-pill-idle   { @apply bg-white text-gray-600 border-gray-300 hover:border-appBlue hover:text-appBlue; }
 
-  .custom-scrollbar::-webkit-scrollbar { height: 4px; }
-  .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; }
+  .custom-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
+  .custom-scrollbar::-webkit-scrollbar-track { @apply bg-transparent; }
+  .custom-scrollbar::-webkit-scrollbar-thumb { @apply bg-gray-300 rounded-full hover:bg-gray-400; }
 </style>

@@ -263,12 +263,12 @@ const LoginView = ({ onSuccess, isLoading }) => (
         <p className="text-gray-500 mb-8 text-sm">Plataforma de Gestión</p>
         {isLoading ? (
           <div className="py-6">
-            <div className="w-10 h-10 border-4 border-appRed border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-            <p className="text-xs text-gray-400">Autenticando...</p>
+            <div className="w-10 h-10 border-4 border-vividRed border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+            <p className="text-xs text-gray-400 font-black uppercase tracking-widest">Autenticando...</p>
           </div>
         ) : (
-          <button onClick={onSuccess} className="w-full bg-appBlue hover:bg-blue-800 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition shadow-sm btn-action">
-            <Icon name="User" size={18}/> Ingresar con Google
+          <button onClick={onSuccess} className="w-full btn-3d-blue py-4 px-4 rounded-2xl flex items-center justify-center gap-3 transition">
+            <Icon name="User" size={20}/> <span className="text-sm font-black uppercase tracking-widest">Ingresar con Google</span>
           </button>
         )}
         <div className="mt-8 text-[10px] text-gray-400">© 2025 G4S Secure Solutions.</div>
@@ -320,21 +320,19 @@ const Sidebar = ({ currentView, setView, onLogout, userContext, syncStatus, last
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto py-3 space-y-1">
+        <div className="flex-1 overflow-y-auto py-3 space-y-2 px-2">
           {menuItems.map((item) => (
-            <div key={item.id} onClick={() => handleNav(item.id)} title={isCollapsed ? item.title : ""} className={`px-4 py-2.5 cursor-pointer transition-colors border-l-4 ${currentView === item.id ? 'bg-red-50 border-appRed' : 'border-transparent hover:bg-gray-50'}`}>
-              <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
-                <Icon name={item.icon} className={currentView === item.id ? 'text-appRed' : 'text-gray-400'} size={isCollapsed ? 22 : 18}/>
-                {!isCollapsed && <span className={`font-medium text-xs ${currentView === item.id ? 'text-appRed font-bold' : 'text-gray-600'}`}>{item.title}</span>}
-              </div>
+            <div key={item.id} onClick={() => handleNav(item.id)} title={isCollapsed ? item.title : ""}
+              className={`px-3 py-3 cursor-pointer transition-all duration-200 rounded-2xl flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} ${currentView === item.id ? 'bg-vividRed text-white shadow-lg shadow-red-500/30 scale-[1.02]' : 'text-gray-500 hover:bg-gray-100'}`}>
+              <Icon name={item.icon} className={currentView === item.id ? 'text-white' : 'text-gray-400'} size={isCollapsed ? 24 : 20}/>
+              {!isCollapsed && <span className={`font-bold text-xs tracking-wide uppercase ${currentView === item.id ? 'text-white' : ''}`}>{item.title}</span>}
             </div>
           ))}
-          <div className="my-2 border-t border-gray-100 mx-4"></div>
-          <div onClick={() => handleNav('config')} title={isCollapsed ? "Configuración" : ""} className={`px-4 py-2.5 cursor-pointer transition-colors border-l-4 ${currentView === 'config' ? 'bg-blue-50 border-appBlue' : 'border-transparent hover:bg-gray-50'}`}>
-            <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
-              <Icon name="Settings" className={currentView === 'config' ? 'text-appBlue' : 'text-gray-400'} size={isCollapsed ? 22 : 18}/>
-              {!isCollapsed && <span className={`font-medium text-xs ${currentView === 'config' ? 'text-appBlue font-bold' : 'text-gray-600'}`}>Configuración</span>}
-            </div>
+          <div className="my-4 border-t border-gray-100 mx-2"></div>
+          <div onClick={() => handleNav('config')} title={isCollapsed ? "Configuración" : ""}
+            className={`px-3 py-3 cursor-pointer transition-all duration-200 rounded-2xl flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} ${currentView === 'config' ? 'bg-vividBlue text-white shadow-lg shadow-blue-500/30 scale-[1.02]' : 'text-gray-500 hover:bg-gray-100'}`}>
+            <Icon name="Settings" className={currentView === 'config' ? 'text-white' : 'text-gray-400'} size={isCollapsed ? 24 : 20}/>
+            {!isCollapsed && <span className={`font-bold text-xs tracking-wide uppercase ${currentView === 'config' ? 'text-white' : ''}`}>Configuración</span>}
           </div>
         </div>
         <div className={`p-4 border-t bg-gray-50 ${isCollapsed ? 'flex flex-col items-center' : ''}`}>
@@ -357,8 +355,8 @@ const Sidebar = ({ currentView, setView, onLogout, userContext, syncStatus, last
               </div>
             )}
           </div>
-          <button onClick={onLogout} title={isCollapsed ? "Salir" : ""} className={`w-full py-2 bg-white border border-gray-300 rounded text-[10px] font-bold text-gray-700 hover:bg-gray-100 transition flex items-center justify-center gap-2 btn-action ${isCollapsed ? 'px-0' : 'px-3'}`}>
-            <Icon name="LogIn" size={13} className="rotate-180"/> {!isCollapsed && "Salir"}
+          <button onClick={onLogout} title={isCollapsed ? "Salir" : ""} className={`w-full py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition flex items-center justify-center gap-2 btn-3d-gray ${isCollapsed ? 'px-0' : 'px-3'}`}>
+            <Icon name="LogIn" size={14} className="rotate-180"/> {!isCollapsed && "Cerrar Sesión"}
           </button>
         </div>
       </div>
@@ -386,36 +384,49 @@ const HomeDashboard = ({ userContext, requests, setView, syncStatus }) => {
         )}
       </div>
       <p className="text-gray-500 mb-8">Bienvenido al portal de Confiabilidad G4S. Los datos muestran el período activo.</p>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
         {[
-          { label:'Total', sub:'Solicitudes', val: stats.total,   icon:'FileText',    bg:'bg-blue-50',   fg:'text-blue-600'   },
-          { label:'En Proceso', sub:'Estudios activos', val: stats.pending,  icon:'Clock',      bg:'bg-yellow-50', fg:'text-yellow-600' },
-          { label:'Finalizados', sub:'Estudios completados', val: stats.completed, icon:'CheckCircle', bg:'bg-green-50',  fg:'text-green-600'  },
+          { label:'Total', sub:'Solicitudes', val: stats.total,   icon:'FileText',    bg:'bg-vividBlue/10',   fg:'text-vividBlue'   },
+          { label:'En Proceso', sub:'Estudios activos', val: stats.pending,  icon:'Clock',      bg:'bg-vividOrange/10', fg:'text-vividOrange' },
+          { label:'Finalizados', sub:'Estudios completados', val: stats.completed, icon:'CheckCircle', bg:'bg-vividGreen/10',  fg:'text-vividGreen'  },
         ].map(s => (
-          <div key={s.label} onClick={() => userContext.role !== 'Cliente Creación' && setView('history')} className={`bg-white p-6 rounded-xl shadow-sm border border-gray-200 transition transform ${userContext.role !== 'Cliente Creación' ? 'cursor-pointer hover:shadow-md hover:-translate-y-1 btn-action' : 'opacity-80'}`}>
-            <div className="flex justify-between items-start mb-4">
-              <div className={`p-3 ${s.bg} ${s.fg} rounded-lg`}><Icon name={s.icon} size={24}/></div>
-              <span className="text-xs font-bold text-gray-400 uppercase">{s.label}</span>
+          <div key={s.label} onClick={() => userContext.role !== 'Cliente Creación' && setView('history')}
+            className={`card-3d p-8 relative overflow-hidden group ${userContext.role !== 'Cliente Creación' ? 'cursor-pointer' : 'opacity-80'}`}>
+            <div className={`absolute top-0 right-0 w-24 h-24 -mr-8 -mt-8 rounded-full opacity-10 transition-transform group-hover:scale-150 duration-500 ${s.bg.replace('/10','')}`}></div>
+            <div className="flex justify-between items-start mb-6 relative z-10">
+              <div className={`p-4 ${s.bg} ${s.fg} rounded-2xl shadow-inner`}><Icon name={s.icon} size={28}/></div>
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{s.label}</span>
             </div>
-            <div className="text-3xl font-bold text-gray-800">{s.val}</div>
-            <div className="text-sm text-gray-500">{s.sub}</div>
+            <div className="text-4xl font-black text-gray-800 mb-1 relative z-10">{s.val}</div>
+            <div className="text-xs font-bold text-gray-500 uppercase tracking-tight relative z-10">{s.sub}</div>
           </div>
         ))}
       </div>
       {userContext.role !== 'Cliente Consulta' && (
-        <>
-          <h2 className="text-xl font-bold text-gray-800 mb-4">¿Qué deseas hacer hoy?</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <button onClick={() => setView('create')} className="flex items-center gap-4 p-6 bg-gradient-to-r from-appRed to-red-700 text-white rounded-xl shadow hover:shadow-lg transition text-left btn-action">
-              <div className="bg-white/20 p-3 rounded-full"><Icon name="ClipboardList" size={32}/></div>
-              <div><div className="text-lg font-bold">Nueva Solicitud</div><div className="text-white/80 text-sm">Registrar un estudio individual.</div></div>
+        <div className="animate-fade-in delay-100">
+          <h2 className="text-2xl font-black text-gray-800 mb-6 flex items-center gap-3">
+            <span className="w-1.5 h-8 bg-vividRed rounded-full"></span>
+            ¿Qué deseas hacer hoy?
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <button onClick={() => setView('create')}
+              className="group flex items-center gap-6 p-8 bg-gradient-to-br from-vividRed to-red-800 text-white rounded-3xl shadow-xl hover:shadow-vividRed/40 transition-all duration-300 transform hover:-translate-y-1 active:scale-95 btn-3d">
+              <div className="bg-white/20 p-5 rounded-2xl backdrop-blur-md group-hover:scale-110 transition-transform"><Icon name="ClipboardList" size={36}/></div>
+              <div className="text-left">
+                <div className="text-xl font-black tracking-tight">Nueva Solicitud</div>
+                <div className="text-white/80 text-sm font-medium">Registrar un estudio individual de forma rápida.</div>
+              </div>
             </button>
-            <button onClick={() => setView('bulk')} className="flex items-center gap-4 p-6 bg-white border border-gray-200 text-gray-700 rounded-xl shadow-sm hover:bg-gray-50 transition text-left btn-action">
-              <div className="bg-blue-50 text-blue-600 p-3 rounded-full"><Icon name="Upload" size={32}/></div>
-              <div><div className="text-lg font-bold">Carga Masiva</div><div className="text-gray-500 text-sm">Subir múltiples registros desde CSV.</div></div>
+            <button onClick={() => setView('bulk')}
+              className="group flex items-center gap-6 p-8 bg-white border border-gray-100 text-gray-700 rounded-3xl shadow-xl hover:shadow-vividBlue/20 transition-all duration-300 transform hover:-translate-y-1 active:scale-95 btn-3d">
+              <div className="bg-vividBlue/10 text-vividBlue p-5 rounded-2xl group-hover:scale-110 transition-transform"><Icon name="Upload" size={36}/></div>
+              <div className="text-left">
+                <div className="text-xl font-black tracking-tight text-gray-800">Carga Masiva</div>
+                <div className="text-gray-500 text-sm font-medium">Subir múltiples registros desde archivos CSV.</div>
+              </div>
             </button>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
@@ -525,11 +536,11 @@ const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onCh
               </div>
             </div>
             
-            <div className="flex items-center gap-2">
-              <button onClick={handleExport} className="px-4 py-2 text-green-700 hover:bg-green-100 border border-green-200 rounded-xl bg-green-50 flex items-center gap-2 text-xs font-bold transition-all btn-action">
+            <div className="flex items-center gap-3">
+              <button onClick={handleExport} className="px-4 py-2 text-vividGreen hover:bg-vividGreen/10 border border-vividGreen/20 rounded-2xl bg-white flex items-center gap-2 text-[10px] font-black uppercase tracking-tight transition-all btn-3d shadow-gray-200">
                 <Icon name="Download" size={14}/> Exportar CSV
               </button>
-              <button onClick={onRefresh} disabled={refreshing} className="px-4 py-2 text-appBlue hover:bg-blue-100 border border-blue-200 rounded-xl bg-blue-50 flex items-center gap-2 text-xs font-bold transition-all btn-action disabled:opacity-50">
+              <button onClick={onRefresh} disabled={refreshing} className="px-4 py-2 text-vividBlue hover:bg-vividBlue/10 border border-vividBlue/20 rounded-2xl bg-white flex items-center gap-2 text-[10px] font-black uppercase tracking-tight transition-all btn-3d shadow-gray-200 disabled:opacity-50">
                 <Icon name="RefreshCw" size={14} className={refreshing ? "animate-spin" : ""}/>
                 {refreshing ? 'Sincronizando...' : 'Actualizar'}
               </button>
@@ -1051,221 +1062,234 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
 
   if (showSuccess) return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/30 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white p-8 rounded-3xl shadow-2xl text-center max-w-sm w-full border border-gray-100 animate-scale-in">
-        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm">
-          <Icon name="CheckCircle" size={40} className="text-green-600"/>
+      <div className="bg-white p-10 rounded-3xl shadow-2xl text-center max-w-md w-full border border-gray-100 animate-scale-in">
+        <div className="w-24 h-24 bg-vividGreen/10 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-inner transform rotate-12">
+          <Icon name="CheckCircle" size={48} className="text-vividGreen -rotate-12"/>
         </div>
-        <h2 className="text-2xl font-bold text-gray-800 mb-2">¡Solicitud Creada!</h2>
-        <div className="text-sm text-gray-500 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100 text-left">
-          <div className="grid grid-cols-2 gap-y-2">
-            <span className="font-bold text-gray-400 text-xs uppercase">ID Solicitud:</span>
-            <span className="text-right font-mono font-bold text-appBlue">{createdId}</span>
-            <span className="font-bold text-gray-400 text-xs uppercase">Evaluado:</span>
-            <span className="text-right font-medium text-gray-700 truncate">{formData.nombre}</span>
+        <h2 className="text-3xl font-black text-gray-800 mb-2 tracking-tight">¡Éxito Total!</h2>
+        <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-8 text-center">La solicitud ha sido procesada</p>
+
+        <div className="bg-gray-50/50 p-6 rounded-3xl border border-gray-100 text-left mb-8 space-y-4">
+          <div className="flex justify-between items-center">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">ID Solicitud</span>
+            <span className="font-mono font-black text-vividBlue bg-white px-3 py-1 rounded-xl shadow-sm border border-gray-100">{createdId}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Evaluado</span>
+            <span className="font-black text-gray-700 truncate ml-4 uppercase text-[11px]">{formData.nombre}</span>
           </div>
         </div>
-        <div className="space-y-3">
-          <button onClick={resetForm} className="w-full bg-gray-900 hover:bg-black text-white font-bold py-3 px-6 rounded-xl shadow-lg transition btn-action flex items-center justify-center gap-2">
-            <Icon name="ClipboardList" size={17}/> Crear Otra
+
+        <div className="grid grid-cols-1 gap-4">
+          <button onClick={resetForm} className="btn-3d-blue py-4 rounded-2xl flex items-center justify-center gap-3">
+            <Icon name="ClipboardList" size={18}/> <span className="text-xs font-black uppercase tracking-widest">Crear Nueva</span>
           </button>
-          <button onClick={() => setView('history')} className="w-full bg-white border border-gray-200 text-gray-600 font-bold py-3 px-6 rounded-xl hover:bg-gray-50 transition btn-action flex items-center justify-center gap-2">
-            <Icon name="History" size={17}/> Ir al Historial
+          <button onClick={() => setView('history')} className="btn-3d-gray py-4 rounded-2xl flex items-center justify-center gap-3">
+            <Icon name="History" size={18}/> <span className="text-xs font-black uppercase tracking-widest text-gray-600">Ver Historial</span>
           </button>
         </div>
       </div>
     </div>
   );
 
-  const inputClass = "w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-appBlue outline-none";
-  const labelClass = "md:col-span-3 text-sm text-gray-600 font-medium";
-  const fieldClass = "grid grid-cols-1 md:grid-cols-12 gap-4 items-center";
+  const inputClass = "w-full border border-gray-200 rounded-xl p-2 text-xs focus:ring-2 focus:ring-vividBlue/20 focus:border-vividBlue outline-none transition-all bg-gray-50/50 hover:bg-white";
+  const labelClass = "text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1 block";
+  const fieldClass = "flex flex-col";
 
   return (
-    <div className="p-4 md:p-8 max-w-4xl mx-auto animate-fade-in">
+    <div className="p-4 md:p-8 max-w-5xl mx-auto animate-fade-in pb-20">
       {/* Stepper */}
-      <div className="flex items-center justify-center mb-8">
-        <div className="flex items-center">
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${step===1?'bg-appRed text-white':'bg-gray-400 text-white'}`}>1</div>
-          <span className={`ml-2 text-sm font-medium ${step===1?'text-gray-800':'text-gray-400'}`}>Información Del Evaluado</span>
+      <div className="flex items-center justify-center mb-10">
+        <div className="flex items-center group cursor-pointer" onClick={() => setStep(1)}>
+          <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-sm transition-all shadow-lg ${step===1?'bg-vividRed text-white shadow-red-500/40 scale-110':'bg-white text-gray-400 border border-gray-100'}`}>1</div>
+          <div className="ml-4">
+             <span className={`block text-[10px] font-black uppercase tracking-widest ${step===1?'text-vividRed':'text-gray-400'}`}>Paso 1</span>
+             <span className={`text-xs font-bold ${step===1?'text-gray-800':'text-gray-400'}`}>Información Evaluado</span>
+          </div>
         </div>
-        <div className="w-12 h-px bg-gray-300 mx-4"></div>
-        <div className="flex items-center">
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${step===2?'bg-appRed text-white':'bg-gray-400 text-white'}`}>2</div>
-          <span className={`ml-2 text-sm font-medium ${step===2?'text-gray-800':'text-gray-400'}`}>Servicios A Aplicar</span>
+        <div className="w-16 h-1 bg-gray-100 mx-6 rounded-full overflow-hidden">
+           <div className={`h-full bg-vividRed transition-all duration-500 ${step===2?'w-full':'w-0'}`}></div>
+        </div>
+        <div className="flex items-center group cursor-pointer" onClick={() => step === 2 && setStep(2)}>
+          <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-sm transition-all shadow-lg ${step===2?'bg-vividRed text-white shadow-red-500/40 scale-110':'bg-white text-gray-400 border border-gray-100'}`}>2</div>
+          <div className="ml-4">
+             <span className={`block text-[10px] font-black uppercase tracking-widest ${step===2?'text-vividRed':'text-gray-400'}`}>Paso 2</span>
+             <span className={`text-xs font-bold ${step===2?'text-gray-800':'text-gray-400'}`}>Servicios A Aplicar</span>
+          </div>
         </div>
       </div>
 
-      <div className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-gray-100">
+      <div className="card-3d p-6 md:p-10 border-none">
         {step === 1 && (
-          <div className="animate-fade-in space-y-5">
-            <h3 className="text-xl font-medium text-gray-800 mb-4">Información Del Evaluado</h3>
+          <div className="animate-fade-in space-y-8">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+               <h3 className="text-2xl font-black text-gray-800 tracking-tight">Datos del Candidato</h3>
+               <div className="px-4 py-1.5 bg-vividBlue/10 text-vividBlue rounded-full text-[10px] font-black uppercase tracking-tighter shadow-inner">
+                 Fecha: {formData.fechaSolicitud.split(',')[0]}
+               </div>
+            </div>
 
-            <div className={fieldClass}><label className={labelClass}>Fecha Solicitud</label>
-              <div className="md:col-span-9"><input type="text" readOnly value={formData.fechaSolicitud} className={`${inputClass} bg-gray-50 text-gray-500`}/></div></div>
-
-            <div className={fieldClass}><label className={labelClass}>Cliente <span className="text-red-500">*</span></label>
-              <div className="md:col-span-9">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className={fieldClass}>
+                <label className={labelClass}>Cliente Principal <span className="text-vividRed">*</span></label>
                 <select name="clientId" value={formData.clientId} onChange={handleChange} className={inputClass}>
                   <option value="">Seleccione...</option>
                   {userContext?.allowedClientIds?.map(id => <option key={id} value={id}>{userContext.clientNames?.[id] || id}</option>)}
                 </select>
-                {clientType && <div className="mt-1 text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded inline-block">Tipo: <span className="text-appBlue">{clientType}</span></div>}
-              </div></div>
-
-            <div className={fieldClass}><label className={labelClass}>NIT</label>
-              <div className="md:col-span-9"><input type="text" readOnly value={formData.nit} className={`${inputClass} bg-gray-50`}/></div></div>
-
-            <div className={fieldClass}><label className={labelClass}>Razón Social</label>
-              <div className="md:col-span-9"><input type="text" readOnly value={formData.razonSocial} className={`${inputClass} bg-gray-50`}/></div></div>
+                {clientType && <div className="mt-1.5 text-[9px] font-black text-vividBlue bg-vividBlue/5 px-2 py-0.5 rounded-lg uppercase self-start">Perfil: {clientType}</div>}
+              </div>
+              <div className={fieldClass}><label className={labelClass}>NIT</label><input type="text" readOnly value={formData.nit} className={`${inputClass} bg-gray-100/50 font-mono font-bold`}/></div>
+              <div className={fieldClass}><label className={labelClass}>Razón Social</label><input type="text" readOnly value={formData.razonSocial} className={`${inputClass} bg-gray-100/50 font-bold`}/></div>
+            </div>
 
             {isInternal && (
-              <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl space-y-4 animate-fade-in">
-                <h4 className="text-sm font-bold text-blue-800 uppercase border-b border-blue-200 pb-1">Datos Proyecto Interno</h4>
-                <div className={fieldClass}><label className={labelClass}>ClienteProyecto</label>
-                  <div className="md:col-span-9"><select name="clienteProyectoInterno" value={formData.clienteProyectoInterno} onChange={handleChange} className={inputClass}>
-                    <option value="">Seleccione...</option>{clienteProyectoList.map((cp,i) => <option key={i} value={cp.Descripcion}>{cp.Descripcion}</option>)}
-                  </select></div></div>
-                <div className={fieldClass}><label className={labelClass}>Línea <span className="text-red-500">*</span></label>
-                  <div className="md:col-span-9"><select name="linea" value={formData.linea} onChange={handleChange} className={inputClass}>
-                    <option value="">Seleccione...</option>{uniqueLineas.map((l,i) => <option key={i} value={l}>{l}</option>)}
-                  </select></div></div>
-                <div className={fieldClass}><label className={labelClass}>Línea Negocio <span className="text-red-500">*</span></label>
-                  <div className="md:col-span-9"><select name="lineaNegocio" value={formData.lineaNegocio} onChange={handleChange} disabled={!formData.linea} className={`${inputClass} disabled:bg-gray-100 disabled:text-gray-400`}>
-                    <option value="">Seleccione...</option>{availableLNs.map((l,i) => <option key={i} value={l}>{l}</option>)}
-                  </select></div></div>
-                <div className={fieldClass}><label className={labelClass}>Centro Costos <span className="text-red-500">*</span></label>
-                  <div className="md:col-span-9"><select name="centroCostos" value={formData.centroCostos} onChange={handleChange} disabled={!formData.lineaNegocio} className={`${inputClass} disabled:bg-gray-100 disabled:text-gray-400`}>
-                    <option value="">Seleccione...</option>{availableCCs.map((c,i) => <option key={i} value={c}>{c}</option>)}
-                  </select></div></div>
+              <div className="p-6 bg-vividBlue/[0.03] rounded-3xl border border-vividBlue/10 space-y-6 animate-scale-in">
+                <div className="flex items-center gap-2 mb-2">
+                   <div className="w-1.5 h-4 bg-vividBlue rounded-full"></div>
+                   <h4 className="text-xs font-black text-vividBlue uppercase tracking-widest">Configuración Proyecto Interno</h4>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className={fieldClass}><label className={labelClass}>Proyecto</label>
+                    <select name="clienteProyectoInterno" value={formData.clienteProyectoInterno} onChange={handleChange} className={inputClass}>
+                      <option value="">Seleccione...</option>{clienteProyectoList.map((cp,i) => <option key={i} value={cp.Descripcion}>{cp.Descripcion}</option>)}
+                    </select></div>
+                  <div className={fieldClass}><label className={labelClass}>Línea <span className="text-vividRed">*</span></label>
+                    <select name="linea" value={formData.linea} onChange={handleChange} className={inputClass}>
+                      <option value="">Seleccione...</option>{uniqueLineas.map((l,i) => <option key={i} value={l}>{l}</option>)}
+                    </select></div>
+                  <div className={fieldClass}><label className={labelClass}>Línea Negocio <span className="text-vividRed">*</span></label>
+                    <select name="lineaNegocio" value={formData.lineaNegocio} onChange={handleChange} disabled={!formData.linea} className={`${inputClass} disabled:opacity-50`}>
+                      <option value="">Seleccione...</option>{availableLNs.map((l,i) => <option key={i} value={l}>{l}</option>)}
+                    </select></div>
+                  <div className={fieldClass}><label className={labelClass}>Centro de Costos <span className="text-vividRed">*</span></label>
+                    <select name="centroCostos" value={formData.centroCostos} onChange={handleChange} disabled={!formData.lineaNegocio} className={`${inputClass} disabled:opacity-50`}>
+                      <option value="">Seleccione...</option>{availableCCs.map((c,i) => <option key={i} value={c}>{c}</option>)}
+                    </select></div>
+                </div>
               </div>
             )}
 
             {(!isInternal && formData.clientId) && (
-              <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl space-y-4 animate-fade-in">
-                <h4 className="text-sm font-bold text-blue-800 uppercase border-b border-blue-200 pb-1">Datos Cliente Externo</h4>
-                {availableSecondaryClients.length > 0 && (<>
-                  <div className={fieldClass}><label className={labelClass}>Cliente Secundario</label>
-                    <div className="md:col-span-9"><select name="clienteClientesSecundarios" value={formData.clienteClientesSecundarios} onChange={handleChange} className={inputClass}>
-                      <option value="">Seleccione...</option>{availableSecondaryClients.map((c,i) => <option key={i} value={c}>{c}</option>)}
-                    </select></div></div>
-                  <div className={fieldClass}><label className={labelClass}>NIT Secundario</label>
-                    <div className="md:col-span-9"><input type="text" name="nitClienteSecundario" value={formData.nitClienteSecundario} onChange={handleChange} className={inputClass}/></div></div>
-                  <div className={fieldClass}><label className={labelClass}>Convenio</label>
-                    <div className="md:col-span-9"><input type="text" name="convenioClienteSecundario" value={formData.convenioClienteSecundario} onChange={handleChange} className={inputClass}/></div></div>
-                  <div className={fieldClass}><label className={labelClass}>Tipo Costo</label>
-                    <div className="md:col-span-9"><input type="text" name="tipoCostoClienteSecundario" value={formData.tipoCostoClienteSecundario} onChange={handleChange} className={inputClass}/></div></div>
-                </>)}
-                <div className={fieldClass}><label className={labelClass}>Centro Costos Externo</label>
-                  <div className="md:col-span-9"><input type="text" name="centroCostosExterno" value={formData.centroCostosExterno} onChange={handleChange} className={inputClass}/></div></div>
+              <div className="p-6 bg-vividBlue/[0.03] rounded-3xl border border-vividBlue/10 space-y-6 animate-scale-in">
+                <div className="flex items-center gap-2 mb-2">
+                   <div className="w-1.5 h-4 bg-vividBlue rounded-full"></div>
+                   <h4 className="text-xs font-black text-vividBlue uppercase tracking-widest">Configuración Cliente Externo</h4>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  {availableSecondaryClients.length > 0 && (<>
+                    <div className={fieldClass}><label className={labelClass}>Cliente Secundario</label>
+                      <select name="clienteClientesSecundarios" value={formData.clienteClientesSecundarios} onChange={handleChange} className={inputClass}>
+                        <option value="">Seleccione...</option>{availableSecondaryClients.map((c,i) => <option key={i} value={c}>{c}</option>)}
+                      </select></div>
+                    <div className={fieldClass}><label className={labelClass}>NIT Secundario</label><input type="text" name="nitClienteSecundario" value={formData.nitClienteSecundario} onChange={handleChange} className={inputClass}/></div>
+                    <div className={fieldClass}><label className={labelClass}>Convenio</label><input type="text" name="convenioClienteSecundario" value={formData.convenioClienteSecundario} onChange={handleChange} className={inputClass}/></div>
+                    <div className={fieldClass}><label className={labelClass}>Tipo Costo</label><input type="text" name="tipoCostoClienteSecundario" value={formData.tipoCostoClienteSecundario} onChange={handleChange} className={inputClass}/></div>
+                  </>)}
+                  <div className={fieldClass}><label className={labelClass}>C. Costos Externo</label><input type="text" name="centroCostosExterno" value={formData.centroCostosExterno} onChange={handleChange} className={inputClass}/></div>
+                </div>
               </div>
             )}
 
-            <div className={fieldClass}><label className={labelClass}>Nombre Completo <span className="text-red-500">*</span></label>
-              <div className="md:col-span-9"><input type="text" name="nombre" value={formData.nombre} onChange={handleChange} className={inputClass}/></div></div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="md:col-span-2 flex flex-col">
+                <label className={labelClass}>Nombre Completo <span className="text-vividRed">*</span></label>
+                <input type="text" name="nombre" value={formData.nombre} onChange={handleChange} className={inputClass} placeholder="Nombre completo del evaluado"/>
+              </div>
+              <div className={fieldClass}><label className={labelClass}>Tipo ID <span className="text-vividRed">*</span></label>
+                <select name="tipoIdentificacion" value={formData.tipoIdentificacion} onChange={handleChange} className={inputClass}>
+                  <option value="">Seleccione...</option>
+                  <option value="Cédula de Ciudadanía">Cédula de Ciudadanía</option>
+                  <option value="Tarjeta de Identidad">Tarjeta de Identidad</option>
+                  <option value="Cédula de Extranjería">Cédula de Extranjería</option>
+                  <option value="Pasaporte">Pasaporte</option>
+                  <option value="Permiso Especial">Permiso Especial</option>
+                  <option value="Permiso Permanente de Trabajo">Permiso Permanente de Trabajo</option>
+                  <option value="PEP">PEP</option>
+                  <option value="Otro">Otro</option>
+                </select></div>
+              <div className={fieldClass}><label className={labelClass}>Identificación <span className="text-vividRed">*</span></label>
+                <input type="text" name="identificacion" value={formData.identificacion} onChange={handleIdentificacionChange} className={inputClass} placeholder="Número"/>
+              </div>
+            </div>
 
-            <div className={fieldClass}><label className={labelClass}>Tipo Identificación <span className="text-red-500">*</span></label>
-              <div className="md:col-span-9"><select name="tipoIdentificacion" value={formData.tipoIdentificacion} onChange={handleChange} className={inputClass}>
-                <option value="">Seleccione...</option>
-                <option value="Cédula de Ciudadanía">Cédula de Ciudadanía</option>
-                <option value="Tarjeta de Identidad">Tarjeta de Identidad</option>
-                <option value="Cédula de Extranjería">Cédula de Extranjería</option>
-                <option value="Pasaporte">Pasaporte</option>
-                <option value="Permiso Especial">Permiso Especial</option>
-                <option value="Permiso Permanente de Trabajo">Permiso Permanente de Trabajo</option>
-                <option value="PEP">PEP</option>
-                <option value="Otro">Otro</option>
-              </select></div></div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className={fieldClass}><label className={labelClass}>Fecha Expedición</label><input type="date" name="fechaExpedicion" value={formData.fechaExpedicion} onChange={handleChange} className={inputClass}/></div>
+              <div className={fieldClass}><label className={labelClass}>Cargo <span className="text-vividRed">*</span></label><input type="text" name="cargo" value={formData.cargo} onChange={handleChange} className={inputClass} placeholder="Puesto"/></div>
+              <div className={fieldClass}><label className={labelClass}>Correo</label><input type="email" name="correo" value={formData.correo} onChange={handleChange} className={inputClass} placeholder="email@ejemplo.com"/></div>
+              <div className={fieldClass}><label className={labelClass}>Celular <span className="text-vividRed">*</span></label>
+                <input type="tel" name="celular" value={formData.celular} onChange={handleCelularChange} inputMode="numeric" pattern="[0-9]*" maxLength={13} className={inputClass} placeholder="3001234567"/>
+              </div>
+            </div>
 
-            <div className={fieldClass}><label className={labelClass}>Identificación <span className="text-red-500">*</span></label>
-              <div className="md:col-span-9">
-                <input type="text" name="identificacion" value={formData.identificacion} onChange={handleIdentificacionChange} className={inputClass}/>
-                <p className="text-xs text-gray-400 mt-1">Solo letras y números, sin espacios. Entre 5 y 15 caracteres.</p>
-              </div></div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className={fieldClass}><label className={labelClass}>Ciudad <span className="text-vividRed">*</span></label>
+                <select name="ciudad" value={formData.ciudad} onChange={handleChange} className={inputClass}>
+                  <option value="">Seleccione...</option>
+                  {ciudadesList.length > 0
+                    ? ciudadesList.map((c,i) => <option key={i} value={c.Ciudades}>{c.Ciudades}</option>)
+                    : ['Bogotá','Medellín','Cali','Barranquilla','Otra'].map(c => <option key={c} value={c}>{c}</option>)}
+                </select></div>
+              <div className={fieldClass}><label className={labelClass}>Barrio</label><input type="text" name="barrio" value={formData.barrio} onChange={handleChange} className={inputClass}/></div>
+              <div className="md:col-span-2 flex flex-col"><label className={labelClass}>Dirección <span className="text-vividRed">*</span></label><input type="text" name="direccion" value={formData.direccion} onChange={handleChange} className={inputClass}/></div>
+            </div>
 
-            <div className={fieldClass}><label className={labelClass}>Fecha Expedición</label>
-              <div className="md:col-span-9"><input type="date" name="fechaExpedicion" value={formData.fechaExpedicion} onChange={handleChange} className={inputClass}/></div></div>
-
-            <div className={fieldClass}><label className={labelClass}>Cargo <span className="text-red-500">*</span></label>
-              <div className="md:col-span-9"><input type="text" name="cargo" value={formData.cargo} onChange={handleChange} className={inputClass}/></div></div>
-
-            <div className={fieldClass}><label className={labelClass}>Correo</label>
-              <div className="md:col-span-9"><input type="email" name="correo" value={formData.correo} onChange={handleChange} className={inputClass}/></div></div>
-
-            {/* FIX Tarea 2: type="tel" en lugar de type="number" */}
-            <div className={fieldClass}><label className={labelClass}>Celular <span className="text-red-500">*</span></label>
-              <div className="md:col-span-9">
-                <input type="tel" name="celular" value={formData.celular} onChange={handleCelularChange}
-                  inputMode="numeric" pattern="[0-9]*" maxLength={13} className={inputClass} placeholder="Ej: 3001234567"/>
-                <p className="text-xs text-gray-400 mt-1">Solo dígitos, máx. 13 caracteres.</p>
-              </div></div>
-
-            <div className={fieldClass}><label className={labelClass}>Ciudad <span className="text-red-500">*</span></label>
-              <div className="md:col-span-9"><select name="ciudad" value={formData.ciudad} onChange={handleChange} className={inputClass}>
-                <option value="">Seleccione...</option>
-                {ciudadesList.length > 0
-                  ? ciudadesList.map((c,i) => <option key={i} value={c.Ciudades}>{c.Ciudades}</option>)
-                  : ['Bogotá','Medellín','Cali','Barranquilla','Otra'].map(c => <option key={c} value={c}>{c}</option>)}
-              </select></div></div>
-
-            <div className={fieldClass}><label className={labelClass}>Barrio</label>
-              <div className="md:col-span-9"><input type="text" name="barrio" value={formData.barrio} onChange={handleChange} className={inputClass}/></div></div>
-
-            <div className={fieldClass}><label className={labelClass}>Dirección <span className="text-red-500">*</span></label>
-              <div className="md:col-span-9"><input type="text" name="direccion" value={formData.direccion} onChange={handleChange} className={inputClass}/></div></div>
-
-            <div className={fieldClass}><label className={labelClass}>Tipo Trabajador <span className="text-red-500">*</span></label>
-              <div className="md:col-span-9">
-                <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-6 pt-4">
+              <div className="flex flex-col w-full md:w-1/2">
+                <label className={labelClass}>Tipo Trabajador <span className="text-vividRed">*</span></label>
+                <div className="flex rounded-2xl bg-gray-100 p-1 overflow-hidden h-10">
                   {['Nuevo','Actual','Reinversión'].map(t => (
                     <button key={t} type="button" onClick={() => setFormData(p => ({...p, tipoTrabajador: t}))}
-                      className={`flex-1 py-2 text-sm font-medium transition-colors border-r last:border-r-0 border-gray-300 btn-action ${formData.tipoTrabajador===t?'bg-gray-100 text-gray-800 font-bold':'bg-white text-gray-500 hover:bg-gray-50'}`}>
+                      className={`flex-1 text-[10px] font-black uppercase tracking-tighter rounded-xl transition-all ${formData.tipoTrabajador===t?'bg-white text-gray-800 shadow-sm scale-[1.02]':'text-gray-400 hover:text-gray-600'}`}>
                       {t}
                     </button>
                   ))}
                 </div>
-              </div></div>
-
-            <div className="flex justify-end mt-8 gap-3">
-              <button type="button" onClick={() => setView('history')} className="px-6 py-2 rounded-lg text-sm font-bold text-gray-600 hover:bg-gray-100 transition btn-action">Cancelar</button>
-              <button type="button" onClick={() => setStep(2)} className="px-6 py-2 rounded-lg text-sm font-bold bg-appBlue text-white hover:bg-blue-800 transition btn-action">Siguiente →</button>
+              </div>
+              <div className="flex gap-4 w-full md:w-auto mt-4 md:mt-0">
+                <button type="button" onClick={() => setView('history')} className="flex-1 md:flex-none px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest text-gray-400 hover:bg-gray-100 transition-all">Cancelar</button>
+                <button type="button" onClick={() => setStep(2)} className="flex-1 md:flex-none px-12 py-3 rounded-2xl text-xs font-black uppercase tracking-widest bg-vividBlue text-white shadow-lg shadow-blue-500/30 hover:scale-105 active:scale-95 transition-all btn-3d">Siguiente →</button>
+              </div>
             </div>
           </div>
         )}
 
         {step === 2 && (
-          <div className="animate-fade-in">
-            <h3 className="text-xl font-medium text-gray-800 mb-6">Servicios A Aplicar</h3>
-            <div className="space-y-3">
-              <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+          <div className="animate-fade-in space-y-8">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+               <h3 className="text-2xl font-black text-gray-800 tracking-tight">Servicios a Aplicar</h3>
+               <div className="flex items-center gap-2 text-vividOrange bg-vividOrange/10 px-3 py-1 rounded-full text-[10px] font-black uppercase shadow-inner">
+                 <Icon name="Info" size={12}/> Seleccione al menos uno
+               </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-gray-50/50 rounded-3xl p-4 border border-gray-100 hover:bg-white transition-all">
                 <ToggleSwitch label="Visita Domiciliaria" value={formData.visitaDomiciliaria} onChange={v => handleToggle('visitaDomiciliaria', v)}/>
                 {formData.visitaDomiciliaria && (
-                  <div className="mt-3 pt-3 border-t border-gray-200 grid grid-cols-1 md:grid-cols-12 gap-4 items-center animate-fade-in">
-                    <label className="md:col-span-4 text-sm font-medium text-gray-600">Modalidad <span className="text-red-500">*</span></label>
-                    <div className="md:col-span-8 flex gap-2 flex-wrap">
-                      {['Presencial','Virtual','Autogestionada'].map(m => (
-                        <button key={m} type="button" onClick={() => setFormData(p => ({...p, modalidadVisita: m}))}
-                          className={`px-4 py-1.5 text-xs rounded-full border transition btn-action ${formData.modalidadVisita===m?'bg-gray-800 text-white border-gray-800 font-bold':'bg-white text-gray-500 border-gray-300 hover:border-gray-400'}`}>{m}</button>
-                      ))}
-                    </div>
+                  <div className="mt-4 pt-4 border-t border-gray-100 flex flex-wrap gap-2 animate-scale-in">
+                    {['Presencial','Virtual','Autogestionada'].map(m => (
+                      <button key={m} type="button" onClick={() => setFormData(p => ({...p, modalidadVisita: m}))}
+                        className={`px-4 py-1.5 text-[10px] font-black uppercase tracking-tight rounded-xl transition-all border ${formData.modalidadVisita===m?'bg-gray-800 text-white border-gray-800 shadow-md scale-105':'bg-white text-gray-400 border-gray-200 hover:border-gray-300'}`}>{m}</button>
+                    ))}
                   </div>
                 )}
               </div>
 
-              <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+              <div className="bg-gray-50/50 rounded-3xl p-4 border border-gray-100 hover:bg-white transition-all">
                 <ToggleSwitch label="Consulta Antecedentes" value={formData.consultaAntecedentes} onChange={v => handleToggle('consultaAntecedentes', v)}/>
               </div>
 
-              <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+              <div className="bg-gray-50/50 rounded-3xl p-4 border border-gray-100 hover:bg-white transition-all md:row-span-2">
                 <ToggleSwitch label="Referenciación" value={formData.referenciacion} onChange={v => handleToggle('referenciacion', v)}/>
                 {formData.referenciacion && (
-                  <div className="mt-3 pt-3 border-t border-gray-200 space-y-3 animate-fade-in pl-4">
+                  <div className="mt-4 pt-4 border-t border-gray-100 space-y-2 animate-scale-in">
                     <ToggleSwitch label="Referencia Académica" value={formData.referenciaAcademica} onChange={v => handleToggle('referenciaAcademica', v)}/>
                     <ToggleSwitch label="Referencia Laboral"   value={formData.referenciaLaboral}   onChange={v => handleToggle('referenciaLaboral', v)}/>
                     <div className="relative">
                       <ToggleSwitch label="Referencia Personal" value={formData.referenciaPersonal} onChange={v => handleToggle('referenciaPersonal', v)}/>
                       {showPersonalRefWarning && (
-                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-yellow-100 text-yellow-800 text-xs font-bold px-3 py-1 rounded shadow border border-yellow-200 animate-fade-in whitespace-nowrap">
-                          No compatible con Visita Domiciliaria activa.
+                        <div className="absolute -top-10 left-0 bg-vividOrange text-white text-[9px] font-black uppercase px-3 py-1.5 rounded-xl shadow-xl shadow-vividOrange/30 animate-fade-in z-10">
+                          Incompatible con Visita Domiciliaria
                         </div>
                       )}
                     </div>
@@ -1273,90 +1297,94 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
                 )}
               </div>
 
-              <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+              <div className="bg-gray-50/50 rounded-3xl p-4 border border-gray-100 hover:bg-white transition-all">
                 <ToggleSwitch label="Estudios Poligrafía" value={formData.estudiosPoligrafia} onChange={v => handleToggle('estudiosPoligrafia', v)}/>
                 {formData.estudiosPoligrafia && (
-                  <div className="mt-3 pt-3 border-t border-gray-200 space-y-4 animate-fade-in">
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
-                      <label className="md:col-span-4 text-sm font-medium text-gray-600">Tipo Poligrafía <span className="text-red-500">*</span></label>
-                      <div className="md:col-span-8"><select name="tipoPoligrafia" value={formData.tipoPoligrafia} onChange={handleChange} className="w-full border border-gray-300 rounded-lg p-2 text-sm bg-white focus:ring-1 focus:ring-appBlue outline-none">
+                  <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-2 gap-4 animate-scale-in">
+                    <div className={fieldClass}><label className={labelClass}>Tipo Poligrafía</label>
+                      <select name="tipoPoligrafia" value={formData.tipoPoligrafia} onChange={handleChange} className={inputClass}>
                         <option value="">Seleccione...</option>
                         {['Preempleo','Rutina','Especifica','Verifeye Preempleo','Verifeye Rutina','Verifeye Especifica','VSA Preempleo','VSA Rutina','VSA Especifica'].map(t => <option key={t} value={t}>{t}</option>)}
                       </select></div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
-                      <label className="md:col-span-4 text-sm font-medium text-gray-600">Ciudad Poligrafía <span className="text-red-500">*</span></label>
-                      <div className="md:col-span-8"><select name="ciudadPoligrafia" value={formData.ciudadPoligrafia} onChange={handleChange} className="w-full border border-gray-300 rounded-lg p-2 text-sm bg-white focus:ring-1 focus:ring-appBlue outline-none">
+                    <div className={fieldClass}><label className={labelClass}>Ciudad Poligrafía</label>
+                      <select name="ciudadPoligrafia" value={formData.ciudadPoligrafia} onChange={handleChange} className={inputClass}>
                         <option value="">Seleccione...</option>
                         {ciudadesPoligrafiaList.length > 0
                           ? ciudadesPoligrafiaList.map((c,i) => <option key={i} value={c.Ciudad}>{c.Ciudad}</option>)
                           : ['Bogotá','Medellín','Cali'].map(c => <option key={c} value={c}>{c}</option>)}
                       </select></div>
-                    </div>
                   </div>
                 )}
               </div>
 
-              <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+              <div className="bg-gray-50/50 rounded-3xl p-4 border border-gray-100 hover:bg-white transition-all">
                 <ToggleSwitch label="Consulta Datacrédito" value={formData.consultaDatacredito} onChange={v => handleToggle('consultaDatacredito', v)}/>
               </div>
-              <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+              <div className="bg-gray-50/50 rounded-3xl p-4 border border-gray-100 hover:bg-white transition-all">
                 <ToggleSwitch label="Comparativo OEA" value={formData.comparativoOEA} onChange={v => handleToggle('comparativoOEA', v)}/>
               </div>
             </div>
 
-            {/* Adjuntos */}
-            <div className="mt-6 bg-white p-5 rounded-xl border border-dashed border-gray-300">
-              <h4 className="text-sm font-bold text-gray-700 mb-4">Adjuntar Documentos</h4>
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-4 items-end">
+            {/* Adjuntos Compactos */}
+            <div className="bg-white p-6 rounded-3xl border border-dashed border-gray-200">
+              <div className="flex items-center gap-2 mb-6">
+                <Icon name="Upload" size={18} className="text-gray-400"/>
+                <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Documentos de Soporte</h4>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-6 items-end">
                 <div className="md:col-span-5">
-                  <label className="text-xs font-bold text-gray-500 block mb-1">Nombre Documento</label>
-                  <input type="text" value={currentDocName} onChange={e => setCurrentDocName(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg p-2 text-sm" placeholder="Ej: Cédula, Diploma..."/>
+                  <label className={labelClass}>Nombre Documento</label>
+                  <input type="text" value={currentDocName} onChange={e => setCurrentDocName(e.target.value)} className={inputClass} placeholder="Ej: Cédula, Diploma..."/>
                 </div>
                 <div className="md:col-span-5">
-                  <label className="text-xs font-bold text-gray-500 block mb-1">Archivo</label>
-                  <input id="fileInput" type="file" onChange={e => e.target.files?.[0] && setCurrentFile(e.target.files[0])}
-                    className="w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+                  <label className={labelClass}>Archivo</label>
+                  <div className="relative">
+                    <input id="fileInput" type="file" onChange={e => e.target.files?.[0] && setCurrentFile(e.target.files[0])}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"/>
+                    <div className="w-full border border-gray-200 rounded-xl p-2 text-xs bg-gray-50 flex items-center justify-between text-gray-500">
+                       <span className="truncate">{currentFile ? currentFile.name : "Seleccionar archivo..."}</span>
+                       <Icon name="FileText" size={14}/>
+                    </div>
+                  </div>
                 </div>
                 <div className="md:col-span-2">
-                  <button onClick={addAttachment} type="button" className="w-full bg-blue-600 text-white rounded-lg p-2 text-xs font-bold hover:bg-blue-700 btn-action">Agregar</button>
+                  <button onClick={addAttachment} type="button" className="w-full bg-gray-800 text-white rounded-xl py-2 text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all">Agregar</button>
                 </div>
               </div>
-              {attachments.length > 0 ? (
-                <ul className="space-y-2 mt-3 bg-gray-50 p-3 rounded-lg">
+              {attachments.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
                   {attachments.map(att => (
-                    <li key={att.id} className="flex justify-between items-center bg-white p-2 rounded-lg border border-gray-200 shadow-sm">
-                      <div className="flex items-center gap-2 overflow-hidden">
-                        <div className="bg-gray-100 p-1.5 rounded text-gray-500"><Icon name="FileText" size={13}/></div>
+                    <div key={att.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-2xl border border-gray-100 shadow-sm animate-scale-in">
+                      <div className="flex items-center gap-3 overflow-hidden">
+                        <div className="bg-white p-2 rounded-xl text-vividBlue shadow-inner"><Icon name="FileText" size={16}/></div>
                         <div className="truncate">
-                          <div className="text-xs font-bold text-gray-700">{att.name}</div>
-                          <div className="text-[10px] text-gray-400">{att.file.name}</div>
+                          <div className="text-[11px] font-black text-gray-700 uppercase tracking-tight truncate">{att.name}</div>
+                          <div className="text-[9px] text-gray-400 truncate">{att.file.name}</div>
                         </div>
                       </div>
-                      <button onClick={() => setAttachments(a => a.filter(x => x.id !== att.id))} className="text-red-500 hover:bg-red-50 p-1.5 rounded transition btn-action">
-                        <Icon name="Trash" size={13}/>
+                      <button onClick={() => setAttachments(a => a.filter(x => x.id !== att.id))} className="text-vividRed hover:bg-red-50 p-2 rounded-xl transition-all">
+                        <Icon name="Trash" size={16}/>
                       </button>
-                    </li>
+                    </div>
                   ))}
-                </ul>
-              ) : <div className="text-center text-xs text-gray-400 italic py-2">No hay documentos adjuntos.</div>}
+                </div>
+              )}
             </div>
 
-            <div className="mt-5">
-              <label className="block text-sm font-bold text-gray-700 mb-2">Notas Adicionales</label>
+            <div className="space-y-2">
+              <label className={labelClass}>Notas Adicionales</label>
               <textarea name="notas" maxLength={3000} value={formData.notas} onChange={handleChange}
-                className="w-full border border-gray-300 rounded-xl p-3 text-sm h-24 outline-none focus:ring-1 focus:ring-appBlue resize-none" placeholder="Observaciones relevantes..."/>
-              <div className="text-right text-xs text-gray-400 mt-1">{formData.notas.length} / 3000</div>
+                className="w-full border border-gray-100 rounded-3xl p-4 text-xs h-28 outline-none focus:ring-2 focus:ring-vividBlue/10 bg-gray-50/50 hover:bg-white transition-all resize-none" placeholder="Observaciones relevantes del caso..."/>
+              <div className="text-right text-[9px] font-black text-gray-300 uppercase tracking-widest">{formData.notas.length} / 3000 CARACTERES</div>
             </div>
 
-            <div className="flex justify-between mt-6 pt-5 border-t border-gray-100">
-              <button type="button" onClick={() => setStep(1)} className="text-gray-600 font-bold text-sm hover:text-black px-4 py-2 btn-action">← Anterior</button>
-              <div className="flex gap-3">
-                <button type="button" onClick={() => setView('history')} className="text-gray-500 font-bold text-sm hover:text-black px-4 py-2 btn-action">Cancelar</button>
+            <div className="flex flex-col md:flex-row items-center justify-between gap-6 pt-6 border-t border-gray-100">
+              <button type="button" onClick={() => setStep(1)} className="w-full md:w-auto px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest text-gray-400 hover:bg-gray-100 transition-all">← Anterior</button>
+              <div className="flex gap-4 w-full md:w-auto">
+                <button type="button" onClick={() => setView('history')} className="flex-1 md:flex-none px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest text-gray-400 hover:bg-gray-100 transition-all">Cancelar</button>
                 <button type="button" onClick={handleSubmit} disabled={uploading}
-                  className="bg-appRed text-white font-bold text-sm px-8 py-2.5 rounded-xl shadow hover:bg-red-700 transition btn-action disabled:opacity-60 flex items-center gap-2">
-                  {uploading ? <><Icon name="RefreshCw" size={15} className="animate-spin"/> Guardando... ({uploadProgress.current}/{uploadProgress.total})</> : <><Icon name="Check" size={15}/> Guardar Solicitud</>}
+                  className="flex-1 md:flex-none px-12 py-3 rounded-2xl text-xs font-black uppercase tracking-widest bg-vividRed text-white shadow-xl shadow-red-500/30 hover:scale-105 active:scale-95 transition-all btn-3d disabled:opacity-50 flex items-center justify-center gap-3">
+                  {uploading ? <><Icon name="RefreshCw" size={16} className="animate-spin"/> Guardando...</> : <><Icon name="Check" size={16}/> Enviar Solicitud</>}
                 </button>
               </div>
             </div>
@@ -1440,34 +1468,39 @@ const BulkUpload = ({ userContext, setView, onReload }) => {
 
   if (uploadResult) return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/30 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white p-8 rounded-3xl shadow-2xl text-center max-w-sm w-full border border-gray-100 animate-scale-in">
-        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm">
-          <Icon name="CheckCircle" size={40} className="text-green-600"/>
+      <div className="bg-white p-10 rounded-3xl shadow-2xl text-center max-w-md w-full border border-gray-100 animate-scale-in">
+        <div className="w-24 h-24 bg-vividGreen/10 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-inner transform rotate-12">
+          <Icon name="CheckCircle" size={48} className="text-vividGreen -rotate-12"/>
         </div>
-        <h2 className="text-2xl font-bold text-gray-800 mb-2">¡Carga Finalizada!</h2>
-        <div className="text-sm text-gray-500 mb-4 bg-gray-50 p-4 rounded-xl border border-gray-100 text-left">
-          <div className="grid grid-cols-2 gap-y-2">
-            <span className="font-bold text-gray-400 text-xs uppercase">Registros Exitosos:</span>
-            <span className="text-right font-mono font-bold text-green-600">{uploadResult.loaded}</span>
-            <span className="font-bold text-gray-400 text-xs uppercase">Errores técnicos:</span>
-            <span className={`text-right font-mono font-bold ${uploadResult.failed > 0 ? 'text-red-500' : 'text-gray-400'}`}>{uploadResult.failed}</span>
+        <h2 className="text-3xl font-black text-gray-800 mb-2 tracking-tight">¡Carga Finalizada!</h2>
+        <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-8 text-center">Resultados del procesamiento masivo</p>
+
+        <div className="bg-gray-50/50 p-6 rounded-3xl border border-gray-100 text-left mb-6 space-y-4">
+          <div className="flex justify-between items-center">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Exitosos</span>
+            <span className="font-mono font-black text-vividGreen bg-white px-3 py-1 rounded-xl shadow-sm border border-gray-100">{uploadResult.loaded}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Fallidos</span>
+            <span className={`font-mono font-black px-3 py-1 rounded-xl shadow-sm border border-gray-100 ${uploadResult.failed > 0 ? 'text-vividRed bg-vividRed/5' : 'text-gray-400 bg-white'}`}>{uploadResult.failed}</span>
           </div>
         </div>
-        {/* Tarea 7: Mostrar errores técnicos si los hay */}
+
         {uploadResult.technicalErrors?.length > 0 && (
-          <div className="bg-red-50 border border-red-100 rounded-xl p-3 mb-4 text-left max-h-36 overflow-y-auto">
-            <p className="text-xs font-bold text-red-700 mb-1">Errores técnicos:</p>
-            <ul className="text-xs text-red-600 space-y-0.5 list-disc list-inside">
-              {uploadResult.technicalErrors.map((e,i) => <li key={i}>{e}</li>)}
+          <div className="bg-vividRed/[0.03] border border-vividRed/10 rounded-2xl p-4 mb-8 text-left max-h-36 overflow-y-auto">
+            <p className="text-[9px] font-black text-vividRed uppercase tracking-widest mb-2">Errores Técnicos Detectados:</p>
+            <ul className="text-[10px] text-gray-600 space-y-1.5 list-disc list-inside font-medium">
+              {uploadResult.technicalErrors.map((e,i) => <li key={i} className="leading-tight">{e}</li>)}
             </ul>
           </div>
         )}
-        <div className="space-y-3">
-          <button onClick={() => { setFile(null); setUploadResult(null); }} className="w-full bg-gray-900 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition btn-action flex items-center justify-center gap-2">
-            <Icon name="Upload" size={17}/> Subir Otro Archivo
+
+        <div className="grid grid-cols-1 gap-4">
+          <button onClick={() => { setFile(null); setUploadResult(null); }} className="btn-3d-blue py-4 rounded-2xl flex items-center justify-center gap-3">
+            <Icon name="Upload" size={18}/> <span className="text-xs font-black uppercase tracking-widest">Subir Otro</span>
           </button>
-          <button onClick={() => setView('history')} className="w-full bg-white border border-gray-200 text-gray-600 font-bold py-3 px-6 rounded-xl hover:bg-gray-50 transition btn-action flex items-center justify-center gap-2">
-            <Icon name="History" size={17}/> Ir al Historial
+          <button onClick={() => setView('history')} className="btn-3d-gray py-4 rounded-2xl flex items-center justify-center gap-3">
+            <Icon name="History" size={18}/> <span className="text-xs font-black uppercase tracking-widest text-gray-600">Ver Historial</span>
           </button>
         </div>
       </div>
@@ -1505,8 +1538,8 @@ const BulkUpload = ({ userContext, setView, onReload }) => {
               </div>
             </div>
             <button onClick={handleUpload} disabled={uploading || !file}
-              className="w-full bg-appRed text-white px-6 py-2.5 rounded-xl shadow hover:bg-red-700 font-bold text-sm btn-action disabled:opacity-50 flex items-center justify-center gap-2">
-              {uploading ? <><Icon name="RefreshCw" size={15} className="animate-spin"/> Procesando...</> : <><Icon name="Upload" size={15}/> Procesar Archivo</>}
+              className="w-full btn-3d-red px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 flex items-center justify-center gap-3">
+              {uploading ? <><Icon name="RefreshCw" size={16} className="animate-spin"/> Procesando...</> : <><Icon name="Upload" size={16}/> Procesar Archivo</>}
             </button>
           </div>
         </div>
@@ -1655,8 +1688,8 @@ const ConfigurationView = ({ userContext, onForceSync, syncStatus, lastSync, onR
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800">Configuración</h2>
         <button onClick={onForceSync} disabled={syncStatus !== 'idle'}
-          className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition flex items-center gap-2 disabled:opacity-50 shadow-sm btn-action">
-          <Icon name="RefreshCw" size={15} className={syncStatus !== 'idle' ? "animate-spin" : ""}/>
+          className="px-5 py-2.5 btn-3d-blue rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 disabled:opacity-50">
+          <Icon name="RefreshCw" size={16} className={syncStatus !== 'idle' ? "animate-spin" : ""}/>
           {syncStatus !== 'idle' ? 'Sincronizando...' : 'Forzar Sincronización'}
         </button>
       </div>
