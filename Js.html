@@ -55,14 +55,37 @@ const isValidPhone = (phone) => {
 // ─── FORMATO DE FECHAS ────────────────────────────────────────────────────
 const formatDateCO = (dateInput, includeTime = true) => {
   if (!dateInput) return '';
-  const val = (dateInput && typeof dateInput === 'object' && dateInput.value) ? dateInput.value : dateInput;
+  let val = (dateInput && typeof dateInput === 'object' && dateInput.value) ? dateInput.value : dateInput;
+
+  // Limpiar strings de BigQuery que a veces traen microsegundos o formatos no estándar
+  if (typeof val === 'string') {
+    // Si parece un timestamp de BigQuery (YYYY-MM-DD HH:MM:SS.mmm UTC), quitar microsegundos
+    val = val.replace(/(\d{4}-\d{2}-\d{2})\s(\d{2}:\d{2}:\d{2})\.\d+/, '$1T$2');
+    // Si no tiene T, ponerla para que el constructor de Date sea más feliz
+    if (val.includes('-') && val.includes(':') && !val.includes('T')) val = val.replace(' ', 'T');
+  }
+
   try {
     const d = new Date(val);
-    if (isNaN(d.getTime())) return String(val);
-    const options = { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' };
-    if (includeTime) { options.hour = '2-digit'; options.minute = '2-digit'; options.hour12 = false; }
+    if (isNaN(d.getTime())) return String(dateInput);
+
+    const options = {
+      timeZone: 'America/Bogota',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    };
+
+    if (includeTime) {
+      options.hour = '2-digit';
+      options.minute = '2-digit';
+      options.hour12 = false;
+    }
+
     return new Intl.DateTimeFormat('es-CO', options).format(d);
-  } catch (e) { return String(val); }
+  } catch (e) {
+    return String(dateInput);
+  }
 };
 
 // ─── COMUNICACIÓN CON SERVIDOR ───────────────────────────────────────────

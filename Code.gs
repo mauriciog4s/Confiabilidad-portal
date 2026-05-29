@@ -289,7 +289,14 @@ function createRequest(email, payload) {
   const bq = new BigQueryClient();
   const projectId = BQ_CREDENTIALS.project_id;
   const tableWrite = `${projectId}.${DATASET_ID}.${TABLES.WRITE_TABLE}`;
+  const tableServices = `${projectId}.${DATASET_ID}.${TABLES.SERVICES}`;
   const newId = generateUniqueId();
+
+  // Normalización de datos críticos
+  const norm = (s) => (s || '').toString().trim().toUpperCase();
+  const nombreNorm = norm(payload.nombre);
+  const identNorm = norm(payload.identificacion);
+  const ciudadNorm = norm(payload.ciudad);
 
   const insertSql = `
     INSERT INTO \`${tableWrite}\`
@@ -321,11 +328,11 @@ function createRequest(email, payload) {
 
   bq.query(insertSql, {
     id: newId, usuarioActualizacion: emailFinal, cliente: payload.clientId,
-    identificacion: payload.identificacion, nombre: payload.nombre,
+    identificacion: identNorm, nombre: nombreNorm,
     cc: payload.centroCostos || 'N/A', tipo: payload.tipoTrabajador, estado: "Creada",
     tipoId: payload.tipoIdentificacion || '', fechaExp: payload.fechaExpedicion || '',
     cargo: payload.cargo || '', correo: payload.correo || '', celular: payload.celular || '',
-    ciudad: payload.ciudad || '', barrio: payload.barrio || '', direccion: payload.direccion || '',
+    ciudad: ciudadNorm, barrio: payload.barrio || '', direccion: payload.direccion || '',
     visita: payload.visitaDomiciliaria || 'NO', modalidad: payload.modalidadVisita || '',
     antecedentes: payload.consultaAntecedentes || 'NO', referencia: payload.referenciacion || 'NO',
     refAcad: payload.referenciaAcademica || 'NO', refLab: payload.referenciaLaboral || 'NO',
@@ -338,6 +345,44 @@ function createRequest(email, payload) {
     convSec: payload.convenioClienteSecundario || '', tipoCostoSec: payload.tipoCostoClienteSecundario || '',
     ccExterno: payload.centroCostosExterno || ''
   });
+
+  // Inicialización de servicios en conServiciosAplicar para disparar lógica de AppSheet
+  const isYes = (v) => v === true || String(v).toUpperCase() === 'SI';
+  const insertService = (tipo, extras = {}) => {
+    const sId = generateUniqueId();
+    const columns = ['ID_ServiciosAplicar', 'ID_SolicitudesConfiabilidad', 'TipoServicio', 'EstadoActual', 'UsuarioActualziacion', 'FechaActualizacion'];
+    const placeholders = ['@sId', '@reqId', '@tipo', "'Asignada'", '@user', 'CAST(CURRENT_TIMESTAMP() AS STRING)'];
+    const params = { sId, reqId: newId, tipo, user: emailFinal };
+    Object.keys(extras).forEach(k => {
+      columns.push(k); placeholders.push(`@${k}`); params[k] = extras[k];
+    });
+    const sql = `INSERT INTO \`${tableServices}\` (${columns.join(',')}) VALUES (${placeholders.join(',')})`;
+    bq.query(sql, params);
+  };
+
+  if (isYes(payload.visitaDomiciliaria)) {
+    insertService("Visita Domiciliaria", { Modalidad: payload.modalidadVisita, Ciudad: ciudadNorm });
+  }
+  if (isYes(payload.consultaAntecedentes)) {
+    insertService("Antecedentes");
+  }
+  if (isYes(payload.referenciacion)) {
+    if (isYes(payload.referenciaAcademica) || isYes(payload.referenciaLaboral)) {
+      insertService("Referencias", {
+        ReferenciaAcademica: isYes(payload.referenciaAcademica) ? 'SI' : 'NO',
+        ReferenciaLaboral: isYes(payload.referenciaLaboral) ? 'SI' : 'NO'
+      });
+    }
+    if (isYes(payload.referenciaPersonal)) {
+      insertService("ReferenciasP", { ReferenciaPersonal: 'SI' });
+    }
+  }
+  if (isYes(payload.estudiosPoligrafia)) {
+    insertService("Poligrafía", { OpcionesPoligrafia: payload.tipoPoligrafia, Ciudad: norm(payload.ciudadPoligrafia) });
+  }
+  if (isYes(payload.consultaDatacredito)) {
+    insertService("Datacredito");
+  }
 
   return { success: true, requestId: newId, message: "Solicitud creada correctamente." };
 }
@@ -492,9 +537,16 @@ function processBulkUpload(email, { csvContent, clientId }) {
   let successCount = 0;
   let insertErrors = 0;
   const insertErrorDetails = [];
+  const tableServices = `${projectId}.${DATASET_ID}.${TABLES.SERVICES}`;
 
   for (const rowData of parsedRows) {
     try {
+      const newId = generateUniqueId();
+      const norm = (s) => (s || '').toString().trim().toUpperCase();
+      const nombreNorm = norm(rowData.NombreCompleto);
+      const identNorm = norm(rowData.Identificacion);
+      const ciudadNorm = norm(rowData.Ciudad);
+
       const insertSql = `
         INSERT INTO \`${tableWrite}\`
         (
@@ -521,12 +573,12 @@ function processBulkUpload(email, { csvContent, clientId }) {
         )
       `;
       bq.query(insertSql, {
-        id: generateUniqueId(), usuarioActualizacion: email, cliente: clientId,
-        ident: rowData.Identificacion || '', nombre: rowData.NombreCompleto || '',
+        id: newId, usuarioActualizacion: email, cliente: clientId,
+        ident: identNorm, nombre: nombreNorm,
         cc: rowData.CentroCostos || '', tipo: rowData.TipoTrabajador || 'Nuevo', estado: "Creada",
         tipoId: rowData.TipoIdentificacion || '', fechaExp: rowData.FechaExpedicion || '',
         cargo: rowData.Cargo || '', correo: rowData.Correo || '', celular: rowData.Celular || '',
-        ciudad: rowData.Ciudad || '', barrio: rowData.Barrio || '', dir: rowData.Direccion || '',
+        ciudad: ciudadNorm, barrio: rowData.Barrio || '', dir: rowData.Direccion || '',
         visita: rowData.VisitaDomiciliaria || 'NO', modVisita: rowData.ModalidadVisita || '',
         antec: rowData.ConsultaAntecedentes || 'NO', ref: rowData.Referenciacion || 'NO',
         refAcad: rowData.ReferenciaAcademica || 'NO', refLab: rowData.ReferenciaLaboral || 'NO',
@@ -536,6 +588,45 @@ function processBulkUpload(email, { csvContent, clientId }) {
         notas: rowData.Notas || '', linea: rowData.Linea || '', lineaNeg: rowData.LineaNegocio || '',
         proyInt: rowData.ClienteProyectoInterno || '', ccExt: rowData.CentroCostosExterno || ''
       });
+
+      // Inicialización de servicios para carga masiva
+      const isYes = (v) => String(v).toUpperCase() === 'SI' || v === 'true' || v === true;
+      const insertService = (tipo, extras = {}) => {
+        const sId = generateUniqueId();
+        const columns = ['ID_ServiciosAplicar', 'ID_SolicitudesConfiabilidad', 'TipoServicio', 'EstadoActual', 'UsuarioActualziacion', 'FechaActualizacion'];
+        const placeholders = ['@sId', '@reqId', '@tipo', "'Asignada'", '@user', 'CAST(CURRENT_TIMESTAMP() AS STRING)'];
+        const params = { sId, reqId: newId, tipo, user: email };
+        Object.keys(extras).forEach(k => {
+          columns.push(k); placeholders.push(`@${k}`); params[k] = extras[k];
+        });
+        const sql = `INSERT INTO \`${tableServices}\` (${columns.join(',')}) VALUES (${placeholders.join(',')})`;
+        bq.query(sql, params);
+      };
+
+      if (isYes(rowData.VisitaDomiciliaria)) {
+        insertService("Visita Domiciliaria", { Modalidad: rowData.ModalidadVisita, Ciudad: ciudadNorm });
+      }
+      if (isYes(rowData.ConsultaAntecedentes)) {
+        insertService("Antecedentes");
+      }
+      if (isYes(rowData.Referenciacion)) {
+        if (isYes(rowData.ReferenciaAcademica) || isYes(rowData.ReferenciaLaboral)) {
+          insertService("Referencias", {
+            ReferenciaAcademica: isYes(rowData.ReferenciaAcademica) ? 'SI' : 'NO',
+            ReferenciaLaboral: isYes(rowData.ReferenciaLaboral) ? 'SI' : 'NO'
+          });
+        }
+        if (isYes(rowData.ReferenciaPersonal)) {
+          insertService("ReferenciasP", { ReferenciaPersonal: 'SI' });
+        }
+      }
+      if (isYes(rowData.EstudiosPoligrafia)) {
+        insertService("Poligrafía", { OpcionesPoligrafia: rowData.TipoPoligrafia, Ciudad: norm(rowData.CiudadP) });
+      }
+      if (isYes(rowData.ConsultaDatacredito)) {
+        insertService("Datacredito");
+      }
+
       successCount++;
     } catch (e) {
       insertErrors++;
