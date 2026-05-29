@@ -9,7 +9,7 @@
 const CONFIG = {
   PROJECT_ID: "g4s-shared-tz1",
   DATASET_ID: "Confiabilidad",
-  ADMIN_USERS: ["jhoan.aitan@co.g4s.com", "luis.romero@co.g4s.com"]
+  ADMIN_USERS: ["jhoan.gaitan@co.g4s.com", "luis.romero@co.g4s.com"]
 };
 
 // Globales de acceso rápido
