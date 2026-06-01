@@ -17,7 +17,7 @@
       tailwind.config = {
         theme: {
           extend: {
-            colors: { appBlue: '#0033A0', appRed: '#D32F2F', appGray: '#F5F5F5' }
+            colors: { appBlue: '#10253F', appRed: '#E4002B', appGray: '#97999B', appWarmGray: '#CCB9AB', appBlack: '#000000' }
           }
         }
       }
@@ -61,7 +61,7 @@
   }
   .toggle-btn-inactive { @apply text-gray-400; }
   .toggle-btn-no  { @apply bg-white text-gray-700 shadow-sm border border-gray-200; }
-  .toggle-btn-si  { @apply bg-[#e60023] text-white shadow-md transform scale-105; }
+  .toggle-btn-si  { @apply bg-appRed text-white shadow-md transform scale-105; }
 
   /* Botones con feedback visual */
   .btn-action {
@@ -122,10 +122,10 @@ class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) return (
       <div className="flex h-full items-center justify-center bg-gray-50 p-4 min-h-[50vh]">
-        <div className="bg-white p-6 rounded-2xl shadow-xl text-center border border-red-100 max-w-sm">
-          <div className="text-red-500 mb-2 font-bold text-lg">Algo salió mal</div>
+        <div className="bg-white p-6 rounded-2xl shadow-xl text-center border border-appRed/20 max-w-sm">
+          <div className="text-appRed mb-2 font-bold text-lg">Algo salió mal</div>
           <p className="text-gray-500 text-sm mb-4">Ocurrió un error inesperado.</p>
-          <button onClick={() => window.location.reload()} className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold btn-action">Recargar</button>
+          <button onClick={() => window.location.reload()} className="bg-appRed text-white px-4 py-2 rounded-lg text-sm font-bold btn-action">Recargar</button>
         </div>
       </div>
     );
@@ -248,7 +248,7 @@ const Icon = ({ name, size = 20, className = "" }) => {
 const RequestRow = React.memo(({ req, onClick }) => (
   <div onClick={onClick}
     className="grid grid-cols-12 gap-2 p-3 border-b hover:bg-gray-50 cursor-pointer text-[10px] items-center transition-colors">
-    <div className="col-span-1 font-bold text-blue-600 truncate">{req.NSolicitud || req.ID_SolicitudesConfiabilidad}</div>
+    <div className="col-span-1 font-bold text-appBlue truncate">{req.NSolicitud || req.ID_SolicitudesConfiabilidad}</div>
     <div className="col-span-2 text-gray-500">{formatDateCO(req.FechaSolicitud?.value || req.FechaSolicitud)}</div>
     <div className="col-span-1 font-mono truncate">{req.Identificacion}</div>
     <div className="col-span-2 flex flex-col">
@@ -267,7 +267,7 @@ const RequestRow = React.memo(({ req, onClick }) => (
 // ─── UTILIDADES UI ────────────────────────────────────────────────────────
 const Toast = ({ message, type = 'info', onClose }) => {
   useEffect(() => { const t = setTimeout(onClose, 4000); return () => clearTimeout(t); }, [onClose]);
-  const colors = { info: 'text-blue-500', success: 'text-green-500', error: 'text-red-500', warning: 'text-yellow-500' };
+  const colors = { info: 'text-appBlue', success: 'text-green-500', error: 'text-appRed', warning: 'text-yellow-500' };
   const iconMap = { info: 'Info', success: 'CheckCircle', error: 'AlertTriangle', warning: 'AlertTriangle' };
   return (
     <div className="toast">
@@ -282,8 +282,8 @@ const getStatusBadgeColor = (status) => {
   if (!status || status === 'None') return 'bg-gray-100 text-gray-600 border border-gray-200';
   const s = status.toString().toLowerCase();
   if (s.includes('confiable'))    return 'bg-green-100 text-green-700 border border-green-200';
-  if (s.includes('proceso') || s.includes('en proceso')) return 'bg-blue-100 text-blue-700 border border-blue-200';
-  if (s.includes('cancelado') || s.includes('no confiable')) return 'bg-red-100 text-red-700 border border-red-200';
+  if (s.includes('proceso') || s.includes('en proceso')) return 'bg-appBlue/10 text-appBlue border border-appBlue/20';
+  if (s.includes('cancelado') || s.includes('no confiable')) return 'bg-appRed/10 text-appRed border border-appRed/20';
   if (s.includes('pendiente'))    return 'bg-orange-100 text-orange-700 border border-orange-200';
   if (s.includes('creada') || s.includes('ingresada')) return 'bg-gray-100 text-gray-500 border border-gray-200';
   return 'bg-yellow-100 text-yellow-700 border border-yellow-200';
@@ -293,7 +293,7 @@ const getStatusBadgeColor = (status) => {
 const ToggleSwitch = ({ value, onChange, label, subLabel }) => (
   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start mb-4 border-b border-gray-100 pb-4 last:border-0">
     <div className="flex flex-col justify-center h-10">
-      <div className="text-sm font-bold text-gray-700">{label} <span className="text-red-500">*</span></div>
+      <div className="text-sm font-bold text-gray-700">{label} <span className="text-appRed">*</span></div>
       {subLabel && <div className="text-xs text-gray-400 leading-tight mt-1">{subLabel}</div>}
     </div>
     <div className="flex justify-end">
@@ -309,7 +309,7 @@ const ToggleSwitch = ({ value, onChange, label, subLabel }) => (
 const AlertModal = ({ show, title, message, items, onClose, type = 'error' }) => {
   if (!show) return null;
   const colors = {
-    error:   { bg: 'bg-red-100',    icon: 'text-red-500',    btn: 'bg-red-600 hover:bg-red-700',    list: 'bg-red-50 border-red-100 text-red-800' },
+    error:   { bg: 'bg-appRed/10',    icon: 'text-appRed',    btn: 'bg-appRed hover:opacity-90',    list: 'bg-appRed/10 border-appRed/20 text-appRed' },
     warning: { bg: 'bg-yellow-100', icon: 'text-yellow-500', btn: 'bg-yellow-600 hover:bg-yellow-700', list: 'bg-yellow-50 border-yellow-100 text-yellow-800' }
   };
   const theme = colors[type] || colors.error;
@@ -351,7 +351,7 @@ const LoginView = ({ onSuccess, isLoading }) => (
             <p className="text-xs text-gray-400">Autenticando...</p>
           </div>
         ) : (
-          <button onClick={onSuccess} className="w-full bg-appBlue hover:bg-blue-800 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition shadow-sm btn-action">
+          <button onClick={onSuccess} className="w-full bg-appBlue hover:opacity-90 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition shadow-sm btn-action">
             <Icon name="User" size={18}/> Ingresar con Google
           </button>
         )}
@@ -406,7 +406,7 @@ const Sidebar = ({ currentView, setView, onLogout, userContext, syncStatus, last
 
         <div className="flex-1 overflow-y-auto py-3 space-y-1">
           {menuItems.map((item) => (
-            <div key={item.id} onClick={() => handleNav(item.id)} title={isCollapsed ? item.title : ""} className={`px-4 py-2.5 cursor-pointer transition-colors border-l-4 ${currentView === item.id ? 'bg-red-50 border-appRed' : 'border-transparent hover:bg-gray-50'}`}>
+            <div key={item.id} onClick={() => handleNav(item.id)} title={isCollapsed ? item.title : ""} className={`px-4 py-2.5 cursor-pointer transition-colors border-l-4 ${currentView === item.id ? 'bg-appRed/10 border-appRed' : 'border-transparent hover:bg-gray-50'}`}>
               <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
                 <Icon name={item.icon} className={currentView === item.id ? 'text-appRed' : 'text-gray-400'} size={isCollapsed ? 22 : 18}/>
                 {!isCollapsed && <span className={`font-medium text-xs ${currentView === item.id ? 'text-appRed font-bold' : 'text-gray-600'}`}>{item.title}</span>}
@@ -414,7 +414,7 @@ const Sidebar = ({ currentView, setView, onLogout, userContext, syncStatus, last
             </div>
           ))}
           <div className="my-2 border-t border-gray-100 mx-4"></div>
-          <div onClick={() => handleNav('config')} title={isCollapsed ? "Configuración" : ""} className={`px-4 py-2.5 cursor-pointer transition-colors border-l-4 ${currentView === 'config' ? 'bg-blue-50 border-appBlue' : 'border-transparent hover:bg-gray-50'}`}>
+          <div onClick={() => handleNav('config')} title={isCollapsed ? "Configuración" : ""} className={`px-4 py-2.5 cursor-pointer transition-colors border-l-4 ${currentView === 'config' ? 'bg-appBlue/10 border-appBlue' : 'border-transparent hover:bg-gray-50'}`}>
             <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
               <Icon name="Settings" className={currentView === 'config' ? 'text-appBlue' : 'text-gray-400'} size={isCollapsed ? 22 : 18}/>
               {!isCollapsed && <span className={`font-medium text-xs ${currentView === 'config' ? 'text-appBlue font-bold' : 'text-gray-600'}`}>Configuración</span>}
@@ -463,16 +463,16 @@ const HomeDashboard = ({ userContext, requests, setView, syncStatus }) => {
       <div className="mb-8 flex items-center gap-3">
         <h1 className="text-3xl font-bold text-gray-800 truncate">Hola, {userContext.email.split('@')[0]}</h1>
         {syncStatus !== 'idle' && (
-          <div className="flex items-center gap-2 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
-            <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-            <span className="text-xs font-bold text-blue-600">Sincronizando...</span>
+          <div className="flex items-center gap-2 bg-appBlue/10 px-3 py-1 rounded-full border border-appBlue/20">
+            <div className="w-4 h-4 border-2 border-appBlue border-t-transparent rounded-full animate-spin"></div>
+            <span className="text-xs font-bold text-appBlue">Sincronizando...</span>
           </div>
         )}
       </div>
       <p className="text-gray-500 mb-8">Bienvenido al portal de Confiabilidad G4S. Los datos muestran el período activo.</p>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
         {[
-          { label:'Total', sub:'Solicitudes', val: stats.total,   icon:'FileText',    bg:'bg-blue-50',   fg:'text-blue-600'   },
+          { label:'Total', sub:'Solicitudes', val: stats.total,   icon:'FileText',    bg:'bg-appBlue/10',   fg:'text-appBlue'   },
           { label:'En Proceso', sub:'Estudios activos', val: stats.pending,  icon:'Clock',      bg:'bg-yellow-50', fg:'text-yellow-600' },
           { label:'Finalizados', sub:'Estudios completados', val: stats.completed, icon:'CheckCircle', bg:'bg-green-50',  fg:'text-green-600'  },
         ].map(s => (
@@ -490,12 +490,12 @@ const HomeDashboard = ({ userContext, requests, setView, syncStatus }) => {
         <>
           <h2 className="text-xl font-bold text-gray-800 mb-4">¿Qué deseas hacer hoy?</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <button onClick={() => setView('create')} className="flex items-center gap-4 p-6 bg-gradient-to-r from-appRed to-red-700 text-white rounded-xl shadow hover:shadow-lg transition text-left btn-action">
+            <button onClick={() => setView('create')} className="flex items-center gap-4 p-6 bg-gradient-to-r from-appRed to-appRed text-white rounded-xl shadow hover:shadow-lg transition text-left btn-action">
               <div className="bg-white/20 p-3 rounded-full"><Icon name="ClipboardList" size={32}/></div>
               <div><div className="text-lg font-bold">Nueva Solicitud</div><div className="text-white/80 text-sm">Registrar un estudio individual.</div></div>
             </button>
             <button onClick={() => setView('bulk')} className="flex items-center gap-4 p-6 bg-white border border-gray-200 text-gray-700 rounded-xl shadow-sm hover:bg-gray-50 transition text-left btn-action">
-              <div className="bg-blue-50 text-blue-600 p-3 rounded-full"><Icon name="Upload" size={32}/></div>
+              <div className="bg-appBlue/10 text-appBlue p-3 rounded-full"><Icon name="Upload" size={32}/></div>
               <div><div className="text-lg font-bold">Carga Masiva</div><div className="text-gray-500 text-sm">Subir múltiples registros desde CSV.</div></div>
             </button>
           </div>
@@ -613,7 +613,7 @@ const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onCh
               <button onClick={handleExport} className="px-4 py-2 text-green-700 hover:bg-green-100 border border-green-200 rounded-xl bg-green-50 flex items-center gap-2 text-xs font-bold transition-all btn-action">
                 <Icon name="Download" size={14}/> Exportar CSV
               </button>
-              <button onClick={onRefresh} disabled={refreshing} className="px-4 py-2 text-appBlue hover:bg-blue-100 border border-blue-200 rounded-xl bg-blue-50 flex items-center gap-2 text-xs font-bold transition-all btn-action disabled:opacity-50">
+              <button onClick={onRefresh} disabled={refreshing} className="px-4 py-2 text-appBlue hover:opacity-90/10 border border-appBlue/20 rounded-xl bg-appBlue/10 flex items-center gap-2 text-xs font-bold transition-all btn-action disabled:opacity-50">
                 <Icon name="RefreshCw" size={14} className={refreshing ? "animate-spin" : ""}/>
                 {refreshing ? 'Sincronizando...' : 'Actualizar'}
               </button>
@@ -634,7 +634,7 @@ const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onCh
             </div>
 
             <div className="flex items-center gap-4">
-               <label className={`flex items-center gap-3 p-2 px-4 rounded-xl border transition-all cursor-pointer select-none ${onlyMine ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200'}`}>
+               <label className={`flex items-center gap-3 p-2 px-4 rounded-xl border transition-all cursor-pointer select-none ${onlyMine ? 'bg-appBlue/10 border-appBlue/20' : 'bg-white border-gray-200'}`}>
                 <div onClick={() => !isForcedMyRequests && setOnlyMine(!onlyMine)} className={`w-10 h-5 rounded-full transition-colors duration-200 flex items-center px-0.5 ${onlyMine ? 'bg-appBlue' : 'bg-gray-300'} ${isForcedMyRequests ? 'opacity-50 cursor-not-allowed' : ''}`}>
                   <div className={`w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-200 ${onlyMine ? 'translate-x-5' : 'translate-x-0'}`}></div>
                 </div>
@@ -676,9 +676,9 @@ const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onCh
       </div>
 
       {refreshing && (
-        <div className="flex items-center justify-center p-2 mb-3 bg-blue-50 border border-blue-100 rounded-lg animate-fade-in">
-          <Icon name="RefreshCw" size={13} className="animate-spin text-blue-600 mr-2"/>
-          <span className="text-xs font-bold text-blue-600">Cargando período: {PERIODS.find(p => p.key === currentPeriod)?.label}...</span>
+        <div className="flex items-center justify-center p-2 mb-3 bg-appBlue/10 border border-appBlue/20 rounded-lg animate-fade-in">
+          <Icon name="RefreshCw" size={13} className="animate-spin text-appBlue mr-2"/>
+          <span className="text-xs font-bold text-appBlue">Cargando período: {PERIODS.find(p => p.key === currentPeriod)?.label}...</span>
         </div>
       )}
 
@@ -712,7 +712,7 @@ const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onCh
               {paginatedData.length === 0 ? (
                 <div className="p-20 text-center flex flex-col items-center justify-center h-full">
               {refreshing
-                ? <><Icon name="RefreshCw" size={32} className="animate-spin text-blue-500 mb-2"/><span className="text-gray-400 text-sm">Cargando...</span></>
+                ? <><Icon name="RefreshCw" size={32} className="animate-spin text-appBlue mb-2"/><span className="text-gray-400 text-sm">Cargando...</span></>
                 : <span className="text-gray-400 italic">No hay registros para el período seleccionado.</span>
               }
             </div>
@@ -779,10 +779,10 @@ const RequestDetail = ({ requestId, onBack, preloadedData }) => {
 
   if (error) return (
     <div className="p-10 text-center">
-      <Icon name="AlertTriangle" size={40} className="text-red-500 mx-auto mb-3"/>
-      <p className="text-red-600 font-bold mb-2">Error al cargar detalle</p>
+      <Icon name="AlertTriangle" size={40} className="text-appRed mx-auto mb-3"/>
+      <p className="text-appRed font-bold mb-2">Error al cargar detalle</p>
       <p className="text-sm text-gray-500 mb-4">{error}</p>
-      <button onClick={onBack} className="text-blue-600 underline text-sm">Volver al listado</button>
+      <button onClick={onBack} className="text-appBlue underline text-sm">Volver al listado</button>
     </div>
   );
 
@@ -821,17 +821,17 @@ const RequestDetail = ({ requestId, onBack, preloadedData }) => {
     const filename = path.split(/[/\\]/).pop();
     const fs = fileStates[filename] || {};
     return (
-      <div className="flex items-center justify-between bg-blue-50 p-2.5 rounded border border-blue-100 mb-2">
+      <div className="flex items-center justify-between bg-appBlue/10 p-2.5 rounded border border-appBlue/20 mb-2">
         <div className="flex items-center gap-3 overflow-hidden flex-1">
-          <div className="bg-white p-1.5 rounded-full text-blue-600 shadow-sm min-w-[28px]"><Icon name="FileText" size={14}/></div>
+          <div className="bg-white p-1.5 rounded-full text-appBlue shadow-sm min-w-[28px]"><Icon name="FileText" size={14}/></div>
           <div className="flex-1 overflow-hidden">
-            <div className="text-xs font-bold text-blue-900 truncate">{label || filename}</div>
-            {date && <div className="text-[9px] text-blue-400">{date}</div>}
-            {fs.message && <div className={`text-[9px] font-bold ${fs.status==='success'?'text-green-600':'text-blue-500'}`}>{fs.message}</div>}
+            <div className="text-xs font-bold text-appBlue truncate">{label || filename}</div>
+            {date && <div className="text-[9px] text-appBlue">{date}</div>}
+            {fs.message && <div className={`text-[9px] font-bold ${fs.status==='success'?'text-green-600':'text-appBlue'}`}>{fs.message}</div>}
           </div>
         </div>
         <button onClick={() => handleDownload(path)} disabled={fs.status==='loading'}
-          className={`ml-2 p-2 rounded-lg transition ${fs.status==='loading' ? 'opacity-50 cursor-not-allowed' : 'bg-white text-blue-600 hover:bg-blue-600 hover:text-white shadow-sm'}`}>
+          className={`ml-2 p-2 rounded-lg transition ${fs.status==='loading' ? 'opacity-50 cursor-not-allowed' : 'bg-white text-appBlue hover:opacity-90 hover:text-white shadow-sm'}`}>
           <Icon name={fs.status==='loading'?'RefreshCw':'Download'} size={15} className={fs.status==='loading'?'animate-spin':''}/>
         </button>
       </div>
@@ -849,7 +849,7 @@ const RequestDetail = ({ requestId, onBack, preloadedData }) => {
             <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
               <DetailField label="Cliente"  value={header.Cliente || header.RazonSocial}/>
               <DetailField label="NIT"      value={header.NIT}/>
-              <div className="col-span-2 mt-1 border-b border-gray-200 pb-1"><h4 className="text-xs font-bold text-blue-600 uppercase">Fechas Clave</h4></div>
+              <div className="col-span-2 mt-1 border-b border-gray-200 pb-1"><h4 className="text-xs font-bold text-appBlue uppercase">Fechas Clave</h4></div>
               <DetailField label="Programación Visita"     value={formatDateCO(header.ProgramacionVisita)}/>
               <DetailField label="Programación Poligrafía" value={formatDateCO(header.ProgramacionPoligrafia)}/>
               <DetailField label="Fecha Entrega ECP"       value={formatDateCO(header.FechaEntregaECP)}/>
@@ -1187,7 +1187,7 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
             <div className={fieldClass}><label className={labelClass}>Fecha Solicitud</label>
               <div className="md:col-span-9"><input type="text" readOnly value={formData.fechaSolicitud} className={`${inputClass} bg-gray-50 text-gray-500`}/></div></div>
 
-            <div className={fieldClass}><label className={labelClass}>Cliente <span className="text-red-500">*</span></label>
+            <div className={fieldClass}><label className={labelClass}>Cliente <span className="text-appRed">*</span></label>
               <div className="md:col-span-9">
                 <select name="clientId" value={formData.clientId} onChange={handleChange} className={inputClass}>
                   <option value="">Seleccione...</option>
@@ -1203,21 +1203,21 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
               <div className="md:col-span-9"><input type="text" readOnly value={formData.razonSocial} className={`${inputClass} bg-gray-50`}/></div></div>
 
             {isInternal && (
-              <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl space-y-4 animate-fade-in">
-                <h4 className="text-sm font-bold text-blue-800 uppercase border-b border-blue-200 pb-1">Datos Proyecto Interno</h4>
+              <div className="p-4 bg-appBlue/10 border border-appBlue/20 rounded-xl space-y-4 animate-fade-in">
+                <h4 className="text-sm font-bold text-appBlue uppercase border-b border-appBlue/20 pb-1">Datos Proyecto Interno</h4>
                 <div className={fieldClass}><label className={labelClass}>ClienteProyecto</label>
                   <div className="md:col-span-9"><select name="clienteProyectoInterno" value={formData.clienteProyectoInterno} onChange={handleChange} className={inputClass}>
                     <option value="">Seleccione...</option>{clienteProyectoList.map((cp,i) => <option key={i} value={cp.Descripcion}>{cp.Descripcion}</option>)}
                   </select></div></div>
-                <div className={fieldClass}><label className={labelClass}>Línea <span className="text-red-500">*</span></label>
+                <div className={fieldClass}><label className={labelClass}>Línea <span className="text-appRed">*</span></label>
                   <div className="md:col-span-9"><select name="linea" value={formData.linea} onChange={handleChange} className={inputClass}>
                     <option value="">Seleccione...</option>{uniqueLineas.map((l,i) => <option key={i} value={l}>{l}</option>)}
                   </select></div></div>
-                <div className={fieldClass}><label className={labelClass}>Línea Negocio <span className="text-red-500">*</span></label>
+                <div className={fieldClass}><label className={labelClass}>Línea Negocio <span className="text-appRed">*</span></label>
                   <div className="md:col-span-9"><select name="lineaNegocio" value={formData.lineaNegocio} onChange={handleChange} disabled={!formData.linea} className={`${inputClass} disabled:bg-gray-100 disabled:text-gray-400`}>
                     <option value="">Seleccione...</option>{availableLNs.map((l,i) => <option key={i} value={l}>{l}</option>)}
                   </select></div></div>
-                <div className={fieldClass}><label className={labelClass}>Centro Costos <span className="text-red-500">*</span></label>
+                <div className={fieldClass}><label className={labelClass}>Centro Costos <span className="text-appRed">*</span></label>
                   <div className="md:col-span-9"><select name="centroCostos" value={formData.centroCostos} onChange={handleChange} disabled={!formData.lineaNegocio} className={`${inputClass} disabled:bg-gray-100 disabled:text-gray-400`}>
                     <option value="">Seleccione...</option>{availableCCs.map((c,i) => <option key={i} value={c}>{c}</option>)}
                   </select></div></div>
@@ -1225,8 +1225,8 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
             )}
 
             {(!isInternal && formData.clientId) && (
-              <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl space-y-4 animate-fade-in">
-                <h4 className="text-sm font-bold text-blue-800 uppercase border-b border-blue-200 pb-1">Datos Cliente Externo</h4>
+              <div className="p-4 bg-appBlue/10 border border-appBlue/20 rounded-xl space-y-4 animate-fade-in">
+                <h4 className="text-sm font-bold text-appBlue uppercase border-b border-appBlue/20 pb-1">Datos Cliente Externo</h4>
                 {availableSecondaryClients.length > 0 && (<>
                   <div className={fieldClass}><label className={labelClass}>Cliente Secundario</label>
                     <div className="md:col-span-9"><select name="clienteClientesSecundarios" value={formData.clienteClientesSecundarios} onChange={handleChange} className={inputClass}>
@@ -1244,10 +1244,10 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
               </div>
             )}
 
-            <div className={fieldClass}><label className={labelClass}>Nombre Completo <span className="text-red-500">*</span></label>
+            <div className={fieldClass}><label className={labelClass}>Nombre Completo <span className="text-appRed">*</span></label>
               <div className="md:col-span-9"><input type="text" name="nombre" value={formData.nombre} onChange={handleChange} className={inputClass}/></div></div>
 
-            <div className={fieldClass}><label className={labelClass}>Tipo Identificación <span className="text-red-500">*</span></label>
+            <div className={fieldClass}><label className={labelClass}>Tipo Identificación <span className="text-appRed">*</span></label>
               <div className="md:col-span-9"><select name="tipoIdentificacion" value={formData.tipoIdentificacion} onChange={handleChange} className={inputClass}>
                 <option value="">Seleccione...</option>
                 <option value="Cédula de Ciudadanía">Cédula de Ciudadanía</option>
@@ -1260,7 +1260,7 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
                 <option value="Otro">Otro</option>
               </select></div></div>
 
-            <div className={fieldClass}><label className={labelClass}>Identificación <span className="text-red-500">*</span></label>
+            <div className={fieldClass}><label className={labelClass}>Identificación <span className="text-appRed">*</span></label>
               <div className="md:col-span-9">
                 <input type="text" name="identificacion" value={formData.identificacion} onChange={handleIdentificacionChange} className={inputClass}/>
                 <p className="text-xs text-gray-400 mt-1">Solo letras y números, sin espacios. Entre 5 y 15 caracteres.</p>
@@ -1269,21 +1269,21 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
             <div className={fieldClass}><label className={labelClass}>Fecha Expedición</label>
               <div className="md:col-span-9"><input type="date" name="fechaExpedicion" value={formData.fechaExpedicion} onChange={handleChange} className={inputClass}/></div></div>
 
-            <div className={fieldClass}><label className={labelClass}>Cargo <span className="text-red-500">*</span></label>
+            <div className={fieldClass}><label className={labelClass}>Cargo <span className="text-appRed">*</span></label>
               <div className="md:col-span-9"><input type="text" name="cargo" value={formData.cargo} onChange={handleChange} className={inputClass}/></div></div>
 
             <div className={fieldClass}><label className={labelClass}>Correo</label>
               <div className="md:col-span-9"><input type="email" name="correo" value={formData.correo} onChange={handleChange} className={inputClass}/></div></div>
 
             {/* FIX Tarea 2: type="tel" en lugar de type="number" */}
-            <div className={fieldClass}><label className={labelClass}>Celular <span className="text-red-500">*</span></label>
+            <div className={fieldClass}><label className={labelClass}>Celular <span className="text-appRed">*</span></label>
               <div className="md:col-span-9">
                 <input type="tel" name="celular" value={formData.celular} onChange={handleCelularChange}
                   inputMode="numeric" pattern="[0-9]*" maxLength={13} className={inputClass} placeholder="Ej: 3001234567"/>
                 <p className="text-xs text-gray-400 mt-1">Solo dígitos, máx. 13 caracteres.</p>
               </div></div>
 
-            <div className={fieldClass}><label className={labelClass}>Ciudad <span className="text-red-500">*</span></label>
+            <div className={fieldClass}><label className={labelClass}>Ciudad <span className="text-appRed">*</span></label>
               <div className="md:col-span-9"><select name="ciudad" value={formData.ciudad} onChange={handleChange} className={inputClass}>
                 <option value="">Seleccione...</option>
                 {ciudadesList.length > 0
@@ -1294,10 +1294,10 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
             <div className={fieldClass}><label className={labelClass}>Barrio</label>
               <div className="md:col-span-9"><input type="text" name="barrio" value={formData.barrio} onChange={handleChange} className={inputClass}/></div></div>
 
-            <div className={fieldClass}><label className={labelClass}>Dirección <span className="text-red-500">*</span></label>
+            <div className={fieldClass}><label className={labelClass}>Dirección <span className="text-appRed">*</span></label>
               <div className="md:col-span-9"><input type="text" name="direccion" value={formData.direccion} onChange={handleChange} className={inputClass}/></div></div>
 
-            <div className={fieldClass}><label className={labelClass}>Tipo Trabajador <span className="text-red-500">*</span></label>
+            <div className={fieldClass}><label className={labelClass}>Tipo Trabajador <span className="text-appRed">*</span></label>
               <div className="md:col-span-9">
                 <div className="flex rounded-lg border border-gray-300 overflow-hidden">
                   {['Nuevo','Actual','Reinversión'].map(t => (
@@ -1311,7 +1311,7 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
 
             <div className="flex justify-end mt-8 gap-3">
               <button type="button" onClick={() => setView('history')} className="px-6 py-2 rounded-lg text-sm font-bold text-gray-600 hover:bg-gray-100 transition btn-action">Cancelar</button>
-              <button type="button" onClick={() => setStep(2)} className="px-6 py-2 rounded-lg text-sm font-bold bg-appBlue text-white hover:bg-blue-800 transition btn-action">Siguiente →</button>
+              <button type="button" onClick={() => setStep(2)} className="px-6 py-2 rounded-lg text-sm font-bold bg-appBlue text-white hover:opacity-90 transition btn-action">Siguiente →</button>
             </div>
           </div>
         )}
@@ -1324,7 +1324,7 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
                 <ToggleSwitch label="Visita Domiciliaria" value={formData.visitaDomiciliaria} onChange={v => handleToggle('visitaDomiciliaria', v)}/>
                 {formData.visitaDomiciliaria && (
                   <div className="mt-3 pt-3 border-t border-gray-200 grid grid-cols-1 md:grid-cols-12 gap-4 items-center animate-fade-in">
-                    <label className="md:col-span-4 text-sm font-medium text-gray-600">Modalidad <span className="text-red-500">*</span></label>
+                    <label className="md:col-span-4 text-sm font-medium text-gray-600">Modalidad <span className="text-appRed">*</span></label>
                     <div className="md:col-span-8 flex gap-2 flex-wrap">
                       {['Presencial','Virtual','Autogestionada'].map(m => (
                         <button key={m} type="button" onClick={() => setFormData(p => ({...p, modalidadVisita: m}))}
@@ -1362,14 +1362,14 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
                 {formData.estudiosPoligrafia && (
                   <div className="mt-3 pt-3 border-t border-gray-200 space-y-4 animate-fade-in">
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
-                      <label className="md:col-span-4 text-sm font-medium text-gray-600">Tipo Poligrafía <span className="text-red-500">*</span></label>
+                      <label className="md:col-span-4 text-sm font-medium text-gray-600">Tipo Poligrafía <span className="text-appRed">*</span></label>
                       <div className="md:col-span-8"><select name="tipoPoligrafia" value={formData.tipoPoligrafia} onChange={handleChange} className="w-full border border-gray-300 rounded-lg p-2 text-sm bg-white focus:ring-1 focus:ring-appBlue outline-none">
                         <option value="">Seleccione...</option>
                         {['Preempleo','Rutina','Especifica','Verifeye Preempleo','Verifeye Rutina','Verifeye Especifica','VSA Preempleo','VSA Rutina','VSA Especifica'].map(t => <option key={t} value={t}>{t}</option>)}
                       </select></div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
-                      <label className="md:col-span-4 text-sm font-medium text-gray-600">Ciudad Poligrafía <span className="text-red-500">*</span></label>
+                      <label className="md:col-span-4 text-sm font-medium text-gray-600">Ciudad Poligrafía <span className="text-appRed">*</span></label>
                       <div className="md:col-span-8"><select name="ciudadPoligrafia" value={formData.ciudadPoligrafia} onChange={handleChange} className="w-full border border-gray-300 rounded-lg p-2 text-sm bg-white focus:ring-1 focus:ring-appBlue outline-none">
                         <option value="">Seleccione...</option>
                         {ciudadesPoligrafiaList.length > 0
@@ -1401,10 +1401,10 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
                 <div className="md:col-span-5">
                   <label className="text-xs font-bold text-gray-500 block mb-1">Archivo</label>
                   <input id="fileInput" type="file" onChange={e => e.target.files?.[0] && setCurrentFile(e.target.files[0])}
-                    className="w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+                    className="w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-appBlue/10 file:text-appBlue hover:file:bg-appBlue/10"/>
                 </div>
                 <div className="md:col-span-2">
-                  <button onClick={addAttachment} type="button" className="w-full bg-blue-600 text-white rounded-lg p-2 text-xs font-bold hover:bg-blue-700 btn-action">Agregar</button>
+                  <button onClick={addAttachment} type="button" className="w-full bg-appBlue text-white rounded-lg p-2 text-xs font-bold hover:opacity-90 btn-action">Agregar</button>
                 </div>
               </div>
               {attachments.length > 0 ? (
@@ -1418,7 +1418,7 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
                           <div className="text-[10px] text-gray-400">{att.file.name}</div>
                         </div>
                       </div>
-                      <button onClick={() => setAttachments(a => a.filter(x => x.id !== att.id))} className="text-red-500 hover:bg-red-50 p-1.5 rounded transition btn-action">
+                      <button onClick={() => setAttachments(a => a.filter(x => x.id !== att.id))} className="text-appRed hover:opacity-90/10 p-1.5 rounded transition btn-action">
                         <Icon name="Trash" size={13}/>
                       </button>
                     </li>
@@ -1439,7 +1439,7 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
               <div className="flex gap-3">
                 <button type="button" onClick={() => setView('history')} className="text-gray-500 font-bold text-sm hover:text-black px-4 py-2 btn-action">Cancelar</button>
                 <button type="button" onClick={handleSubmit} disabled={uploading}
-                  className="bg-appRed text-white font-bold text-sm px-8 py-2.5 rounded-xl shadow hover:bg-red-700 transition btn-action disabled:opacity-60 flex items-center gap-2">
+                  className="bg-appRed text-white font-bold text-sm px-8 py-2.5 rounded-xl shadow hover:opacity-90 transition btn-action disabled:opacity-60 flex items-center gap-2">
                   {uploading ? <><Icon name="RefreshCw" size={15} className="animate-spin"/> Guardando... ({uploadProgress.current}/{uploadProgress.total})</> : <><Icon name="Check" size={15}/> Guardar Solicitud</>}
                 </button>
               </div>
@@ -1534,14 +1534,14 @@ const BulkUpload = ({ userContext, setView, onReload }) => {
             <span className="font-bold text-gray-400 text-xs uppercase">Registros Exitosos:</span>
             <span className="text-right font-mono font-bold text-green-600">{uploadResult.loaded}</span>
             <span className="font-bold text-gray-400 text-xs uppercase">Errores técnicos:</span>
-            <span className={`text-right font-mono font-bold ${uploadResult.failed > 0 ? 'text-red-500' : 'text-gray-400'}`}>{uploadResult.failed}</span>
+            <span className={`text-right font-mono font-bold ${uploadResult.failed > 0 ? 'text-appRed' : 'text-gray-400'}`}>{uploadResult.failed}</span>
           </div>
         </div>
         {/* Tarea 7: Mostrar errores técnicos si los hay */}
         {uploadResult.technicalErrors?.length > 0 && (
-          <div className="bg-red-50 border border-red-100 rounded-xl p-3 mb-4 text-left max-h-36 overflow-y-auto">
-            <p className="text-xs font-bold text-red-700 mb-1">Errores técnicos:</p>
-            <ul className="text-xs text-red-600 space-y-0.5 list-disc list-inside">
+          <div className="bg-appRed/10 border border-appRed/20 rounded-xl p-3 mb-4 text-left max-h-36 overflow-y-auto">
+            <p className="text-xs font-bold text-appRed mb-1">Errores técnicos:</p>
+            <ul className="text-xs text-appRed space-y-0.5 list-disc list-inside">
               {uploadResult.technicalErrors.map((e,i) => <li key={i}>{e}</li>)}
             </ul>
           </div>
@@ -1570,11 +1570,11 @@ const BulkUpload = ({ userContext, setView, onReload }) => {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div className="border-r border-gray-100 pr-6">
-            <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4"><Icon name="Download" size={32}/></div>
+            <div className="w-16 h-16 bg-appBlue/10 text-appBlue rounded-full flex items-center justify-center mx-auto mb-4"><Icon name="Download" size={32}/></div>
             <h3 className="text-lg font-bold text-gray-700 text-center mb-2">Paso 1: Descargar Plantilla</h3>
             <p className="text-sm text-gray-500 text-center mb-5">Obtenga el formato CSV para este cliente.</p>
             <button onClick={handleDownloadTemplate} disabled={downloading || !selectedClient}
-              className="flex items-center justify-center gap-2 mx-auto text-blue-600 font-bold hover:underline text-sm btn-action disabled:opacity-50">
+              className="flex items-center justify-center gap-2 mx-auto text-appBlue font-bold hover:underline text-sm btn-action disabled:opacity-50">
               {downloading ? <><Icon name="RefreshCw" size={15} className="animate-spin"/> Buscando...</> : <><Icon name="Download" size={15}/> Descargar Plantilla</>}
             </button>
           </div>
@@ -1589,7 +1589,7 @@ const BulkUpload = ({ userContext, setView, onReload }) => {
               </div>
             </div>
             <button onClick={handleUpload} disabled={uploading || !file}
-              className="w-full bg-appRed text-white px-6 py-2.5 rounded-xl shadow hover:bg-red-700 font-bold text-sm btn-action disabled:opacity-50 flex items-center justify-center gap-2">
+              className="w-full bg-appRed text-white px-6 py-2.5 rounded-xl shadow hover:opacity-90 font-bold text-sm btn-action disabled:opacity-50 flex items-center justify-center gap-2">
               {uploading ? <><Icon name="RefreshCw" size={15} className="animate-spin"/> Procesando...</> : <><Icon name="Upload" size={15}/> Procesar Archivo</>}
             </button>
           </div>
@@ -1683,10 +1683,10 @@ const AdminClientModal = ({ clientId, clientName, onClose, showToast }) => {
                   )}
                   <div className="flex flex-col gap-4">
                     <div className="flex items-center gap-3 border-b border-gray-100 pb-3">
-                      <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl"><Icon name="User" size={20}/></div>
+                      <div className="p-2.5 bg-appBlue/10 text-appBlue rounded-xl"><Icon name="User" size={20}/></div>
                       <div>
                         <div className="font-bold text-gray-800">{u.Email}</div>
-                        <div className="text-[10px] uppercase font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded inline-block mt-0.5">Perfil Actual: {u.Rol_Asignado}</div>
+                        <div className="text-[10px] uppercase font-black text-appBlue bg-appBlue/10 px-2 py-0.5 rounded inline-block mt-0.5">Perfil Actual: {u.Rol_Asignado}</div>
                       </div>
                     </div>
 
@@ -1739,7 +1739,7 @@ const ConfigurationView = ({ userContext, onForceSync, syncStatus, lastSync, onR
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800">Configuración</h2>
         <button onClick={onForceSync} disabled={syncStatus !== 'idle'}
-          className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition flex items-center gap-2 disabled:opacity-50 shadow-sm btn-action">
+          className="px-4 py-2 bg-appBlue text-white rounded-xl text-sm font-bold hover:opacity-90 transition flex items-center gap-2 disabled:opacity-50 shadow-sm btn-action">
           <Icon name="RefreshCw" size={15} className={syncStatus !== 'idle' ? "animate-spin" : ""}/>
           {syncStatus !== 'idle' ? 'Sincronizando...' : 'Forzar Sincronización'}
         </button>
@@ -1808,7 +1808,7 @@ const ConfigurationView = ({ userContext, onForceSync, syncStatus, lastSync, onR
           ].map((item, i) => (
             <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
               <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-full ${item.syncing ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'}`}>
+                <div className={`p-2 rounded-full ${item.syncing ? 'bg-appBlue/10 text-appBlue' : 'bg-green-100 text-green-600'}`}>
                   {item.syncing ? <Icon name="RefreshCw" size={17} className="animate-spin"/> : <Icon name="CheckCircle" size={17}/>}
                 </div>
                 <div>
@@ -1834,7 +1834,7 @@ const ConfigurationView = ({ userContext, onForceSync, syncStatus, lastSync, onR
 
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
         <div className="flex items-center gap-4">
-          <div className="h-14 w-14 bg-blue-100 rounded-full flex items-center justify-center text-blue-600"><Icon name="User" size={28}/></div>
+          <div className="h-14 w-14 bg-appBlue/10 rounded-full flex items-center justify-center text-appBlue"><Icon name="User" size={28}/></div>
           <div>
             <div className="text-xs uppercase font-bold text-gray-500">Cuenta Activa</div>
             <div className="text-lg font-bold text-gray-800">{userContext?.email}</div>
@@ -1992,11 +1992,11 @@ const App = () => {
   useEffect(() => { handleLogin(); }, []);
 
   if (initError && !userCtx) return (
-    <div className="flex h-screen items-center justify-center flex-col gap-4 bg-gray-50 text-red-700 animate-fade-in p-6">
-      <Icon name="AlertTriangle" size={48} className="text-red-600"/>
+    <div className="flex h-screen items-center justify-center flex-col gap-4 bg-gray-50 text-appRed animate-fade-in p-6">
+      <Icon name="AlertTriangle" size={48} className="text-appRed"/>
       <div className="text-center">
         <h1 className="text-2xl font-bold mb-2">Error de Conexión</h1>
-        <p className="text-sm bg-white p-4 rounded-xl border border-red-200 shadow-sm max-w-md">{initError}</p>
+        <p className="text-sm bg-white p-4 rounded-xl border border-appRed/20 shadow-sm max-w-md">{initError}</p>
       </div>
       <button onClick={() => window.location.reload()} className="px-6 py-2 bg-gray-800 text-white rounded-xl hover:bg-black transition shadow btn-action">Reintentar</button>
     </div>
@@ -2007,10 +2007,10 @@ const App = () => {
   if (view === 'unauthorized') return (
     <div className="flex h-screen items-center justify-center bg-gray-100 text-center p-8">
       <div className="bg-white p-8 rounded-xl shadow-lg max-w-md">
-        <Icon name="ShieldCheck" size={48} className="mx-auto text-red-600 mb-4"/>
+        <Icon name="ShieldCheck" size={48} className="mx-auto text-appRed mb-4"/>
         <h1 className="text-xl font-bold text-gray-800 mb-2">Acceso Restringido</h1>
         <p className="text-gray-500 text-sm mb-4">Su usuario <strong>{userCtx.email}</strong> no tiene permisos registrados en el sistema.</p>
-        <button onClick={() => window.location.reload()} className="text-blue-600 font-bold text-sm hover:underline btn-action">Volver a intentar</button>
+        <button onClick={() => window.location.reload()} className="text-appBlue font-bold text-sm hover:underline btn-action">Volver a intentar</button>
       </div>
     </div>
   );
@@ -2062,7 +2062,7 @@ const App = () => {
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<App/>);
-
 </script>
+
   </body>
 </html>
