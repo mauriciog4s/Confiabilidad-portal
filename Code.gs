@@ -573,17 +573,31 @@ if (!hasData) continue;
     }
 
     // 4. Dependencias obligatorias internas por Servicio
+    // Si el servicio padre es NO, forzar limpieza de campos hijos
+    // (por si el CSV los trae rellenos por error)
+    if (rowData.VisitaDomiciliaria !== 'SI') rowData.ModalidadVisita = '';
+    if (rowData.Referenciacion !== 'SI') {
+      rowData.ReferenciaAcademica = 'NO';
+      rowData.ReferenciaLaboral   = 'NO';
+      rowData.ReferenciaPersonal  = 'NO';
+    }
+    if (rowData.EstudiosPoligrafia !== 'SI') {
+      rowData.TipoPoligrafia = '';
+      rowData.CiudadP        = '';
+    }
+
+    // Validar campos hijos SOLO si el servicio padre está activo
     if (rowData.VisitaDomiciliaria === 'SI' && !rowData.ModalidadVisita) {
       validationErrors.push(`Fila ${rowNum}: ModalidadVisita es obligatoria cuando aplica VisitaDomiciliaria`);
     }
     if (rowData.Referenciacion === 'SI') {
       if (!rowData.ReferenciaAcademica) validationErrors.push(`Fila ${rowNum}: ReferenciaAcademica (SI/NO) es obligatoria al aplicar Referenciacion`);
-      if (!rowData.ReferenciaLaboral) validationErrors.push(`Fila ${rowNum}: ReferenciaLaboral (SI/NO) es obligatoria al aplicar Referenciacion`);
-      if (!rowData.ReferenciaPersonal) validationErrors.push(`Fila ${rowNum}: ReferenciaPersonal (SI/NO) es obligatoria al aplicar Referenciacion`);
+      if (!rowData.ReferenciaLaboral)   validationErrors.push(`Fila ${rowNum}: ReferenciaLaboral (SI/NO) es obligatoria al aplicar Referenciacion`);
+      if (!rowData.ReferenciaPersonal)  validationErrors.push(`Fila ${rowNum}: ReferenciaPersonal (SI/NO) es obligatoria al aplicar Referenciacion`);
     }
     if (rowData.EstudiosPoligrafia === 'SI') {
       if (!rowData.TipoPoligrafia) validationErrors.push(`Fila ${rowNum}: TipoPoligrafia es obligatorio cuando aplica EstudiosPoligrafia`);
-      if (!rowData.CiudadP) validationErrors.push(`Fila ${rowNum}: CiudadP es obligatoria cuando aplica EstudiosPoligrafia`);
+      if (!rowData.CiudadP)        validationErrors.push(`Fila ${rowNum}: CiudadP es obligatoria cuando aplica EstudiosPoligrafia`);
     }
 
     parsedRows.push(rowData);
