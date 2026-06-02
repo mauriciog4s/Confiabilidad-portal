@@ -5,7 +5,7 @@ const { useState, useEffect, useMemo, useRef, useCallback } = React;
 const PROXY_URL   = "https://script.google.com/a/macros/co.g4s.com/s/AKfycbxQB6XNAaKr8gXmzUNBsu4lLwjc9NwK_XjHSJmw37HVRNvBHDM5sQOIg6NLcXXs0Im4/exec";
 const PROXY_TOKEN = "G4S-ACCESS-KEY-2025";
 
-// ─── SEGURIDAD BÁSICA (Tarea 5) ──────────────────────────────────────────
+// ─── SEGURIDAD BÁSICA ────────────────────────────────────────────────────
 (function applySecurityMeasures() {
   document.addEventListener('contextmenu', e => e.preventDefault());
   document.addEventListener('keydown', e => {
@@ -13,7 +13,6 @@ const PROXY_TOKEN = "G4S-ACCESS-KEY-2025";
     if (e.ctrlKey && e.shiftKey && ['I','J','C'].includes(e.key)) { e.preventDefault(); return; }
     if (e.ctrlKey && e.key === 'u') { e.preventDefault(); return; }
   });
-  // Detectar DevTools abierto (aproximación)
   let devToolsOpen = false;
   const threshold = 160;
   window.addEventListener('resize', () => {
@@ -21,7 +20,6 @@ const PROXY_TOKEN = "G4S-ACCESS-KEY-2025";
       if (!devToolsOpen) { devToolsOpen = true; console.clear(); }
     } else { devToolsOpen = false; }
   });
-  // Tarea 3: Anti-debugging periódico
   setInterval(() => {
     if (devToolsOpen) {
       console.clear();
@@ -151,6 +149,12 @@ const Icon = ({ name, size = 20, className = "" }) => {
     X: <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>,
     Filter: <><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></>,
     Calendar: <><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></>,
+    Building: <><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M3 9h6"/><path d="M3 15h6"/><path d="M15 7h2"/><path d="M15 11h2"/><path d="M15 15h2"/></>,
+    IdCard: <><rect width="20" height="14" x="2" y="5" rx="2"/><circle cx="8" cy="12" r="2"/><path d="M14 9h4"/><path d="M14 13h4"/></>,
+    MapPin: <><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></>,
+    Briefcase: <><rect width="20" height="14" x="2" y="7" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></>,
+    Phone: <><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.15 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.16 6.16l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></>,
+    Wrench: <><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></>,
   };
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24"
@@ -207,16 +211,34 @@ const getStatusBadgeColor = (status) => {
 
 // ─── TOGGLE SWITCH ────────────────────────────────────────────────────────
 const ToggleSwitch = ({ value, onChange, label, subLabel }) => (
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start mb-4 border-b border-gray-100 pb-4 last:border-0">
-    <div className="flex flex-col justify-center h-10">
+  <div className="flex items-center justify-between py-1">
+    <div className="flex flex-col">
       <div className="text-sm font-bold text-gray-700">{label} <span className="text-red-500">*</span></div>
-      {subLabel && <div className="text-xs text-gray-400 leading-tight mt-1">{subLabel}</div>}
+      {subLabel && <div className="text-xs text-gray-400 leading-tight mt-0.5">{subLabel}</div>}
     </div>
-    <div className="flex justify-end">
-      <div className="toggle-group">
-        <button type="button" onClick={() => onChange(false)} className={`toggle-btn ${value === false ? 'toggle-btn-no' : 'toggle-btn-inactive'}`}>NO</button>
-        <button type="button" onClick={() => onChange(true)}  className={`toggle-btn ${value === true  ? 'toggle-btn-si' : 'toggle-btn-inactive'}`}>SÍ</button>
+    <div className="toggle-group flex-shrink-0 ml-4">
+      <button type="button" onClick={() => onChange(false)} className={`toggle-btn ${value === false ? 'toggle-btn-no' : 'toggle-btn-inactive'}`}>NO</button>
+      <button type="button" onClick={() => onChange(true)}  className={`toggle-btn ${value === true  ? 'toggle-btn-si' : 'toggle-btn-inactive'}`}>SÍ</button>
+    </div>
+  </div>
+);
+
+// ─── SECCIÓN DIVISORA DEL FORMULARIO ─────────────────────────────────────
+const FormSection = ({ icon, title, color = '#10253F', children }) => (
+  <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
+    {/* Header de sección */}
+    <div
+      className="flex items-center gap-3 px-5 py-3"
+      style={{ backgroundColor: color, borderBottom: `3px solid ${color}` }}
+    >
+      <div className="bg-white/20 p-1.5 rounded-lg">
+        <Icon name={icon} size={16} className="text-white" />
       </div>
+      <span className="text-white font-black text-xs uppercase tracking-widest">{title}</span>
+    </div>
+    {/* Contenido */}
+    <div className="bg-white p-5">
+      {children}
     </div>
   </div>
 );
@@ -311,7 +333,6 @@ const Sidebar = ({ currentView, setView, onLogout, userContext, syncStatus, last
             </button>
           )}
         </div>
-        
         {isCollapsed && (
           <div className="hidden md:flex justify-center p-3 border-b border-gray-50">
             <button onClick={toggleCollapse} className="p-2 text-gray-400 hover:text-appBlue bg-gray-50 rounded-lg transition-colors">
@@ -319,7 +340,6 @@ const Sidebar = ({ currentView, setView, onLogout, userContext, syncStatus, last
             </button>
           </div>
         )}
-
         <div className="flex-1 overflow-y-auto py-3 space-y-2 px-2">
           {menuItems.map((item) => (
             <div key={item.id} onClick={() => handleNav(item.id)} title={isCollapsed ? item.title : ""}
@@ -432,7 +452,7 @@ const HomeDashboard = ({ userContext, requests, setView, syncStatus }) => {
   );
 };
 
-// ─── LISTA DE SOLICITUDES (con filtros de período) ────────────────────────
+// ─── LISTA DE SOLICITUDES ────────────────────────────────────────────────
 const PERIODS = [
   { key: 'today', label: 'Hoy'     },
   { key: 'week',  label: 'Semana'  },
@@ -446,20 +466,18 @@ const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onCh
   const [page,         setPage]         = useState(1);
   const [dateRange,    setDateRange]    = useState({ start: '', end: '' });
   const [clientFilter, setClientFilter] = useState('');
-  const [onlyMine,     setOnlyMine]     = useState(false);  // Tarea 6: filtro "Mis Solicitudes"
+  const [onlyMine,     setOnlyMine]     = useState(false);
 
   const requests = useMemo(() => (initialData && Array.isArray(initialData.data)) ? initialData.data : [], [initialData]);
 
   const statusTabs = useMemo(() => {
     const displayStatuses = ['Todo', 'Cancelado', 'Confiable', 'Confiable preliminar', 'En proceso', 'Ingresada', 'No confiable', 'None'];
     const counts = { 'Todo': requests.length };
-    
     requests.forEach(r => {
       let s = r.EstadoActual;
       if (!s || s.trim() === '') s = 'None';
       counts[s] = (counts[s] || 0) + 1;
     });
-
     return displayStatuses.map(s => ({ name: s, count: counts[s] || 0 }));
   }, [requests]);
 
@@ -492,7 +510,7 @@ const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onCh
   const handleExport = () => {
     if (!filteredRequests.length) return alert("No hay datos para exportar.");
     const exportData = filteredRequests.filter(r => !['Creada','Ingresada'].includes((r.EstadoActual||'').trim()));
-    if (!exportData.length) return alert("No hay registros válidos para exportar (se excluyen Creadas e Ingresadas).");
+    if (!exportData.length) return alert("No hay registros válidos para exportar.");
     const headers = Object.keys(exportData[0]);
     const csv = [headers.join(','), ...exportData.map(row => headers.map(f => `"${String(row[f]||'').replace(/"/g,'""')}"`).join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -511,7 +529,6 @@ const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onCh
     if (userContext?.isAdmin) return false;
     if (userContext?.role === 'Cliente Perfilado') return true;
     if (!clientFilter) return false;
-    // Forzado a nivel de cliente O a nivel de relación usuario-cliente
     return userContext?.clientData?.[clientFilter]?.forcedMyRequests ||
            userContext?.userClientConfig?.[clientFilter]?.forcedMyRequests || false;
   }, [clientFilter, userContext]);
@@ -522,7 +539,6 @@ const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onCh
 
   return (
     <div className="p-4 md:p-6 h-full flex flex-col animate-fade-in overflow-hidden">
-      {/* Barra de Filtros Estructurada */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm mb-4 overflow-hidden">
         <div className="p-4 bg-gray-50/50 border-b border-gray-100">
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -535,7 +551,6 @@ const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onCh
                 <p className="text-[10px] text-gray-500 font-medium uppercase tracking-wider">Gestión de Solicitudes</p>
               </div>
             </div>
-            
             <div className="flex items-center gap-3">
               <button onClick={handleExport} className="px-4 py-2 text-vividGreen hover:bg-vividGreen/10 border border-vividGreen/20 rounded-2xl bg-white flex items-center gap-2 text-[10px] font-black uppercase tracking-tight transition-all btn-3d shadow-gray-200">
                 <Icon name="Download" size={14}/> Exportar CSV
@@ -547,9 +562,7 @@ const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onCh
             </div>
           </div>
         </div>
-
         <div className="p-5 space-y-4">
-          {/* Fila 1: Período y Mis Solicitudes */}
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-3 bg-gray-100 p-1 rounded-xl border border-gray-200">
               {PERIODS.map(p => (
@@ -559,7 +572,6 @@ const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onCh
                 </button>
               ))}
             </div>
-
             <div className="flex items-center gap-4">
                <label className={`flex items-center gap-3 p-2 px-4 rounded-xl border transition-all cursor-pointer select-none ${onlyMine ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200'}`}>
                 <div onClick={() => !isForcedMyRequests && setOnlyMine(!onlyMine)} className={`w-10 h-5 rounded-full transition-colors duration-200 flex items-center px-0.5 ${onlyMine ? 'bg-appBlue' : 'bg-gray-300'} ${isForcedMyRequests ? 'opacity-50 cursor-not-allowed' : ''}`}>
@@ -573,15 +585,12 @@ const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onCh
               </div>
             </div>
           </div>
-
-          {/* Fila 2: Búsqueda, Fechas y Cliente */}
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
             <div className="md:col-span-4 relative group">
               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-appBlue transition-colors"><Icon name="Search" size={16}/></div>
               <input type="text" className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-appBlue/20 focus:border-appBlue transition-all"
                 placeholder="ID, Cédula o Nombre del evaluado..." value={search} onChange={e => setSearch(e.target.value)}/>
             </div>
-
             <div className="md:col-span-4 flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-1">
               <Icon name="Calendar" size={14} className="text-gray-400"/>
               <input type="date" value={dateRange.start} onChange={e => setDateRange({...dateRange, start: e.target.value})}
@@ -590,7 +599,6 @@ const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onCh
               <input type="date" value={dateRange.end} onChange={e => setDateRange({...dateRange, end: e.target.value})}
                 className="w-full bg-transparent p-1.5 text-[11px] font-medium focus:outline-none"/>
             </div>
-
             <div className="md:col-span-4">
               <select value={clientFilter} onChange={e => setClientFilter(e.target.value)}
                 className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-appBlue/20 focus:border-appBlue transition-all appearance-none cursor-pointer">
@@ -609,7 +617,6 @@ const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onCh
         </div>
       )}
 
-      {/* Tabs de estado */}
       <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
         {statusTabs.map(tab => (
           <button key={tab.name} onClick={() => setFilter(tab.name)}
@@ -619,30 +626,29 @@ const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onCh
         ))}
       </div>
 
-      {/* Tabla - Tarea 4: Responsividad con scroll horizontal */}
       <div className="bg-white rounded-xl shadow-sm border overflow-hidden flex-1 flex flex-col">
         <div className="overflow-x-auto flex-1 custom-scrollbar">
           <div className="min-w-[1000px]">
             <div className="grid grid-cols-12 gap-2 p-3 border-b bg-gray-50 text-[10px] font-bold text-gray-400 uppercase tracking-tight sticky top-0 z-10">
-          <div className="col-span-1">N° Sol</div>
-          <div className="col-span-2">F. Solicitud</div>
-          <div className="col-span-1">Cédula</div>
-          <div className="col-span-2">Nombre / Cargo</div>
-          <div className="col-span-1 text-center">Estado</div>
-          <div className="col-span-1 text-center">Est. EP</div>
-          <div className="col-span-1 text-center">P. Vis</div>
-          <div className="col-span-1 text-center">P. Pol</div>
-          <div className="col-span-1 text-center">E. ECP</div>
-          <div className="col-span-1 text-center">E. EP</div>
-        </div>
+              <div className="col-span-1">N° Sol</div>
+              <div className="col-span-2">F. Solicitud</div>
+              <div className="col-span-1">Cédula</div>
+              <div className="col-span-2">Nombre / Cargo</div>
+              <div className="col-span-1 text-center">Estado</div>
+              <div className="col-span-1 text-center">Est. EP</div>
+              <div className="col-span-1 text-center">P. Vis</div>
+              <div className="col-span-1 text-center">P. Pol</div>
+              <div className="col-span-1 text-center">E. ECP</div>
+              <div className="col-span-1 text-center">E. EP</div>
+            </div>
             <div className="divide-y divide-gray-100">
               {paginatedData.length === 0 ? (
                 <div className="p-20 text-center flex flex-col items-center justify-center h-full">
-              {refreshing
-                ? <><Icon name="RefreshCw" size={32} className="animate-spin text-blue-500 mb-2"/><span className="text-gray-400 text-sm">Cargando...</span></>
-                : <span className="text-gray-400 italic">No hay registros para el período seleccionado.</span>
-              }
-            </div>
+                  {refreshing
+                    ? <><Icon name="RefreshCw" size={32} className="animate-spin text-blue-500 mb-2"/><span className="text-gray-400 text-sm">Cargando...</span></>
+                    : <span className="text-gray-400 italic">No hay registros para el período seleccionado.</span>
+                  }
+                </div>
               ) : paginatedData.map((req, i) => (
                 <RequestRow key={req.ID_SolicitudesConfiabilidad || i} req={req} onClick={() => { setSelectedRequest(req); setView('detail'); }} />
               ))}
@@ -661,7 +667,7 @@ const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onCh
   );
 };
 
-// ─── DETALLE DE SOLICITUD (carga bajo demanda) ────────────────────────────
+// ─── DETALLE DE SOLICITUD ─────────────────────────────────────────────────
 const RequestDetail = ({ requestId, onBack, preloadedData }) => {
   const [detailData, setDetailData] = useState(null);
   const [loading, setLoading]       = useState(true);
@@ -669,8 +675,7 @@ const RequestDetail = ({ requestId, onBack, preloadedData }) => {
   const [fileStates, setFileStates] = useState({});
 
   useEffect(() => {
-    setLoading(true);
-    setError(null);
+    setLoading(true); setError(null);
     runServer('getRequestDetail', { id: requestId })
       .then(data => { setDetailData(data); setLoading(false); })
       .catch(err => { setError(err.message); setLoading(false); });
@@ -703,7 +708,6 @@ const RequestDetail = ({ requestId, onBack, preloadedData }) => {
       <p className="text-sm text-gray-500">Cargando detalles de la solicitud...</p>
     </div>
   );
-
   if (error) return (
     <div className="p-10 text-center">
       <Icon name="AlertTriangle" size={40} className="text-red-500 mx-auto mb-3"/>
@@ -913,11 +917,11 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
     tipoCostoClienteSecundario: '', centroCostosExterno: ''
   });
 
-  const ciudadesList          = useMemo(() => masterData?.conCiudades || [], [masterData]);
+  const ciudadesList           = useMemo(() => masterData?.conCiudades || [], [masterData]);
   const ciudadesPoligrafiaList = useMemo(() => masterData?.conPoligrafias || [], [masterData]);
-  const clienteProyectoList   = useMemo(() => masterData?.ClienteProyecto || [], [masterData]);
-  const lineaCCList           = useMemo(() => masterData?.LineaCC || [], [masterData]);
-  const secondaryClientsRaw   = useMemo(() => masterData?.conClientesSecundarios || [], [masterData]);
+  const clienteProyectoList    = useMemo(() => masterData?.ClienteProyecto || [], [masterData]);
+  const lineaCCList            = useMemo(() => masterData?.LineaCC || [], [masterData]);
+  const secondaryClientsRaw    = useMemo(() => masterData?.conClientesSecundarios || [], [masterData]);
 
   const availableSecondaryClients = useMemo(() => {
     if (!formData.clientId) return [];
@@ -927,9 +931,9 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
   const clientType = useMemo(() => (formData.clientId && userContext?.clientTypes) ? userContext.clientTypes[formData.clientId] : '', [formData.clientId, userContext]);
   const isInternal = useMemo(() => clientType === 'Interno', [clientType]);
 
-  const uniqueLineas   = useMemo(() => [...new Set(lineaCCList.map(i => i.Linea))].sort(), [lineaCCList]);
-  const availableLNs   = useMemo(() => !formData.linea ? [] : [...new Set(lineaCCList.filter(i => i.Linea === formData.linea).map(i => i.LN_Nombre))].sort(), [formData.linea, lineaCCList]);
-  const availableCCs   = useMemo(() => (!formData.linea || !formData.lineaNegocio) ? [] : [...new Set(lineaCCList.filter(i => i.Linea === formData.linea && i.LN_Nombre === formData.lineaNegocio).map(i => i.CC_Nombre))].sort(), [formData.linea, formData.lineaNegocio, lineaCCList]);
+  const uniqueLineas = useMemo(() => [...new Set(lineaCCList.map(i => i.Linea))].sort(), [lineaCCList]);
+  const availableLNs = useMemo(() => !formData.linea ? [] : [...new Set(lineaCCList.filter(i => i.Linea === formData.linea).map(i => i.LN_Nombre))].sort(), [formData.linea, lineaCCList]);
+  const availableCCs = useMemo(() => (!formData.linea || !formData.lineaNegocio) ? [] : [...new Set(lineaCCList.filter(i => i.Linea === formData.linea && i.LN_Nombre === formData.lineaNegocio).map(i => i.CC_Nombre))].sort(), [formData.linea, formData.lineaNegocio, lineaCCList]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -945,7 +949,6 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
     }
   };
 
-  // FIX Tarea 2: solo dígitos, sin type="number"
   const handleCelularChange = (e) => {
     const val = e.target.value.replace(/\D/g, '');
     if (val.length <= 13) setFormData(p => ({ ...p, celular: val }));
@@ -956,11 +959,24 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
     if (val.length <= 15) setFormData(p => ({ ...p, identificacion: val }));
   };
 
+  // ── handleToggle con limpieza de campos hijos ──────────────────────────
   const handleToggle = (name, val) => {
     if (name === 'referenciaPersonal' && val === true && formData.visitaDomiciliaria) { setShowPersonalRefWarning(true); return; }
     setFormData(p => {
       const next = { ...p, [name]: val };
-      if (name === 'visitaDomiciliaria' && val === true) next.referenciaPersonal = false;
+      if (name === 'visitaDomiciliaria') {
+        if (val === true)  next.referenciaPersonal = false;
+        if (val === false) next.modalidadVisita = '';
+      }
+      if (name === 'referenciacion' && val === false) {
+        next.referenciaAcademica = null;
+        next.referenciaLaboral   = null;
+        next.referenciaPersonal  = null;
+      }
+      if (name === 'estudiosPoligrafia' && val === false) {
+        next.tipoPoligrafia   = '';
+        next.ciudadPoligrafia = '';
+      }
       return next;
     });
   };
@@ -1013,7 +1029,7 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
       if (formData.referenciaPersonal  === null) missing.push("Referencia Personal (seleccione SÍ o NO)");
     }
     if (formData.estudiosPoligrafia) {
-      if (!formData.tipoPoligrafia)  missing.push("Tipo de Poligrafía");
+      if (!formData.tipoPoligrafia)   missing.push("Tipo de Poligrafía");
       if (!formData.ciudadPoligrafia) missing.push("Ciudad Poligrafía");
     }
     const hasService = formData.visitaDomiciliaria || formData.consultaAntecedentes || formData.referenciacion || formData.estudiosPoligrafia || formData.consultaDatacredito || formData.comparativoOEA;
@@ -1026,15 +1042,15 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
 
     const payload = {
       ...formData,
-      visitaDomiciliaria: formData.visitaDomiciliaria ? 'SI' : 'NO',
-      consultaAntecedentes: formData.consultaAntecedentes ? 'SI' : 'NO',
-      referenciacion: formData.referenciacion ? 'SI' : 'NO',
+      visitaDomiciliaria:  formData.visitaDomiciliaria  ? 'SI' : 'NO',
+      consultaAntecedentes:formData.consultaAntecedentes? 'SI' : 'NO',
+      referenciacion:      formData.referenciacion      ? 'SI' : 'NO',
       referenciaAcademica: formData.referenciaAcademica === true ? 'SI' : 'NO',
       referenciaLaboral:   formData.referenciaLaboral   === true ? 'SI' : 'NO',
       referenciaPersonal:  formData.referenciaPersonal  === true ? 'SI' : 'NO',
-      estudiosPoligrafia: formData.estudiosPoligrafia ? 'SI' : 'NO',
+      estudiosPoligrafia:  formData.estudiosPoligrafia  ? 'SI' : 'NO',
       consultaDatacredito: formData.consultaDatacredito ? 'SI' : 'NO',
-      comparativoOEA:     formData.comparativoOEA     ? 'SI' : 'NO',
+      comparativoOEA:      formData.comparativoOEA      ? 'SI' : 'NO',
     };
 
     try {
@@ -1068,7 +1084,6 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
         </div>
         <h2 className="text-3xl font-black text-gray-800 mb-2 tracking-tight">¡Éxito Total!</h2>
         <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-8 text-center">La solicitud ha sido procesada</p>
-
         <div className="bg-gray-50/50 p-6 rounded-3xl border border-gray-100 text-left mb-8 space-y-4">
           <div className="flex justify-between items-center">
             <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">ID Solicitud</span>
@@ -1079,7 +1094,6 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
             <span className="font-black text-gray-700 truncate ml-4 uppercase text-[11px]">{formData.nombre}</span>
           </div>
         </div>
-
         <div className="grid grid-cols-1 gap-4">
           <button onClick={resetForm} className="btn-3d-blue py-4 rounded-2xl flex items-center justify-center gap-3">
             <Icon name="ClipboardList" size={18}/> <span className="text-xs font-black uppercase tracking-widest">Crear Nueva</span>
@@ -1092,44 +1106,51 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
     </div>
   );
 
-  const inputClass = "w-full border border-gray-200 rounded-xl p-2 text-xs focus:ring-2 focus:ring-vividBlue/20 focus:border-vividBlue outline-none transition-all bg-gray-50/50 hover:bg-white";
-  const labelClass = "text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1 block";
+  const inputClass = "w-full border border-gray-200 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-vividBlue/20 focus:border-vividBlue outline-none transition-all bg-white hover:border-gray-300";
+  const labelClass = "text-[10px] font-black text-gray-500 uppercase tracking-wider mb-1.5 block";
   const fieldClass = "flex flex-col";
 
   return (
-    <div className="p-4 md:p-8 max-w-5xl mx-auto animate-fade-in pb-20">
-      {/* Stepper */}
+    <div className="p-4 md:p-8 max-w-5xl mx-auto animate-fade-in pb-24">
+
+      {/* ── STEPPER ─────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-center mb-10">
         <div className="flex items-center group cursor-pointer" onClick={() => setStep(1)}>
           <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-sm transition-all shadow-lg ${step===1?'bg-vividRed text-white shadow-red-500/40 scale-110':'bg-white text-gray-400 border border-gray-100'}`}>1</div>
           <div className="ml-4">
-             <span className={`block text-[10px] font-black uppercase tracking-widest ${step===1?'text-vividRed':'text-gray-400'}`}>Paso 1</span>
-             <span className={`text-xs font-bold ${step===1?'text-gray-800':'text-gray-400'}`}>Información Evaluado</span>
+            <span className={`block text-[10px] font-black uppercase tracking-widest ${step===1?'text-vividRed':'text-gray-400'}`}>Paso 1</span>
+            <span className={`text-xs font-bold ${step===1?'text-gray-800':'text-gray-400'}`}>Información Evaluado</span>
           </div>
         </div>
         <div className="w-16 h-1 bg-gray-100 mx-6 rounded-full overflow-hidden">
-           <div className={`h-full bg-vividRed transition-all duration-500 ${step===2?'w-full':'w-0'}`}></div>
+          <div className={`h-full bg-vividRed transition-all duration-500 ${step===2?'w-full':'w-0'}`}></div>
         </div>
         <div className="flex items-center group cursor-pointer" onClick={() => step === 2 && setStep(2)}>
           <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-sm transition-all shadow-lg ${step===2?'bg-vividRed text-white shadow-red-500/40 scale-110':'bg-white text-gray-400 border border-gray-100'}`}>2</div>
           <div className="ml-4">
-             <span className={`block text-[10px] font-black uppercase tracking-widest ${step===2?'text-vividRed':'text-gray-400'}`}>Paso 2</span>
-             <span className={`text-xs font-bold ${step===2?'text-gray-800':'text-gray-400'}`}>Servicios A Aplicar</span>
+            <span className={`block text-[10px] font-black uppercase tracking-widest ${step===2?'text-vividRed':'text-gray-400'}`}>Paso 2</span>
+            <span className={`text-xs font-bold ${step===2?'text-gray-800':'text-gray-400'}`}>Servicios A Aplicar</span>
           </div>
         </div>
       </div>
 
-      <div className="card-3d p-6 md:p-10 border-none">
-        {step === 1 && (
-          <div className="animate-fade-in space-y-8">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-4">
-               <h3 className="text-2xl font-black text-gray-800 tracking-tight">Datos del Candidato</h3>
-               <div className="px-4 py-1.5 bg-vividBlue/10 text-vividBlue rounded-full text-[10px] font-black uppercase tracking-tighter shadow-inner">
-                 Fecha: {formData.fechaSolicitud.split(',')[0]}
-               </div>
-            </div>
+      {/* ════════════════════════════════════════════════════════════════
+          PASO 1 — INFORMACIÓN DEL EVALUADO
+      ════════════════════════════════════════════════════════════════ */}
+      {step === 1 && (
+        <div className="animate-fade-in space-y-5">
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Cabecera del formulario */}
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-2xl font-black text-gray-800 tracking-tight">Datos del Candidato</h3>
+            <div className="px-4 py-1.5 bg-vividBlue/10 text-vividBlue rounded-full text-[10px] font-black uppercase tracking-tighter shadow-inner">
+              Fecha: {formData.fechaSolicitud.split(',')[0]}
+            </div>
+          </div>
+
+          {/* ── SECCIÓN 1: Cliente ─────────────────────────────────────── */}
+          <FormSection icon="Building" title="1. Información del Cliente" color="#10253F">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               <div className={fieldClass}>
                 <label className={labelClass}>Cliente Principal <span className="text-vividRed">*</span></label>
                 <select name="clientId" value={formData.clientId} onChange={handleChange} className={inputClass}>
@@ -1138,15 +1159,22 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
                 </select>
                 {clientType && <div className="mt-1.5 text-[9px] font-black text-vividBlue bg-vividBlue/5 px-2 py-0.5 rounded-lg uppercase self-start">Perfil: {clientType}</div>}
               </div>
-              <div className={fieldClass}><label className={labelClass}>NIT</label><input type="text" readOnly value={formData.nit} className={`${inputClass} bg-gray-100/50 font-mono font-bold`}/></div>
-              <div className={fieldClass}><label className={labelClass}>Razón Social</label><input type="text" readOnly value={formData.razonSocial} className={`${inputClass} bg-gray-100/50 font-bold`}/></div>
+              <div className={fieldClass}>
+                <label className={labelClass}>NIT</label>
+                <input type="text" readOnly value={formData.nit} className={`${inputClass} bg-gray-50 font-mono font-bold cursor-not-allowed`}/>
+              </div>
+              <div className={fieldClass}>
+                <label className={labelClass}>Razón Social</label>
+                <input type="text" readOnly value={formData.razonSocial} className={`${inputClass} bg-gray-50 font-bold cursor-not-allowed`}/>
+              </div>
             </div>
 
+            {/* Sub-sección cliente interno */}
             {isInternal && (
-              <div className="p-6 bg-vividBlue/[0.03] rounded-3xl border border-vividBlue/10 space-y-6 animate-scale-in">
-                <div className="flex items-center gap-2 mb-2">
-                   <div className="w-1.5 h-4 bg-vividBlue rounded-full"></div>
-                   <h4 className="text-xs font-black text-vividBlue uppercase tracking-widest">Configuración Proyecto Interno</h4>
+              <div className="mt-5 pt-5 border-t-2 border-dashed border-blue-100">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-1 h-4 bg-vividBlue rounded-full"></div>
+                  <span className="text-[10px] font-black text-vividBlue uppercase tracking-widest">Configuración Proyecto Interno</span>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div className={fieldClass}><label className={labelClass}>Proyecto</label>
@@ -1158,22 +1186,23 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
                       <option value="">Seleccione...</option>{uniqueLineas.map((l,i) => <option key={i} value={l}>{l}</option>)}
                     </select></div>
                   <div className={fieldClass}><label className={labelClass}>Línea Negocio <span className="text-vividRed">*</span></label>
-                    <select name="lineaNegocio" value={formData.lineaNegocio} onChange={handleChange} disabled={!formData.linea} className={`${inputClass} disabled:opacity-50`}>
+                    <select name="lineaNegocio" value={formData.lineaNegocio} onChange={handleChange} disabled={!formData.linea} className={`${inputClass} disabled:opacity-50 disabled:cursor-not-allowed`}>
                       <option value="">Seleccione...</option>{availableLNs.map((l,i) => <option key={i} value={l}>{l}</option>)}
                     </select></div>
                   <div className={fieldClass}><label className={labelClass}>Centro de Costos <span className="text-vividRed">*</span></label>
-                    <select name="centroCostos" value={formData.centroCostos} onChange={handleChange} disabled={!formData.lineaNegocio} className={`${inputClass} disabled:opacity-50`}>
+                    <select name="centroCostos" value={formData.centroCostos} onChange={handleChange} disabled={!formData.lineaNegocio} className={`${inputClass} disabled:opacity-50 disabled:cursor-not-allowed`}>
                       <option value="">Seleccione...</option>{availableCCs.map((c,i) => <option key={i} value={c}>{c}</option>)}
                     </select></div>
                 </div>
               </div>
             )}
 
+            {/* Sub-sección cliente externo */}
             {(!isInternal && formData.clientId) && (
-              <div className="p-6 bg-vividBlue/[0.03] rounded-3xl border border-vividBlue/10 space-y-6 animate-scale-in">
-                <div className="flex items-center gap-2 mb-2">
-                   <div className="w-1.5 h-4 bg-vividBlue rounded-full"></div>
-                   <h4 className="text-xs font-black text-vividBlue uppercase tracking-widest">Configuración Cliente Externo</h4>
+              <div className="mt-5 pt-5 border-t-2 border-dashed border-blue-100">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-1 h-4 bg-vividBlue rounded-full"></div>
+                  <span className="text-[10px] font-black text-vividBlue uppercase tracking-widest">Configuración Cliente Externo</span>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   {availableSecondaryClients.length > 0 && (<>
@@ -1189,13 +1218,17 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
                 </div>
               </div>
             )}
+          </FormSection>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          {/* ── SECCIÓN 2: Identificación ──────────────────────────────── */}
+          <FormSection icon="IdCard" title="2. Identificación del Evaluado" color="#B91C1C">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
               <div className="md:col-span-2 flex flex-col">
                 <label className={labelClass}>Nombre Completo <span className="text-vividRed">*</span></label>
                 <input type="text" name="nombre" value={formData.nombre} onChange={handleChange} className={inputClass} placeholder="Nombre completo del evaluado"/>
               </div>
-              <div className={fieldClass}><label className={labelClass}>Tipo ID <span className="text-vividRed">*</span></label>
+              <div className={fieldClass}>
+                <label className={labelClass}>Tipo ID <span className="text-vividRed">*</span></label>
                 <select name="tipoIdentificacion" value={formData.tipoIdentificacion} onChange={handleChange} className={inputClass}>
                   <option value="">Seleccione...</option>
                   <option value="Cédula de Ciudadanía">Cédula de Ciudadanía</option>
@@ -1206,197 +1239,242 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
                   <option value="Permiso Permanente de Trabajo">Permiso Permanente de Trabajo</option>
                   <option value="PEP">PEP</option>
                   <option value="Otro">Otro</option>
-                </select></div>
-              <div className={fieldClass}><label className={labelClass}>Identificación <span className="text-vividRed">*</span></label>
+                </select>
+              </div>
+              <div className={fieldClass}>
+                <label className={labelClass}>N° Identificación <span className="text-vividRed">*</span></label>
                 <input type="text" name="identificacion" value={formData.identificacion} onChange={handleIdentificacionChange} className={inputClass} placeholder="Número"/>
               </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div className={fieldClass}><label className={labelClass}>Fecha Expedición</label><input type="date" name="fechaExpedicion" value={formData.fechaExpedicion} onChange={handleChange} className={inputClass}/></div>
-              <div className={fieldClass}><label className={labelClass}>Cargo <span className="text-vividRed">*</span></label><input type="text" name="cargo" value={formData.cargo} onChange={handleChange} className={inputClass} placeholder="Puesto"/></div>
-              <div className={fieldClass}><label className={labelClass}>Correo</label><input type="email" name="correo" value={formData.correo} onChange={handleChange} className={inputClass} placeholder="email@ejemplo.com"/></div>
-              <div className={fieldClass}><label className={labelClass}>Celular <span className="text-vividRed">*</span></label>
+              <div className={fieldClass}>
+                <label className={labelClass}>Fecha Expedición</label>
+                <input type="date" name="fechaExpedicion" value={formData.fechaExpedicion} onChange={handleChange} className={inputClass}/>
+              </div>
+              <div className={fieldClass}>
+                <label className={labelClass}>Cargo <span className="text-vividRed">*</span></label>
+                <input type="text" name="cargo" value={formData.cargo} onChange={handleChange} className={inputClass} placeholder="Puesto"/>
+              </div>
+              <div className={fieldClass}>
+                <label className={labelClass}>Correo</label>
+                <input type="email" name="correo" value={formData.correo} onChange={handleChange} className={inputClass} placeholder="email@ejemplo.com"/>
+              </div>
+              <div className={fieldClass}>
+                <label className={labelClass}>Celular <span className="text-vividRed">*</span></label>
                 <input type="tel" name="celular" value={formData.celular} onChange={handleCelularChange} inputMode="numeric" pattern="[0-9]*" maxLength={13} className={inputClass} placeholder="3001234567"/>
               </div>
             </div>
+          </FormSection>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div className={fieldClass}><label className={labelClass}>Ciudad <span className="text-vividRed">*</span></label>
+          {/* ── SECCIÓN 3: Ubicación ──────────────────────────────────── */}
+          <FormSection icon="MapPin" title="3. Ubicación" color="#065F46">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+              <div className={fieldClass}>
+                <label className={labelClass}>Ciudad <span className="text-vividRed">*</span></label>
                 <select name="ciudad" value={formData.ciudad} onChange={handleChange} className={inputClass}>
                   <option value="">Seleccione...</option>
                   {ciudadesList.length > 0
                     ? ciudadesList.map((c,i) => <option key={i} value={c.Ciudades}>{c.Ciudades}</option>)
                     : ['Bogotá','Medellín','Cali','Barranquilla','Otra'].map(c => <option key={c} value={c}>{c}</option>)}
-                </select></div>
-              <div className={fieldClass}><label className={labelClass}>Barrio</label><input type="text" name="barrio" value={formData.barrio} onChange={handleChange} className={inputClass}/></div>
-              <div className="md:col-span-2 flex flex-col"><label className={labelClass}>Dirección <span className="text-vividRed">*</span></label><input type="text" name="direccion" value={formData.direccion} onChange={handleChange} className={inputClass}/></div>
-            </div>
-
-            <div className="flex flex-col md:flex-row items-center justify-between gap-6 pt-4">
-              <div className="flex flex-col w-full md:w-1/2">
-                <label className={labelClass}>Tipo Trabajador <span className="text-vividRed">*</span></label>
-                <div className="flex rounded-2xl bg-gray-100 p-1 overflow-hidden h-10">
-                  {['Nuevo','Actual','Reinversión'].map(t => (
-                    <button key={t} type="button" onClick={() => setFormData(p => ({...p, tipoTrabajador: t}))}
-                      className={`flex-1 text-[10px] font-black uppercase tracking-tighter rounded-xl transition-all ${formData.tipoTrabajador===t?'bg-white text-gray-800 shadow-sm scale-[1.02]':'text-gray-400 hover:text-gray-600'}`}>
-                      {t}
-                    </button>
-                  ))}
-                </div>
+                </select>
               </div>
-              <div className="flex gap-4 w-full md:w-auto mt-4 md:mt-0">
-                <button type="button" onClick={() => setView('history')} className="flex-1 md:flex-none px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest text-gray-400 hover:bg-gray-100 transition-all">Cancelar</button>
-                <button type="button" onClick={() => setStep(2)} className="flex-1 md:flex-none px-12 py-3 rounded-2xl text-xs font-black uppercase tracking-widest bg-vividBlue text-white shadow-lg shadow-blue-500/30 hover:scale-105 active:scale-95 transition-all btn-3d">Siguiente →</button>
+              <div className={fieldClass}>
+                <label className={labelClass}>Barrio</label>
+                <input type="text" name="barrio" value={formData.barrio} onChange={handleChange} className={inputClass}/>
+              </div>
+              <div className="md:col-span-2 flex flex-col">
+                <label className={labelClass}>Dirección <span className="text-vividRed">*</span></label>
+                <input type="text" name="direccion" value={formData.direccion} onChange={handleChange} className={inputClass}/>
               </div>
             </div>
-          </div>
-        )}
+          </FormSection>
 
-        {step === 2 && (
-          <div className="animate-fade-in space-y-8">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-4">
-               <h3 className="text-2xl font-black text-gray-800 tracking-tight">Servicios a Aplicar</h3>
-               <div className="flex items-center gap-2 text-vividOrange bg-vividOrange/10 px-3 py-1 rounded-full text-[10px] font-black uppercase shadow-inner">
-                 <Icon name="Info" size={12}/> Seleccione al menos uno
-               </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-gray-50/50 rounded-3xl p-4 border border-gray-100 hover:bg-white transition-all">
-                <ToggleSwitch label="Visita Domiciliaria" value={formData.visitaDomiciliaria} onChange={v => handleToggle('visitaDomiciliaria', v)}/>
-                {formData.visitaDomiciliaria && (
-                  <div className="mt-4 pt-4 border-t border-gray-100 flex flex-wrap gap-2 animate-scale-in">
-                    {['Presencial','Virtual','Autogestionada'].map(m => (
-                      <button key={m} type="button" onClick={() => setFormData(p => ({...p, modalidadVisita: m}))}
-                        className={`px-4 py-1.5 text-[10px] font-black uppercase tracking-tight rounded-xl transition-all border ${formData.modalidadVisita===m?'bg-gray-800 text-white border-gray-800 shadow-md scale-105':'bg-white text-gray-400 border-gray-200 hover:border-gray-300'}`}>{m}</button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="bg-gray-50/50 rounded-3xl p-4 border border-gray-100 hover:bg-white transition-all">
-                <ToggleSwitch label="Consulta Antecedentes" value={formData.consultaAntecedentes} onChange={v => handleToggle('consultaAntecedentes', v)}/>
-              </div>
-
-              <div className="bg-gray-50/50 rounded-3xl p-4 border border-gray-100 hover:bg-white transition-all md:row-span-2">
-                <ToggleSwitch label="Referenciación" value={formData.referenciacion} onChange={v => handleToggle('referenciacion', v)}/>
-                {formData.referenciacion && (
-                  <div className="mt-4 pt-4 border-t border-gray-100 space-y-2 animate-scale-in">
-                    <ToggleSwitch label="Referencia Académica" value={formData.referenciaAcademica} onChange={v => handleToggle('referenciaAcademica', v)}/>
-                    <ToggleSwitch label="Referencia Laboral"   value={formData.referenciaLaboral}   onChange={v => handleToggle('referenciaLaboral', v)}/>
-                    <div className="relative">
-                      <ToggleSwitch label="Referencia Personal" value={formData.referenciaPersonal} onChange={v => handleToggle('referenciaPersonal', v)}/>
-                      {showPersonalRefWarning && (
-                        <div className="absolute -top-10 left-0 bg-vividOrange text-white text-[9px] font-black uppercase px-3 py-1.5 rounded-xl shadow-xl shadow-vividOrange/30 animate-fade-in z-10">
-                          Incompatible con Visita Domiciliaria
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="bg-gray-50/50 rounded-3xl p-4 border border-gray-100 hover:bg-white transition-all">
-                <ToggleSwitch label="Estudios Poligrafía" value={formData.estudiosPoligrafia} onChange={v => handleToggle('estudiosPoligrafia', v)}/>
-                {formData.estudiosPoligrafia && (
-                  <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-2 gap-4 animate-scale-in">
-                    <div className={fieldClass}><label className={labelClass}>Tipo Poligrafía</label>
-                      <select name="tipoPoligrafia" value={formData.tipoPoligrafia} onChange={handleChange} className={inputClass}>
-                        <option value="">Seleccione...</option>
-                        {['Preempleo','Rutina','Especifica','Verifeye Preempleo','Verifeye Rutina','Verifeye Especifica','VSA Preempleo','VSA Rutina','VSA Especifica'].map(t => <option key={t} value={t}>{t}</option>)}
-                      </select></div>
-                    <div className={fieldClass}><label className={labelClass}>Ciudad Poligrafía</label>
-                      <select name="ciudadPoligrafia" value={formData.ciudadPoligrafia} onChange={handleChange} className={inputClass}>
-                        <option value="">Seleccione...</option>
-                        {ciudadesPoligrafiaList.length > 0
-                          ? ciudadesPoligrafiaList.map((c,i) => <option key={i} value={c.Ciudad}>{c.Ciudad}</option>)
-                          : ['Bogotá','Medellín','Cali'].map(c => <option key={c} value={c}>{c}</option>)}
-                      </select></div>
-                  </div>
-                )}
-              </div>
-
-              <div className="bg-gray-50/50 rounded-3xl p-4 border border-gray-100 hover:bg-white transition-all">
-                <ToggleSwitch label="Consulta Datacrédito" value={formData.consultaDatacredito} onChange={v => handleToggle('consultaDatacredito', v)}/>
-              </div>
-              <div className="bg-gray-50/50 rounded-3xl p-4 border border-gray-100 hover:bg-white transition-all">
-                <ToggleSwitch label="Comparativo OEA" value={formData.comparativoOEA} onChange={v => handleToggle('comparativoOEA', v)}/>
-              </div>
-            </div>
-
-            {/* Adjuntos Compactos */}
-            <div className="bg-white p-6 rounded-3xl border border-dashed border-gray-200">
-              <div className="flex items-center gap-2 mb-6">
-                <Icon name="Upload" size={18} className="text-gray-400"/>
-                <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Documentos de Soporte</h4>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-6 items-end">
-                <div className="md:col-span-5">
-                  <label className={labelClass}>Nombre Documento</label>
-                  <input type="text" value={currentDocName} onChange={e => setCurrentDocName(e.target.value)} className={inputClass} placeholder="Ej: Cédula, Diploma..."/>
-                </div>
-                <div className="md:col-span-5">
-                  <label className={labelClass}>Archivo</label>
-                  <div className="relative">
-                    <input id="fileInput" type="file" onChange={e => e.target.files?.[0] && setCurrentFile(e.target.files[0])}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"/>
-                    <div className="w-full border border-gray-200 rounded-xl p-2 text-xs bg-gray-50 flex items-center justify-between text-gray-500">
-                       <span className="truncate">{currentFile ? currentFile.name : "Seleccionar archivo..."}</span>
-                       <Icon name="FileText" size={14}/>
-                    </div>
-                  </div>
-                </div>
-                <div className="md:col-span-2">
-                  <button onClick={addAttachment} type="button" className="w-full bg-gray-800 text-white rounded-xl py-2 text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all">Agregar</button>
-                </div>
-              </div>
-              {attachments.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
-                  {attachments.map(att => (
-                    <div key={att.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-2xl border border-gray-100 shadow-sm animate-scale-in">
-                      <div className="flex items-center gap-3 overflow-hidden">
-                        <div className="bg-white p-2 rounded-xl text-vividBlue shadow-inner"><Icon name="FileText" size={16}/></div>
-                        <div className="truncate">
-                          <div className="text-[11px] font-black text-gray-700 uppercase tracking-tight truncate">{att.name}</div>
-                          <div className="text-[9px] text-gray-400 truncate">{att.file.name}</div>
-                        </div>
-                      </div>
-                      <button onClick={() => setAttachments(a => a.filter(x => x.id !== att.id))} className="text-vividRed hover:bg-red-50 p-2 rounded-xl transition-all">
-                        <Icon name="Trash" size={16}/>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <label className={labelClass}>Notas Adicionales</label>
-              <textarea name="notas" maxLength={3000} value={formData.notas} onChange={handleChange}
-                className="w-full border border-gray-100 rounded-3xl p-4 text-xs h-28 outline-none focus:ring-2 focus:ring-vividBlue/10 bg-gray-50/50 hover:bg-white transition-all resize-none" placeholder="Observaciones relevantes del caso..."/>
-              <div className="text-right text-[9px] font-black text-gray-300 uppercase tracking-widest">{formData.notas.length} / 3000 CARACTERES</div>
-            </div>
-
-            <div className="flex flex-col md:flex-row items-center justify-between gap-6 pt-6 border-t border-gray-100">
-              <button type="button" onClick={() => setStep(1)} className="w-full md:w-auto px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest text-gray-400 hover:bg-gray-100 transition-all">← Anterior</button>
-              <div className="flex gap-4 w-full md:w-auto">
-                <button type="button" onClick={() => setView('history')} className="flex-1 md:flex-none px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest text-gray-400 hover:bg-gray-100 transition-all">Cancelar</button>
-                <button type="button" onClick={handleSubmit} disabled={uploading}
-                  className="flex-1 md:flex-none px-12 py-3 rounded-2xl text-xs font-black uppercase tracking-widest bg-vividRed text-white shadow-xl shadow-red-500/30 hover:scale-105 active:scale-95 transition-all btn-3d disabled:opacity-50 flex items-center justify-center gap-3">
-                  {uploading ? <><Icon name="RefreshCw" size={16} className="animate-spin"/> Guardando...</> : <><Icon name="Check" size={16}/> Enviar Solicitud</>}
+          {/* ── SECCIÓN 4: Tipo Trabajador ────────────────────────────── */}
+          <FormSection icon="Briefcase" title="4. Tipo de Trabajador" color="#92400E">
+            <div className="flex rounded-2xl bg-gray-100 p-1 overflow-hidden h-11 max-w-sm">
+              {['Nuevo','Actual','Reinversión'].map(t => (
+                <button key={t} type="button" onClick={() => setFormData(p => ({...p, tipoTrabajador: t}))}
+                  className={`flex-1 text-[11px] font-black uppercase tracking-tighter rounded-xl transition-all ${formData.tipoTrabajador===t?'bg-white text-gray-800 shadow-sm scale-[1.02]':'text-gray-400 hover:text-gray-600'}`}>
+                  {t}
                 </button>
-              </div>
+              ))}
+            </div>
+          </FormSection>
+
+          {/* Botones navegación */}
+          <div className="flex flex-col md:flex-row items-center justify-end gap-4 pt-2">
+            <button type="button" onClick={() => setView('history')} className="w-full md:w-auto px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest text-gray-400 hover:bg-gray-100 transition-all">Cancelar</button>
+            <button type="button" onClick={() => setStep(2)} className="w-full md:w-auto px-12 py-3 rounded-2xl text-xs font-black uppercase tracking-widest bg-vividBlue text-white shadow-lg shadow-blue-500/30 hover:scale-105 active:scale-95 transition-all btn-3d">Siguiente →</button>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════════════════════
+          PASO 2 — SERVICIOS A APLICAR
+      ════════════════════════════════════════════════════════════════ */}
+      {step === 2 && (
+        <div className="animate-fade-in space-y-5">
+
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-2xl font-black text-gray-800 tracking-tight">Servicios a Aplicar</h3>
+            <div className="flex items-center gap-2 text-vividOrange bg-vividOrange/10 px-3 py-1 rounded-full text-[10px] font-black uppercase shadow-inner">
+              <Icon name="Info" size={12}/> Seleccione al menos uno
             </div>
           </div>
-        )}
-      </div>
+
+          {/* ── VISITA DOMICILIARIA ───────────────────────────────────── */}
+          <FormSection icon="Home" title="Visita Domiciliaria" color="#1D4ED8">
+            <ToggleSwitch label="¿Aplicar Visita Domiciliaria?" value={formData.visitaDomiciliaria} onChange={v => handleToggle('visitaDomiciliaria', v)}/>
+            {formData.visitaDomiciliaria && (
+              <div className="mt-4 pt-4 border-t-2 border-dashed border-blue-100 animate-scale-in">
+                <label className={`${labelClass} mb-3`}>Modalidad de Visita <span className="text-vividRed">*</span></label>
+                <div className="flex flex-wrap gap-2">
+                  {['Presencial','Virtual','Autogestionada'].map(m => (
+                    <button key={m} type="button" onClick={() => setFormData(p => ({...p, modalidadVisita: m}))}
+                      className={`px-5 py-2 text-[11px] font-black uppercase tracking-tight rounded-xl transition-all border-2 ${formData.modalidadVisita===m?'bg-blue-700 text-white border-blue-700 shadow-md':'bg-white text-gray-500 border-gray-200 hover:border-blue-300 hover:text-blue-600'}`}>{m}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </FormSection>
+
+          {/* ── CONSULTA ANTECEDENTES ─────────────────────────────────── */}
+          <FormSection icon="Search" title="Consulta de Antecedentes" color="#065F46">
+            <ToggleSwitch label="¿Aplicar Consulta de Antecedentes?" value={formData.consultaAntecedentes} onChange={v => handleToggle('consultaAntecedentes', v)}/>
+          </FormSection>
+
+          {/* ── REFERENCIACIÓN ────────────────────────────────────────── */}
+          <FormSection icon="Phone" title="Referenciación" color="#7C3AED">
+            <ToggleSwitch label="¿Aplicar Referenciación?" value={formData.referenciacion} onChange={v => handleToggle('referenciacion', v)}/>
+            {formData.referenciacion && (
+              <div className="mt-4 pt-4 border-t-2 border-dashed border-purple-100 animate-scale-in space-y-3">
+                <p className="text-[10px] font-black text-purple-600 uppercase tracking-widest mb-3">Tipos de referencia a aplicar:</p>
+
+                <div className="bg-gray-50 rounded-xl px-4 py-3 border border-gray-200">
+                  <ToggleSwitch label="Referencia Académica" value={formData.referenciaAcademica} onChange={v => handleToggle('referenciaAcademica', v)}/>
+                </div>
+
+                <div className="bg-gray-50 rounded-xl px-4 py-3 border border-gray-200">
+                  <ToggleSwitch label="Referencia Laboral" value={formData.referenciaLaboral} onChange={v => handleToggle('referenciaLaboral', v)}/>
+                </div>
+
+                <div className="bg-gray-50 rounded-xl px-4 py-3 border border-gray-200 relative">
+                  <ToggleSwitch label="Referencia Personal" value={formData.referenciaPersonal} onChange={v => handleToggle('referenciaPersonal', v)}/>
+                  {showPersonalRefWarning && (
+                    <div className="absolute -top-10 left-0 bg-vividOrange text-white text-[9px] font-black uppercase px-3 py-1.5 rounded-xl shadow-xl shadow-vividOrange/30 animate-fade-in z-10">
+                      Incompatible con Visita Domiciliaria
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </FormSection>
+
+          {/* ── ESTUDIOS POLIGRAFÍA ───────────────────────────────────── */}
+          <FormSection icon="Wrench" title="Estudios de Poligrafía" color="#92400E">
+            <ToggleSwitch label="¿Aplicar Estudios de Poligrafía?" value={formData.estudiosPoligrafia} onChange={v => handleToggle('estudiosPoligrafia', v)}/>
+            {formData.estudiosPoligrafia && (
+              <div className="mt-4 pt-4 border-t-2 border-dashed border-amber-100 animate-scale-in grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className={fieldClass}>
+                  <label className={labelClass}>Tipo de Poligrafía <span className="text-vividRed">*</span></label>
+                  <select name="tipoPoligrafia" value={formData.tipoPoligrafia} onChange={handleChange} className={inputClass}>
+                    <option value="">Seleccione...</option>
+                    {['Preempleo','Rutina','Especifica','Verifeye Preempleo','Verifeye Rutina','Verifeye Especifica','VSA Preempleo','VSA Rutina','VSA Especifica'].map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div className={fieldClass}>
+                  <label className={labelClass}>Ciudad de Poligrafía <span className="text-vividRed">*</span></label>
+                  <select name="ciudadPoligrafia" value={formData.ciudadPoligrafia} onChange={handleChange} className={inputClass}>
+                    <option value="">Seleccione...</option>
+                    {ciudadesPoligrafiaList.length > 0
+                      ? ciudadesPoligrafiaList.map((c,i) => <option key={i} value={c.Ciudad}>{c.Ciudad}</option>)
+                      : ['Bogotá','Medellín','Cali'].map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              </div>
+            )}
+          </FormSection>
+
+          {/* ── CONSULTA DATACRÉDITO + COMPARATIVO OEA (fila) ───────── */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <FormSection icon="FileText" title="Consulta Datacrédito" color="#0F766E">
+              <ToggleSwitch label="¿Aplicar Consulta Datacrédito?" value={formData.consultaDatacredito} onChange={v => handleToggle('consultaDatacredito', v)}/>
+            </FormSection>
+
+            <FormSection icon="ShieldCheck" title="Comparativo OEA" color="#6B21A8">
+              <ToggleSwitch label="¿Aplicar Comparativo OEA?" value={formData.comparativoOEA} onChange={v => handleToggle('comparativoOEA', v)}/>
+            </FormSection>
+          </div>
+
+          {/* ── DOCUMENTOS DE SOPORTE ────────────────────────────────── */}
+          <FormSection icon="Upload" title="Documentos de Soporte" color="#475569">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-5 items-end">
+              <div className="md:col-span-5">
+                <label className={labelClass}>Nombre del Documento</label>
+                <input type="text" value={currentDocName} onChange={e => setCurrentDocName(e.target.value)} className={inputClass} placeholder="Ej: Cédula, Diploma..."/>
+              </div>
+              <div className="md:col-span-5">
+                <label className={labelClass}>Archivo</label>
+                <div className="relative">
+                  <input id="fileInput" type="file" onChange={e => e.target.files?.[0] && setCurrentFile(e.target.files[0])}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"/>
+                  <div className="w-full border border-gray-200 rounded-xl p-2.5 text-xs bg-white flex items-center justify-between text-gray-500 hover:border-gray-300 transition-all">
+                    <span className="truncate">{currentFile ? currentFile.name : "Seleccionar archivo..."}</span>
+                    <Icon name="FileText" size={14} className="text-gray-400 flex-shrink-0 ml-2"/>
+                  </div>
+                </div>
+              </div>
+              <div className="md:col-span-2">
+                <button onClick={addAttachment} type="button" className="w-full bg-gray-800 hover:bg-black text-white rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all">Agregar</button>
+              </div>
+            </div>
+
+            {attachments.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-4 border-t border-gray-100">
+                {attachments.map(att => (
+                  <div key={att.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-2xl border border-gray-200 shadow-sm animate-scale-in">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <div className="bg-white p-2 rounded-xl text-vividBlue shadow-inner border border-gray-100"><Icon name="FileText" size={16}/></div>
+                      <div className="truncate">
+                        <div className="text-[11px] font-black text-gray-700 uppercase tracking-tight truncate">{att.name}</div>
+                        <div className="text-[9px] text-gray-400 truncate">{att.file.name}</div>
+                      </div>
+                    </div>
+                    <button onClick={() => setAttachments(a => a.filter(x => x.id !== att.id))} className="text-vividRed hover:bg-red-50 p-2 rounded-xl transition-all flex-shrink-0 ml-2">
+                      <Icon name="Trash" size={16}/>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </FormSection>
+
+          {/* ── NOTAS ────────────────────────────────────────────────── */}
+          <FormSection icon="FileText" title="Notas Adicionales" color="#374151">
+            <textarea name="notas" maxLength={3000} value={formData.notas} onChange={handleChange}
+              className="w-full border border-gray-200 rounded-xl p-4 text-xs h-28 outline-none focus:ring-2 focus:ring-gray-300 bg-white transition-all resize-none hover:border-gray-300"
+              placeholder="Observaciones relevantes del caso..."/>
+            <div className="text-right text-[9px] font-black text-gray-300 uppercase tracking-widest mt-1">{formData.notas.length} / 3000 CARACTERES</div>
+          </FormSection>
+
+          {/* Botones navegación */}
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-2">
+            <button type="button" onClick={() => setStep(1)} className="w-full md:w-auto px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest text-gray-400 hover:bg-gray-100 transition-all">← Anterior</button>
+            <div className="flex gap-4 w-full md:w-auto">
+              <button type="button" onClick={() => setView('history')} className="flex-1 md:flex-none px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest text-gray-400 hover:bg-gray-100 transition-all">Cancelar</button>
+              <button type="button" onClick={handleSubmit} disabled={uploading}
+                className="flex-1 md:flex-none px-12 py-3 rounded-2xl text-xs font-black uppercase tracking-widest bg-vividRed text-white shadow-xl shadow-red-500/30 hover:scale-105 active:scale-95 transition-all btn-3d disabled:opacity-50 flex items-center justify-center gap-3">
+                {uploading ? <><Icon name="RefreshCw" size={16} className="animate-spin"/> Guardando...</> : <><Icon name="Check" size={16}/> Enviar Solicitud</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <AlertModal show={showValidationAlert} title="Faltan Datos" items={missingFields} onClose={() => setShowValidationAlert(false)}/>
     </div>
   );
 };
 
-// ─── CARGA MASIVA (Tarea 7: log detallado) ───────────────────────────────
+// ─── CARGA MASIVA ─────────────────────────────────────────────────────────
 const BulkUpload = ({ userContext, setView, onReload }) => {
   const [selectedClient, setSelectedClient] = useState('');
   const [downloading, setDownloading]       = useState(false);
@@ -1456,7 +1534,6 @@ const BulkUpload = ({ userContext, setView, onReload }) => {
         const response = await runServer('processBulkUpload', { csvContent: base64Content, clientId: selectedClient });
         if (response.success) { setUploadResult(response); if (onReload) onReload(); }
         else {
-          // Errores de validación del backend
           setValidationErrors(response.errorList || [response.message]);
           setShowValidationAlert(true);
         }
@@ -1474,7 +1551,6 @@ const BulkUpload = ({ userContext, setView, onReload }) => {
         </div>
         <h2 className="text-3xl font-black text-gray-800 mb-2 tracking-tight">¡Carga Finalizada!</h2>
         <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-8 text-center">Resultados del procesamiento masivo</p>
-
         <div className="bg-gray-50/50 p-6 rounded-3xl border border-gray-100 text-left mb-6 space-y-4">
           <div className="flex justify-between items-center">
             <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Exitosos</span>
@@ -1485,7 +1561,6 @@ const BulkUpload = ({ userContext, setView, onReload }) => {
             <span className={`font-mono font-black px-3 py-1 rounded-xl shadow-sm border border-gray-100 ${uploadResult.failed > 0 ? 'text-vividRed bg-vividRed/5' : 'text-gray-400 bg-white'}`}>{uploadResult.failed}</span>
           </div>
         </div>
-
         {uploadResult.technicalErrors?.length > 0 && (
           <div className="bg-vividRed/[0.03] border border-vividRed/10 rounded-2xl p-4 mb-8 text-left max-h-36 overflow-y-auto">
             <p className="text-[9px] font-black text-vividRed uppercase tracking-widest mb-2">Errores Técnicos Detectados:</p>
@@ -1494,7 +1569,6 @@ const BulkUpload = ({ userContext, setView, onReload }) => {
             </ul>
           </div>
         )}
-
         <div className="grid grid-cols-1 gap-4">
           <button onClick={() => { setFile(null); setUploadResult(null); }} className="btn-3d-blue py-4 rounded-2xl flex items-center justify-center gap-3">
             <Icon name="Upload" size={18}/> <span className="text-xs font-black uppercase tracking-widest">Subir Otro</span>
@@ -1552,12 +1626,11 @@ const BulkUpload = ({ userContext, setView, onReload }) => {
 };
 
 // ─── CONFIGURACIÓN ────────────────────────────────────────────────────────
-// ─── MODAL DE ADMINISTRACIÓN DE USUARIOS POR CLIENTE ──────────────────────
 const AdminClientModal = ({ clientId, clientName, onClose, showToast }) => {
-  const [users, setUsers] = useState([]);
+  const [users, setUsers]     = useState([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(null);
-  const [search, setSearch] = useState('');
+  const [search, setSearch]   = useState('');
 
   const filteredUsers = useMemo(() => {
     if (!search) return users;
@@ -1612,7 +1685,6 @@ const AdminClientModal = ({ clientId, clientName, onClose, showToast }) => {
             <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors"><Icon name="X" size={24}/></button>
           </div>
         </div>
-
         <div className="flex-1 overflow-y-auto p-6 bg-gray-50/30">
           {loading ? (
             <div className="flex flex-col items-center py-20 gap-4">
@@ -1625,7 +1697,7 @@ const AdminClientModal = ({ clientId, clientName, onClose, showToast }) => {
             <div className="space-y-6">
               {filteredUsers.map(u => (
                 <div key={u.Email} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm transition-all overflow-hidden relative">
-                   {updating === u.Email && (
+                  {updating === u.Email && (
                     <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex items-center justify-center">
                       <div className="w-8 h-8 border-4 border-appBlue border-t-transparent rounded-full animate-spin"></div>
                     </div>
@@ -1638,14 +1710,10 @@ const AdminClientModal = ({ clientId, clientName, onClose, showToast }) => {
                         <div className="text-[10px] uppercase font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded inline-block mt-0.5">Perfil Actual: {u.Rol_Asignado}</div>
                       </div>
                     </div>
-
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                       {ROLES_INFO.map(role => (
-                        <div
-                          key={role.id}
-                          onClick={() => !updating && handleUpdate(u.Email, role.id)}
-                          className={`cursor-pointer p-3 rounded-xl border-2 transition-all flex flex-col gap-1 ${u.Rol_Asignado === role.id ? 'border-appBlue bg-blue-50/50' : 'border-gray-100 hover:border-gray-300 bg-white'}`}
-                        >
+                        <div key={role.id} onClick={() => !updating && handleUpdate(u.Email, role.id)}
+                          className={`cursor-pointer p-3 rounded-xl border-2 transition-all flex flex-col gap-1 ${u.Rol_Asignado === role.id ? 'border-appBlue bg-blue-50/50' : 'border-gray-100 hover:border-gray-300 bg-white'}`}>
                           <div className="flex items-center justify-between">
                             <span className={`text-[11px] font-black uppercase ${u.Rol_Asignado === role.id ? 'text-appBlue' : 'text-gray-500'}`}>{role.title}</span>
                             {u.Rol_Asignado === role.id && <Icon name="CheckCircle" size={14} className="text-appBlue"/>}
@@ -1660,7 +1728,6 @@ const AdminClientModal = ({ clientId, clientName, onClose, showToast }) => {
             </div>
           )}
         </div>
-
         <div className="p-4 border-t bg-white text-center">
           <button onClick={onClose} className="px-12 py-2.5 bg-gray-900 text-white font-bold rounded-xl hover:bg-black transition shadow-lg btn-action">Finalizar Gestión</button>
         </div>
@@ -1670,7 +1737,7 @@ const AdminClientModal = ({ clientId, clientName, onClose, showToast }) => {
 };
 
 const ConfigurationView = ({ userContext, onForceSync, syncStatus, lastSync, onRefreshClients, showToast }) => {
-  const [clientSearch, setClientSearch] = useState('');
+  const [clientSearch, setClientSearch]           = useState('');
   const [selectedAdminClient, setSelectedAdminClient] = useState(null);
 
   const filteredClientIds = useMemo(() => {
@@ -1693,8 +1760,6 @@ const ConfigurationView = ({ userContext, onForceSync, syncStatus, lastSync, onR
           {syncStatus !== 'idle' ? 'Sincronizando...' : 'Forzar Sincronización'}
         </button>
       </div>
-
-      {/* Tarea 8: Panel de Administración de Clientes */}
       {userContext.isAdmin && (
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 mb-8 animate-fade-in">
           <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
@@ -1707,47 +1772,36 @@ const ConfigurationView = ({ userContext, onForceSync, syncStatus, lastSync, onR
             </div>
             <div className="relative w-full md:w-64">
               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><Icon name="Search" size={14}/></div>
-              <input
-                type="text"
-                placeholder="Buscar cliente..."
-                value={clientSearch}
-                onChange={e => setClientSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-appRed/20 focus:border-appRed outline-none transition-all"
-              />
+              <input type="text" placeholder="Buscar cliente..." value={clientSearch} onChange={e => setClientSearch(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-appRed/20 focus:border-appRed outline-none transition-all"/>
             </div>
           </div>
-          
           <div className="max-h-96 overflow-y-auto border border-gray-100 rounded-xl shadow-inner bg-gray-50/30">
             <table className="w-full text-left text-xs">
               <thead className="bg-gray-50 text-gray-400 font-bold uppercase tracking-wider border-b border-gray-100">
-                <tr>
-                  <th className="px-4 py-3">Cliente</th>
-                </tr>
+                <tr><th className="px-4 py-3">Cliente</th></tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {filteredClientIds.length === 0 ? (
                   <tr><td className="px-4 py-8 text-center text-gray-400 italic">No se encontraron clientes.</td></tr>
-                ) : filteredClientIds.map(id => {
-                  return (
-                    <tr key={id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3 cursor-pointer" onClick={() => setSelectedAdminClient(id)}>
-                        <div className="font-bold text-gray-700 hover:text-appBlue transition-colors flex items-center justify-between">
-                          <div className="flex flex-col">
-                            <span className="text-sm">{userContext?.clientNames?.[id] || id}</span>
-                            <span className="text-[10px] text-gray-400 font-mono">{id}</span>
-                          </div>
-                          <Icon name="ChevronRight" size={16} className="text-gray-300"/>
+                ) : filteredClientIds.map(id => (
+                  <tr key={id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 cursor-pointer" onClick={() => setSelectedAdminClient(id)}>
+                      <div className="font-bold text-gray-700 hover:text-appBlue transition-colors flex items-center justify-between">
+                        <div className="flex flex-col">
+                          <span className="text-sm">{userContext?.clientNames?.[id] || id}</span>
+                          <span className="text-[10px] text-gray-400 font-mono">{id}</span>
                         </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                        <Icon name="ChevronRight" size={16} className="text-gray-300"/>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         </div>
       )}
-
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-6">
         <h3 className="font-bold text-gray-700 mb-4">Estado de Datos</h3>
         <div className="space-y-3">
@@ -1780,7 +1834,6 @@ const ConfigurationView = ({ userContext, onForceSync, syncStatus, lastSync, onR
           </div>
         </div>
       </div>
-
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
         <div className="flex items-center gap-4">
           <div className="h-14 w-14 bg-blue-100 rounded-full flex items-center justify-center text-blue-600"><Icon name="User" size={28}/></div>
@@ -1793,19 +1846,13 @@ const ConfigurationView = ({ userContext, onForceSync, syncStatus, lastSync, onR
           </div>
         </div>
       </div>
-
       {selectedAdminClient && (
-        <AdminClientModal
-          clientId={selectedAdminClient}
-          clientName={userContext.clientNames[selectedAdminClient]}
-          onClose={() => setSelectedAdminClient(null)}
-          showToast={showToast}
-        />
+        <AdminClientModal clientId={selectedAdminClient} clientName={userContext.clientNames[selectedAdminClient]}
+          onClose={() => setSelectedAdminClient(null)} showToast={showToast}/>
       )}
     </div>
   );
 };
-
 
 // ─── APP PRINCIPAL ────────────────────────────────────────────────────────
 const App = () => {
@@ -1896,7 +1943,6 @@ const App = () => {
         const defaultPeriod = isHistoryDefault ? 'year' : 'today';
         setPeriod(defaultPeriod);
         setView(ctx.role === 'Cliente Consulta' ? 'history' : 'home');
-        // Cargar datos en paralelo
         Promise.all([
           runServer('getRequests', { period: defaultPeriod }).then(r => { setInitialData(r); }),
           runServer('getMasterData', {}).then(m => { setMasterData(m); })
@@ -1912,30 +1958,20 @@ const App = () => {
   };
 
   const handleLogout = useCallback(() => {
-    setUserCtx(null);
-    setInitError(null);
-    setIsLoading(false);
-    setView('loading');
+    setUserCtx(null); setInitError(null); setIsLoading(false); setView('loading');
   }, []);
 
-  // Tarea 1: Cierre de sesión por inactividad (10 min)
   useEffect(() => {
     if (!userCtx) return;
     let timer;
     const resetTimer = () => {
       clearTimeout(timer);
-      timer = setTimeout(() => {
-        showToast("Sesión cerrada por inactividad.", "warning");
-        handleLogout();
-      }, 600000); // 10 minutos
+      timer = setTimeout(() => { showToast("Sesión cerrada por inactividad.", "warning"); handleLogout(); }, 600000);
     };
     const events = ['mousedown', 'keydown', 'touchstart', 'scroll'];
     events.forEach(e => window.addEventListener(e, resetTimer));
     resetTimer();
-    return () => {
-      events.forEach(e => window.removeEventListener(e, resetTimer));
-      clearTimeout(timer);
-    };
+    return () => { events.forEach(e => window.removeEventListener(e, resetTimer)); clearTimeout(timer); };
   }, [userCtx, handleLogout]);
 
   useEffect(() => { handleLogin(); }, []);
@@ -1982,7 +2018,8 @@ const App = () => {
       case 'bulk':
         if (role === 'Cliente Consulta') return <RequestList setView={setView} setSelectedRequest={setSelectedRequest} initialData={initialData} onRefresh={() => refreshAll(true)} onChangePeriod={handleChangePeriod} currentPeriod={period} refreshing={syncStatus !== 'idle'} userContext={userCtx} masterData={masterData}/>;
         return <BulkUpload userContext={userCtx} setView={setView} onReload={() => loadRequests()}/>;
-      case 'config':  return <ConfigurationView userContext={userCtx} onForceSync={() => refreshAll(true)} syncStatus={syncStatus} lastSync={lastSync} onRefreshClients={handleRefreshClients} showToast={showToast}/>;
+      case 'config':
+        return <ConfigurationView userContext={userCtx} onForceSync={() => refreshAll(true)} syncStatus={syncStatus} lastSync={lastSync} onRefreshClients={handleRefreshClients} showToast={showToast}/>;
       default:
         if (role === 'Cliente Consulta') return <RequestList setView={setView} setSelectedRequest={setSelectedRequest} initialData={initialData} onRefresh={() => refreshAll(true)} onChangePeriod={handleChangePeriod} currentPeriod={period} refreshing={syncStatus !== 'idle'} userContext={userCtx} masterData={masterData}/>;
         return <HomeDashboard userContext={userCtx} requests={initialData?.data||[]} setView={setView} syncStatus={syncStatus}/>;
@@ -1991,19 +2028,15 @@ const App = () => {
 
   return (
     <div className="flex h-screen bg-gray-100 text-gray-800 animate-fade-in overflow-hidden">
-      {/* Top bar mobile */}
       <div className="md:hidden fixed top-0 left-0 right-0 h-14 bg-white border-b border-gray-200 z-20 flex items-center px-4 justify-between shadow-sm">
         <button onClick={() => setSidebarOpen(true)} className="p-2 -ml-2 text-gray-600 btn-action"><Icon name="Menu" size={23}/></button>
         <span className="font-bold text-gray-800">Confiabilidad</span>
         <div className="w-8"></div>
       </div>
-
       <Sidebar currentView={view} setView={setView} onLogout={handleLogout} userContext={userCtx} syncStatus={syncStatus} lastSync={lastSync} isOpen={sidebarOpen} toggleSidebar={setSidebarOpen} isCollapsed={isSidebarCollapsed} toggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}/>
-
       <div className={`flex-1 ${isSidebarCollapsed ? 'md:ml-20' : 'md:ml-64'} transition-all duration-300 w-full h-full overflow-y-auto pt-14 md:pt-0`}>
         <ErrorBoundary>{renderView()}</ErrorBoundary>
       </div>
-
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)}/>}
     </div>
   );
