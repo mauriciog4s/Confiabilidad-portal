@@ -224,22 +224,17 @@ const ToggleSwitch = ({ value, onChange, label, subLabel }) => (
 );
 
 // ─── SECCIÓN DIVISORA DEL FORMULARIO ─────────────────────────────────────
-const FormSection = ({ icon, title, color = '#10253F', children }) => (
-  <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
-    {/* Header de sección */}
-    <div
-      className="flex items-center gap-3 px-5 py-3"
-      style={{ backgroundColor: color, borderBottom: `3px solid ${color}` }}
-    >
-      <div className="bg-white/20 p-1.5 rounded-lg">
-        <Icon name={icon} size={16} className="text-white" />
-      </div>
-      <span className="text-white font-black text-xs uppercase tracking-widest">{title}</span>
+// Sección minimalista: línea divisora + ícono + título, sin tarjeta propia
+const FormSection = ({ icon, title, children }) => (
+  <div>
+    {/* Divisor con título */}
+    <div className="flex items-center gap-2 mb-4">
+      <Icon name={icon} size={14} style={{ color: '#10253F' }} />
+      <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#10253F' }}>{title}</span>
+      <div className="flex-1 h-px bg-gray-200 ml-1"></div>
     </div>
     {/* Contenido */}
-    <div className="bg-white p-5">
-      {children}
-    </div>
+    <div>{children}</div>
   </div>
 );
 
@@ -1138,18 +1133,22 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
           PASO 1 — INFORMACIÓN DEL EVALUADO
       ════════════════════════════════════════════════════════════════ */}
       {step === 1 && (
-        <div className="animate-fade-in space-y-5">
+        <div className="animate-fade-in">
 
-          {/* Cabecera del formulario */}
-          <div className="flex items-center justify-between mb-2">
+          {/* Cabecera */}
+          <div className="flex items-center justify-between mb-5">
             <h3 className="text-2xl font-black text-gray-800 tracking-tight">Datos del Candidato</h3>
             <div className="px-4 py-1.5 bg-vividBlue/10 text-vividBlue rounded-full text-[10px] font-black uppercase tracking-tighter shadow-inner">
               Fecha: {formData.fechaSolicitud.split(',')[0]}
             </div>
           </div>
 
-          {/* ── SECCIÓN 1: Cliente ─────────────────────────────────────── */}
-          <FormSection icon="Building" title="1. Información del Cliente" color="#10253F">
+          {/* ── TARJETA ÚNICA ── */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm divide-y divide-gray-100">
+
+          {/* SECCIÓN 1 */}
+          <div className="p-6">
+          <FormSection icon="Building" title="1. Información del Cliente">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               <div className={fieldClass}>
                 <label className={labelClass}>Cliente Principal <span className="text-vividRed">*</span></label>
@@ -1219,9 +1218,11 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
               </div>
             )}
           </FormSection>
+          </div>
 
-          {/* ── SECCIÓN 2: Identificación ──────────────────────────────── */}
-          <FormSection icon="IdCard" title="2. Identificación del Evaluado" color="#B91C1C">
+          {/* SECCIÓN 2 */}
+          <div className="p-6">
+          <FormSection icon="IdCard" title="2. Identificación del Evaluado">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
               <div className="md:col-span-2 flex flex-col">
                 <label className={labelClass}>Nombre Completo <span className="text-vividRed">*</span></label>
@@ -1263,9 +1264,11 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
               </div>
             </div>
           </FormSection>
+          </div>
 
-          {/* ── SECCIÓN 3: Ubicación ──────────────────────────────────── */}
-          <FormSection icon="MapPin" title="3. Ubicación" color="#065F46">
+          {/* SECCIÓN 3 */}
+          <div className="p-6">
+          <FormSection icon="MapPin" title="3. Ubicación">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
               <div className={fieldClass}>
                 <label className={labelClass}>Ciudad <span className="text-vividRed">*</span></label>
@@ -1286,9 +1289,11 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
               </div>
             </div>
           </FormSection>
+          </div>
 
-          {/* ── SECCIÓN 4: Tipo Trabajador ────────────────────────────── */}
-          <FormSection icon="Briefcase" title="4. Tipo de Trabajador" color="#92400E">
+          {/* SECCIÓN 4 */}
+          <div className="p-6">
+          <FormSection icon="Briefcase" title="4. Tipo de Trabajador">
             <div className="flex rounded-2xl bg-gray-100 p-1 overflow-hidden h-11 max-w-sm">
               {['Nuevo','Actual','Reinversión'].map(t => (
                 <button key={t} type="button" onClick={() => setFormData(p => ({...p, tipoTrabajador: t}))}
@@ -1298,9 +1303,12 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
               ))}
             </div>
           </FormSection>
+          </div>
+
+          </div>{/* fin tarjeta */}
 
           {/* Botones navegación */}
-          <div className="flex flex-col md:flex-row items-center justify-end gap-4 pt-2">
+          <div className="flex flex-col md:flex-row items-center justify-end gap-4 pt-4">
             <button type="button" onClick={() => setView('history')} className="w-full md:w-auto px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest text-gray-400 hover:bg-gray-100 transition-all">Cancelar</button>
             <button type="button" onClick={() => setStep(2)} className="w-full md:w-auto px-12 py-3 rounded-2xl text-xs font-black uppercase tracking-widest bg-vividBlue text-white shadow-lg shadow-blue-500/30 hover:scale-105 active:scale-95 transition-all btn-3d">Siguiente →</button>
           </div>
@@ -1311,17 +1319,22 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
           PASO 2 — SERVICIOS A APLICAR
       ════════════════════════════════════════════════════════════════ */}
       {step === 2 && (
-        <div className="animate-fade-in space-y-5">
+        <div className="animate-fade-in">
 
-          <div className="flex items-center justify-between mb-2">
+          {/* Cabecera */}
+          <div className="flex items-center justify-between mb-5">
             <h3 className="text-2xl font-black text-gray-800 tracking-tight">Servicios a Aplicar</h3>
             <div className="flex items-center gap-2 text-vividOrange bg-vividOrange/10 px-3 py-1 rounded-full text-[10px] font-black uppercase shadow-inner">
               <Icon name="Info" size={12}/> Seleccione al menos uno
             </div>
           </div>
 
-          {/* ── VISITA DOMICILIARIA ───────────────────────────────────── */}
-          <FormSection icon="Home" title="Visita Domiciliaria" color="#1D4ED8">
+          {/* ── TARJETA ÚNICA ── */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm divide-y divide-gray-100">
+
+          {/* Visita Domiciliaria */}
+          <div className="p-6">
+          <FormSection icon="Home" title="Visita Domiciliaria">
             <ToggleSwitch label="¿Aplicar Visita Domiciliaria?" value={formData.visitaDomiciliaria} onChange={v => handleToggle('visitaDomiciliaria', v)}/>
             {formData.visitaDomiciliaria && (
               <div className="mt-4 pt-4 border-t-2 border-dashed border-blue-100 animate-scale-in">
@@ -1335,14 +1348,18 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
               </div>
             )}
           </FormSection>
+          </div>
 
-          {/* ── CONSULTA ANTECEDENTES ─────────────────────────────────── */}
-          <FormSection icon="Search" title="Consulta de Antecedentes" color="#065F46">
+          {/* Antecedentes */}
+          <div className="p-6">
+          <FormSection icon="Search" title="Consulta de Antecedentes">
             <ToggleSwitch label="¿Aplicar Consulta de Antecedentes?" value={formData.consultaAntecedentes} onChange={v => handleToggle('consultaAntecedentes', v)}/>
           </FormSection>
+          </div>
 
-          {/* ── REFERENCIACIÓN ────────────────────────────────────────── */}
-          <FormSection icon="Phone" title="Referenciación" color="#7C3AED">
+          {/* Referenciación */}
+          <div className="p-6">
+          <FormSection icon="Phone" title="Referenciación">
             <ToggleSwitch label="¿Aplicar Referenciación?" value={formData.referenciacion} onChange={v => handleToggle('referenciacion', v)}/>
             {formData.referenciacion && (
               <div className="mt-4 pt-4 border-t-2 border-dashed border-purple-100 animate-scale-in space-y-3">
@@ -1367,9 +1384,11 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
               </div>
             )}
           </FormSection>
+          </div>
 
-          {/* ── ESTUDIOS POLIGRAFÍA ───────────────────────────────────── */}
-          <FormSection icon="Wrench" title="Estudios de Poligrafía" color="#92400E">
+          {/* Poligrafía */}
+          <div className="p-6">
+          <FormSection icon="Wrench" title="Estudios de Poligrafía">
             <ToggleSwitch label="¿Aplicar Estudios de Poligrafía?" value={formData.estudiosPoligrafia} onChange={v => handleToggle('estudiosPoligrafia', v)}/>
             {formData.estudiosPoligrafia && (
               <div className="mt-4 pt-4 border-t-2 border-dashed border-amber-100 animate-scale-in grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -1392,20 +1411,25 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
               </div>
             )}
           </FormSection>
-
-          {/* ── CONSULTA DATACRÉDITO + COMPARATIVO OEA (fila) ───────── */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <FormSection icon="FileText" title="Consulta Datacrédito" color="#0F766E">
-              <ToggleSwitch label="¿Aplicar Consulta Datacrédito?" value={formData.consultaDatacredito} onChange={v => handleToggle('consultaDatacredito', v)}/>
-            </FormSection>
-
-            <FormSection icon="ShieldCheck" title="Comparativo OEA" color="#6B21A8">
-              <ToggleSwitch label="¿Aplicar Comparativo OEA?" value={formData.comparativoOEA} onChange={v => handleToggle('comparativoOEA', v)}/>
-            </FormSection>
           </div>
 
-          {/* ── DOCUMENTOS DE SOPORTE ────────────────────────────────── */}
-          <FormSection icon="Upload" title="Documentos de Soporte" color="#475569">
+          {/* Datacrédito + OEA */}
+          <div className="p-6">
+          <FormSection icon="FileText" title="Datacrédito y Comparativo OEA">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                <ToggleSwitch label="Consulta Datacrédito" value={formData.consultaDatacredito} onChange={v => handleToggle('consultaDatacredito', v)}/>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                <ToggleSwitch label="Comparativo OEA" value={formData.comparativoOEA} onChange={v => handleToggle('comparativoOEA', v)}/>
+              </div>
+            </div>
+          </FormSection>
+          </div>
+
+          {/* Documentos */}
+          <div className="p-6">
+          <FormSection icon="Upload" title="Documentos de Soporte">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-5 items-end">
               <div className="md:col-span-5">
                 <label className={labelClass}>Nombre del Documento</label>
@@ -1446,17 +1470,22 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
               </div>
             )}
           </FormSection>
+          </div>
 
-          {/* ── NOTAS ────────────────────────────────────────────────── */}
-          <FormSection icon="FileText" title="Notas Adicionales" color="#374151">
+          {/* Notas */}
+          <div className="p-6">
+          <FormSection icon="FileText" title="Notas Adicionales">
             <textarea name="notas" maxLength={3000} value={formData.notas} onChange={handleChange}
               className="w-full border border-gray-200 rounded-xl p-4 text-xs h-28 outline-none focus:ring-2 focus:ring-gray-300 bg-white transition-all resize-none hover:border-gray-300"
               placeholder="Observaciones relevantes del caso..."/>
             <div className="text-right text-[9px] font-black text-gray-300 uppercase tracking-widest mt-1">{formData.notas.length} / 3000 CARACTERES</div>
           </FormSection>
+          </div>
+
+          </div>{/* fin tarjeta */}
 
           {/* Botones navegación */}
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-2">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-4">
             <button type="button" onClick={() => setStep(1)} className="w-full md:w-auto px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest text-gray-400 hover:bg-gray-100 transition-all">← Anterior</button>
             <div className="flex gap-4 w-full md:w-auto">
               <button type="button" onClick={() => setView('history')} className="flex-1 md:flex-none px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest text-gray-400 hover:bg-gray-100 transition-all">Cancelar</button>
