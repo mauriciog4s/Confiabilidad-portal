@@ -1019,10 +1019,14 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
     }
     if (formData.visitaDomiciliaria && !formData.modalidadVisita) missing.push("Modalidad Visita");
     if (formData.referenciacion) {
-      if (formData.referenciaAcademica === null) missing.push("Referencia Académica (seleccione SÍ o NO)");
-      if (formData.referenciaLaboral   === null) missing.push("Referencia Laboral (seleccione SÍ o NO)");
-      if (formData.referenciaPersonal  === null) missing.push("Referencia Personal (seleccione SÍ o NO)");
-    }
+  if (formData.referenciaAcademica === null) missing.push("Referencia Académica (seleccione SÍ o NO)");
+  if (formData.referenciaLaboral   === null) missing.push("Referencia Laboral (seleccione SÍ o NO)");
+  if (formData.referenciaPersonal  === null) missing.push("Referencia Personal (seleccione SÍ o NO)");
+
+  // Al menos una referencia debe ser SÍ
+  const alMenosUnaRef = formData.referenciaAcademica === true || formData.referenciaLaboral === true || formData.referenciaPersonal === true;
+  if (!alMenosUnaRef) missing.push("Referenciación: debe seleccionar SÍ en al menos una referencia (Académica, Laboral o Personal)");
+}
     if (formData.estudiosPoligrafia) {
       if (!formData.tipoPoligrafia)   missing.push("Tipo de Poligrafía");
       if (!formData.ciudadPoligrafia) missing.push("Ciudad Poligrafía");
