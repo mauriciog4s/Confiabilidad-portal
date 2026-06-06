@@ -591,10 +591,14 @@ if (!hasData) continue;
       validationErrors.push(`Fila ${rowNum}: ModalidadVisita es obligatoria cuando aplica VisitaDomiciliaria`);
     }
     if (rowData.Referenciacion === 'SI') {
-      if (!rowData.ReferenciaAcademica) validationErrors.push(`Fila ${rowNum}: ReferenciaAcademica (SI/NO) es obligatoria al aplicar Referenciacion`);
-      if (!rowData.ReferenciaLaboral)   validationErrors.push(`Fila ${rowNum}: ReferenciaLaboral (SI/NO) es obligatoria al aplicar Referenciacion`);
-      if (!rowData.ReferenciaPersonal)  validationErrors.push(`Fila ${rowNum}: ReferenciaPersonal (SI/NO) es obligatoria al aplicar Referenciacion`);
-    }
+  if (!rowData.ReferenciaAcademica) validationErrors.push(`Fila ${rowNum}: ReferenciaAcademica (SI/NO) es obligatoria al aplicar Referenciacion`);
+  if (!rowData.ReferenciaLaboral)   validationErrors.push(`Fila ${rowNum}: ReferenciaLaboral (SI/NO) es obligatoria al aplicar Referenciacion`);
+  if (!rowData.ReferenciaPersonal)  validationErrors.push(`Fila ${rowNum}: ReferenciaPersonal (SI/NO) es obligatoria al aplicar Referenciacion`);
+
+  // Al menos una referencia debe ser SI
+  const alMenosUnaRef = rowData.ReferenciaAcademica === 'SI' || rowData.ReferenciaLaboral === 'SI' || rowData.ReferenciaPersonal === 'SI';
+  if (!alMenosUnaRef) validationErrors.push(`Fila ${rowNum}: Referenciacion activa pero todas las referencias están en NO — debe tener al menos una en SI`);
+}
     if (rowData.EstudiosPoligrafia === 'SI') {
       if (!rowData.TipoPoligrafia) validationErrors.push(`Fila ${rowNum}: TipoPoligrafia es obligatorio cuando aplica EstudiosPoligrafia`);
       if (!rowData.CiudadP)        validationErrors.push(`Fila ${rowNum}: CiudadP es obligatoria cuando aplica EstudiosPoligrafia`);
