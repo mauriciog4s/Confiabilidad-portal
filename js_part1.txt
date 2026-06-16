@@ -1,0 +1,1000 @@
+<script type="text/babel">
+const { useState, useEffect, useMemo, useRef, useCallback } = React;
+
+// ─── CONFIG PROXY (solo URL pública del proxy de archivos) ───────────────
+const PROXY_URL   = "https://script.google.com/a/macros/co.g4s.com/s/AKfycbxQB6XNAaKr8gXmzUNBsu4lLwjc9NwK_XjHSJmw37HVRNvBHDM5sQOIg6NLcXXs0Im4/exec";
+const PROXY_TOKEN = "G4S-ACCESS-KEY-2025";
+
+// ─── SEGURIDAD BÁSICA ────────────────────────────────────────────────────
+(function applySecurityMeasures() {
+  document.addEventListener('contextmenu', e => e.preventDefault());
+  document.addEventListener('keydown', e => {
+    if (e.key === 'F12') { e.preventDefault(); return; }
+    if (e.ctrlKey && e.shiftKey && ['I','J','C'].includes(e.key)) { e.preventDefault(); return; }
+    if (e.ctrlKey && e.key === 'u') { e.preventDefault(); return; }
+  });
+  let devToolsOpen = false;
+  const threshold = 160;
+  window.addEventListener('resize', () => {
+    if (window.outerWidth - window.innerWidth > threshold || window.outerHeight - window.innerHeight > threshold) {
+      if (!devToolsOpen) { devToolsOpen = true; console.clear(); }
+    } else { devToolsOpen = false; }
+  });
+  setInterval(() => {
+    if (devToolsOpen) {
+      console.clear();
+      (function() { return false; }['constructor']('debugger')['call']());
+    }
+  }, 2000);
+})();
+
+// ─── ERROR BOUNDARY ──────────────────────────────────────────────────────
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  componentDidCatch(error, info) { console.error("Error capturado:", error, info); }
+  render() {
+    if (this.state.hasError) return (
+      <div className="flex h-full items-center justify-center bg-gray-50 p-4 min-h-[50vh]">
+        <div className="bg-white p-6 rounded-2xl shadow-xl text-center border border-red-100 max-w-sm">
+          <div className="text-red-500 mb-2 font-bold text-lg">Algo salió mal</div>
+          <p className="text-gray-500 text-sm mb-4">Ocurrió un error inesperado.</p>
+          <button onClick={() => window.location.reload()} className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold btn-action">Recargar</button>
+        </div>
+      </div>
+    );
+    return this.props.children;
+  }
+}
+
+// ─── VALIDADORES ─────────────────────────────────────────────────────────
+const isValidEmail = (email) => {
+  if (!email || email.trim() === '') return true;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim().toLowerCase());
+};
+const isValidPhone = (phone) => {
+  if (!phone || String(phone).trim() === '') return true;
+  return /^\d{7,13}$/.test(String(phone).trim());
+};
+
+// ─── FORMATO DE FECHAS ────────────────────────────────────────────────────
+const formatDateCO = (dateInput, includeTime = true) => {
+  if (!dateInput) return '';
+  const val = (dateInput && typeof dateInput === 'object' && dateInput.value) ? dateInput.value : dateInput;
+  try {
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return String(val);
+    const options = { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' };
+    if (includeTime) { options.hour = '2-digit'; options.minute = '2-digit'; options.hour12 = false; }
+    return new Intl.DateTimeFormat('es-CO', options).format(d);
+  } catch (e) { return String(val); }
+};
+
+// ─── COMUNICACIÓN CON SERVIDOR ───────────────────────────────────────────
+const runServer = (endpoint, payload = {}) => {
+  return new Promise((resolve, reject) => {
+    if (typeof google === 'undefined' || !google.script) {
+      setTimeout(() => resolve({ success: true, message: 'Mock', data: [], total: 0 }), 400);
+      return;
+    }
+    google.script.run
+      .withSuccessHandler((res) => {
+        if (res && res.error) reject(new Error(res.message));
+        else resolve(res);
+      })
+      .withFailureHandler((err) => reject(err))
+      .apiHandler({ endpoint, payload });
+  });
+};
+
+// ─── UPLOAD VÍA PROXY ─────────────────────────────────────────────────────
+const uploadFileViaProxy = (file, aliasName) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      const base64 = reader.result.toString().replace(/^data:(.*,)?/, '');
+      const iframeName = 'upload_' + Date.now() + Math.random();
+      const iframe = document.createElement('iframe');
+      iframe.name = iframeName; iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+      const form = document.createElement('form');
+      form.target = iframeName; form.action = PROXY_URL;
+      form.method = 'POST'; form.style.display = 'none';
+      const datos = { token: PROXY_TOKEN, filename: aliasName, mimetype: file.type, base64 };
+      for (const key in datos) {
+        const input = document.createElement('input');
+        input.type = 'hidden'; input.name = key; input.value = datos[key];
+        form.appendChild(input);
+      }
+      document.body.appendChild(form);
+      iframe.onload = function() {
+        setTimeout(() => {
+          if (document.body.contains(form)) document.body.removeChild(form);
+          if (document.body.contains(iframe)) document.body.removeChild(iframe);
+        }, 2000);
+        resolve(true);
+      };
+      form.submit();
+    };
+    reader.onerror = reject;
+  });
+};
+
+// ─── ICONOS ───────────────────────────────────────────────────────────────
+const Icon = ({ name, size = 20, className = "" }) => {
+  const icons = {
+    Home: <><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></>,
+    ClipboardList: <><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M15 2H9a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1Z"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></>,
+    History: <><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 12"/><path d="M3 3v9h9"/><path d="M12 7v5l4 2"/></>,
+    FileText: <><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></>,
+    FileSignature: <><path d="M20 19.5v.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8.5L20 7.5V11"/><path d="M18 5.675V9H14.675L18 5.675Z"/><path d="M18 11l-2.293 2.293a1 1 0 0 0 0 1.414l1.586 1.586a1 1 0 0 0 1.414 0L21 14"/><path d="M12 15l-3 3 .707 2.293 2.293-2.293 3-3"/></>,
+    ChevronRight: <path d="m9 18 6-6-6-6"/>,
+    User: <><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>,
+    Settings: <><path d="M12.22 2h-.44a2 2 0 0 1-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.09a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.09a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.09a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></>,
+    ShieldCheck: <><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></>,
+    LogIn: <><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" x2="3" y1="12" y2="12"/></>,
+    Search: <><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></>,
+    RefreshCw: <><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></>,
+    Info: <><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="8"/><line x1="12" x2="12.01" y2="16"/></>,
+    CheckCircle: <><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></>,
+    Clock: <><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>,
+    CloudLightning: <><path d="M19 16.9A5 5 0 0 0 18 7h-1.26a8 8 0 1 0-11.62 9"/><polyline points="13 11 9 17 15 17 11 23"/></>,
+    Download: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></>,
+    Upload: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></>,
+    AlertTriangle: <><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></>,
+    Check: <polyline points="20 6 9 17 4 12"/>,
+    Trash: <><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></>,
+    Menu: <><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></>,
+    X: <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>,
+    Filter: <><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></>,
+    Calendar: <><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></>,
+    Building: <><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M3 9h6"/><path d="M3 15h6"/><path d="M15 7h2"/><path d="M15 11h2"/><path d="M15 15h2"/></>,
+    IdCard: <><rect width="20" height="14" x="2" y="5" rx="2"/><circle cx="8" cy="12" r="2"/><path d="M14 9h4"/><path d="M14 13h4"/></>,
+    MapPin: <><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></>,
+    Briefcase: <><rect width="20" height="14" x="2" y="7" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></>,
+    Phone: <><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.15 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.16 6.16l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></>,
+    Wrench: <><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></>,
+  };
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24"
+      fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      {icons[name] || <circle cx="12" cy="12" r="10"/>}
+    </svg>
+  );
+};
+
+// ─── COMPONENTES OPTIMIZADOS ──────────────────────────────────────────────
+const RequestRow = React.memo(({ req, onClick }) => (
+  <div onClick={onClick}
+    className="grid grid-cols-12 gap-2 p-3 border-b hover:bg-gray-50 cursor-pointer text-[10px] items-center transition-colors">
+    <div className="col-span-1 font-bold text-blue-600 truncate">{req.NSolicitud || req.ID_SolicitudesConfiabilidad}</div>
+    <div className="col-span-2 text-gray-500">{formatDateCO(req.FechaSolicitud?.value || req.FechaSolicitud)}</div>
+    <div className="col-span-1 font-mono truncate">{req.Identificacion}</div>
+    <div className="col-span-2 flex flex-col">
+      <span className="truncate font-medium text-gray-700">{req.NombreCompleto}</span>
+      {req.Cargo && <span className="text-[9px] text-gray-400 uppercase truncate">{req.Cargo}</span>}
+    </div>
+    <div className="col-span-1 text-center"><span className={`inline-flex items-center justify-center w-20 h-[22px] rounded text-[9px] font-bold uppercase ${getStatusBadgeColor(req.EstadoActual)}`}>{req.EstadoActual}</span></div>
+    <div className="col-span-1 text-center">{req.EstadoActualEP ? <span className="inline-flex items-center justify-center w-20 h-[22px] rounded text-[9px] font-bold uppercase bg-purple-100 text-purple-700 border border-purple-200 truncate">{req.EstadoActualEP}</span> : <span className="text-gray-300">-</span>}</div>
+    <div className="col-span-1 text-center text-gray-500">{formatDateCO(req.ProgramacionVisita, false) || '-'}</div>
+    <div className="col-span-1 text-center text-gray-500">{formatDateCO(req.ProgramacionPoligrafia, false) || '-'}</div>
+    <div className="col-span-1 text-center text-gray-500">{formatDateCO(req.FechaEntregaECP, false) || '-'}</div>
+    <div className="col-span-1 text-center text-gray-500">{formatDateCO(req.FechaEntregaEP, false) || '-'}</div>
+  </div>
+));
+
+// ─── UTILIDADES UI ────────────────────────────────────────────────────────
+const Toast = ({ message, type = 'info', onClose }) => {
+  useEffect(() => { const t = setTimeout(onClose, 4000); return () => clearTimeout(t); }, [onClose]);
+  const colors = { info: 'text-blue-500', success: 'text-green-500', error: 'text-red-500', warning: 'text-yellow-500' };
+  const iconMap = { info: 'Info', success: 'CheckCircle', error: 'AlertTriangle', warning: 'AlertTriangle' };
+  return (
+    <div className="toast">
+      <Icon name={iconMap[type] || 'Info'} className={colors[type] || colors.info} size={20}/>
+      <span className="text-sm text-gray-700 font-medium">{message}</span>
+      <button onClick={onClose} className="ml-2 text-gray-300 hover:text-gray-500"><Icon name="X" size={14}/></button>
+    </div>
+  );
+};
+
+const getStatusBadgeColor = (status) => {
+  if (!status || status === 'None') return 'bg-gray-100 text-gray-600 border border-gray-200';
+  const s = status.toString().toLowerCase();
+  if (s.includes('confiable'))    return 'bg-green-100 text-green-700 border border-green-200';
+  if (s.includes('proceso') || s.includes('en proceso')) return 'bg-blue-100 text-blue-700 border border-blue-200';
+  if (s.includes('cancelado') || s.includes('no confiable')) return 'bg-red-100 text-red-700 border border-red-200';
+  if (s.includes('pendiente'))    return 'bg-orange-100 text-orange-700 border border-orange-200';
+  if (s.includes('creada') || s.includes('ingresada')) return 'bg-gray-100 text-gray-500 border border-gray-200';
+  return 'bg-yellow-100 text-yellow-700 border border-yellow-200';
+};
+
+// ─── TOGGLE SWITCH ────────────────────────────────────────────────────────
+const ToggleSwitch = ({ value, onChange, label, subLabel }) => (
+  <div className="flex items-center justify-between py-1">
+    <div className="flex flex-col">
+      <div className="text-sm font-bold text-gray-700">{label} <span className="text-red-500">*</span></div>
+      {subLabel && <div className="text-xs text-gray-400 leading-tight mt-0.5">{subLabel}</div>}
+    </div>
+    <div className="toggle-group flex-shrink-0 ml-4">
+      <button type="button" onClick={() => onChange(false)} className={`toggle-btn ${value === false ? 'toggle-btn-no' : 'toggle-btn-inactive'}`}>NO</button>
+      <button type="button" onClick={() => onChange(true)}  className={`toggle-btn ${value === true  ? 'toggle-btn-si' : 'toggle-btn-inactive'}`}>SÍ</button>
+    </div>
+  </div>
+);
+
+// ─── SECCIÓN DIVISORA DEL FORMULARIO ─────────────────────────────────────
+// Sección minimalista: línea divisora + ícono + título, sin tarjeta propia
+const FormSection = ({ icon, title, children }) => (
+  <div>
+    {/* Divisor con título */}
+    <div className="flex items-center gap-2 mb-4">
+      <Icon name={icon} size={14} style={{ color: '#10253F' }} />
+      <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#10253F' }}>{title}</span>
+      <div className="flex-1 h-px bg-gray-200 ml-1"></div>
+    </div>
+    {/* Contenido */}
+    <div>{children}</div>
+  </div>
+);
+
+// ─── MODAL DE ALERTA ──────────────────────────────────────────────────────
+const AlertModal = ({ show, title, message, items, onClose, type = 'error' }) => {
+  if (!show) return null;
+  const colors = {
+    error:   { bg: 'bg-red-100',    icon: 'text-red-500',    btn: 'bg-red-600 hover:bg-red-700',    list: 'bg-red-50 border-red-100 text-red-800' },
+    warning: { bg: 'bg-yellow-100', icon: 'text-yellow-500', btn: 'bg-yellow-600 hover:bg-yellow-700', list: 'bg-yellow-50 border-yellow-100 text-yellow-800' }
+  };
+  const theme = colors[type] || colors.error;
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm animate-fade-in">
+      <div className="bg-white p-8 rounded-3xl shadow-2xl text-center max-w-sm w-full border border-gray-100 transform animate-scale-in">
+        <div className={`w-20 h-20 ${theme.bg} rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm`}>
+          <Icon name="AlertTriangle" size={40} className={theme.icon} />
+        </div>
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">{title}</h2>
+        {items && items.length > 0 ? (
+          <div className={`text-left ${theme.list} p-4 rounded-xl border mb-6 max-h-60 overflow-y-auto`}>
+            <p className="font-bold text-xs mb-2 uppercase">Detalles ({items.length}):</p>
+            <ul className="list-disc list-inside text-sm space-y-1">
+              {items.map((item, idx) => <li key={idx}>{item}</li>)}
+            </ul>
+          </div>
+        ) : <p className="text-gray-500 mb-6 text-sm">{message}</p>}
+        <button onClick={onClose} className={`w-full ${theme.btn} text-white font-bold py-3 px-6 rounded-xl shadow-lg transition btn-action`}>Entendido</button>
+      </div>
+    </div>
+  );
+};
+
+// ─── VISTA DE LOGIN ───────────────────────────────────────────────────────
+const LoginView = ({ onSuccess, isLoading }) => (
+  <div className="flex flex-col h-screen bg-gray-100">
+    <div className="bg-appRed h-2 w-full"></div>
+    <div className="flex-1 flex items-center justify-center p-4">
+      <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full text-center">
+        <div className="flex justify-center mb-6">
+          <img src="https://www.g4s.com/es-co/-/media/g4s/global/images/logos/g4s---an-allied-universal-company-logo/g4s_one-company_logo_180x136.ashx" alt="G4S Logo" className="h-20 w-auto object-contain"/>
+        </div>
+        <h1 className="text-2xl font-bold text-gray-800 mb-2">Confiabilidad</h1>
+        <p className="text-gray-500 mb-8 text-sm">Plataforma de Gestión</p>
+        {isLoading ? (
+          <div className="py-6">
+            <div className="w-10 h-10 border-4 border-vividRed border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+            <p className="text-xs text-gray-400 font-black uppercase tracking-widest">Autenticando...</p>
+          </div>
+        ) : (
+          <button onClick={onSuccess} className="w-full btn-3d-blue py-4 px-4 rounded-2xl flex items-center justify-center gap-3 transition">
+            <Icon name="User" size={20}/> <span className="text-sm font-black uppercase tracking-widest">Ingresar con Google</span>
+          </button>
+        )}
+        <div className="mt-8 text-[10px] text-gray-400">© 2025 G4S Secure Solutions.</div>
+      </div>
+    </div>
+  </div>
+);
+
+// ─── SIDEBAR ──────────────────────────────────────────────────────────────
+const Sidebar = ({ currentView, setView, onLogout, userContext, syncStatus, lastSync, isOpen, toggleSidebar, isCollapsed, toggleCollapse }) => {
+  const menuItems = useMemo(() => {
+    const all = [
+      { id: 'home',    icon: 'Home',          title: 'Inicio' },
+      { id: 'create',  icon: 'ClipboardList', title: 'Nueva Solicitud' },
+      { id: 'bulk',    icon: 'Upload',        title: 'Carga Masiva' },
+      { id: 'history', icon: 'History',       title: 'Histórico' },
+    ];
+    const role = userContext?.role || '';
+    if (role === 'Cliente Creación') return all.filter(i => ['home', 'create', 'bulk'].includes(i.id));
+    if (role === 'Cliente Consulta') return all.filter(i => ['history'].includes(i.id));
+    return all;
+  }, [userContext]);
+  const handleNav = (id) => {
+    setView(id);
+    if (window.innerWidth < 768 && toggleSidebar) toggleSidebar(false);
+  };
+  return (
+    <>
+      {isOpen && <div className="fixed inset-0 bg-black/50 z-30 md:hidden" onClick={() => toggleSidebar(false)}></div>}
+      <div className={`fixed inset-y-0 left-0 z-40 ${isCollapsed ? 'w-20' : 'w-64'} bg-white border-r border-gray-200 flex flex-col shadow-lg transform transition-all duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
+        <div className={`p-4 border-b border-gray-100 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
+          <div className="flex items-center gap-3 cursor-pointer overflow-hidden" onClick={() => handleNav('home')}>
+            <img src="https://www.g4s.com/es-co/-/media/g4s/global/images/logos/g4s---an-allied-universal-company-logo/g4s_one-company_logo_180x136.ashx" alt="G4S" className="h-8 w-auto object-contain flex-shrink-0"/>
+            {!isCollapsed && <span className="font-bold text-gray-800 text-lg whitespace-nowrap animate-fade-in">Confiabilidad</span>}
+          </div>
+          <button onClick={() => toggleSidebar(false)} className="md:hidden text-gray-400 hover:text-gray-700"><Icon name="X" size={22}/></button>
+          {!isCollapsed && (
+            <button onClick={toggleCollapse} className="hidden md:flex text-gray-400 hover:text-appBlue transition-colors">
+              <Icon name="Menu" size={20}/>
+            </button>
+          )}
+        </div>
+        {isCollapsed && (
+          <div className="hidden md:flex justify-center p-3 border-b border-gray-50">
+            <button onClick={toggleCollapse} className="p-2 text-gray-400 hover:text-appBlue bg-gray-50 rounded-lg transition-colors">
+              <Icon name="Menu" size={20}/>
+            </button>
+          </div>
+        )}
+        <div className="flex-1 overflow-y-auto py-3 space-y-2 px-2">
+          {menuItems.map((item) => (
+            <div key={item.id} onClick={() => handleNav(item.id)} title={isCollapsed ? item.title : ""}
+              className={`px-3 py-3 cursor-pointer transition-all duration-200 rounded-2xl flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} ${currentView === item.id ? 'bg-vividRed text-white shadow-lg shadow-red-500/30 scale-[1.02]' : 'text-gray-500 hover:bg-gray-100'}`}>
+              <Icon name={item.icon} className={currentView === item.id ? 'text-white' : 'text-gray-400'} size={isCollapsed ? 24 : 20}/>
+              {!isCollapsed && <span className={`font-bold text-xs tracking-wide uppercase ${currentView === item.id ? 'text-white' : ''}`}>{item.title}</span>}
+            </div>
+          ))}
+          <div className="my-4 border-t border-gray-100 mx-2"></div>
+          <div onClick={() => handleNav('config')} title={isCollapsed ? "Configuración" : ""}
+            className={`px-3 py-3 cursor-pointer transition-all duration-200 rounded-2xl flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} ${currentView === 'config' ? 'bg-vividBlue text-white shadow-lg shadow-blue-500/30 scale-[1.02]' : 'text-gray-500 hover:bg-gray-100'}`}>
+            <Icon name="Settings" className={currentView === 'config' ? 'text-white' : 'text-gray-400'} size={isCollapsed ? 24 : 20}/>
+            {!isCollapsed && <span className={`font-bold text-xs tracking-wide uppercase ${currentView === 'config' ? 'text-white' : ''}`}>Configuración</span>}
+          </div>
+        </div>
+        <div className={`p-4 border-t bg-gray-50 ${isCollapsed ? 'flex flex-col items-center' : ''}`}>
+          <div className="flex flex-col gap-2 mb-3 w-full">
+            <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'}`}>
+              <div className="p-2 rounded-full bg-gray-200 flex items-center justify-center min-w-[32px] h-8 w-8"><Icon name="User" size={14} className="text-gray-600"/></div>
+              {!isCollapsed && (
+                <div className="overflow-hidden flex-1 animate-fade-in">
+                  <div className="text-[9px] uppercase font-bold text-gray-400">Usuario</div>
+                  <div className="text-[10px] font-bold text-gray-800 truncate" title={userContext?.email}>{userContext?.email || '...'}</div>
+                </div>
+              )}
+            </div>
+            {!isCollapsed && (
+              <div className="flex justify-between items-center bg-white border border-gray-200 rounded px-2 py-1 animate-fade-in">
+                <div className="text-gray-500 text-[9px] font-bold flex items-center gap-1">
+                  <Icon name="CloudLightning" size={9}/> {syncStatus !== 'idle' ? '...' : 'Al día'}
+                </div>
+                {lastSync && <span className="text-[9px] text-gray-400">{new Date(Number(lastSync)).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span>}
+              </div>
+            )}
+          </div>
+          <button onClick={onLogout} title={isCollapsed ? "Salir" : ""} className={`w-full py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition flex items-center justify-center gap-2 btn-3d-gray ${isCollapsed ? 'px-0' : 'px-3'}`}>
+            <Icon name="LogIn" size={14} className="rotate-180"/> {!isCollapsed && "Cerrar Sesión"}
+          </button>
+        </div>
+      </div>
+    </>
+  );
+};
+
+// ─── HOME DASHBOARD ───────────────────────────────────────────────────────
+const HomeDashboard = ({ userContext, requests, setView, syncStatus }) => {
+  const stats = useMemo(() => {
+    const total     = requests.length;
+    const pending   = requests.filter(r => { const s = (r.EstadoActual||'').toLowerCase(); return s.includes('proceso') || s.includes('pendiente'); }).length;
+    const completed = requests.filter(r => (r.EstadoActual||'').toLowerCase().includes('confiable')).length;
+    return { total, pending, completed };
+  }, [requests]);
+  return (
+    <div className="p-6 md:p-8 max-w-6xl mx-auto animate-fade-in pb-20">
+      <div className="mb-8 flex items-center gap-3">
+        <h1 className="text-3xl font-bold text-gray-800 truncate">Hola, {userContext.email.split('@')[0]}</h1>
+        {syncStatus !== 'idle' && (
+          <div className="flex items-center gap-2 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
+            <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+            <span className="text-xs font-bold text-blue-600">Sincronizando...</span>
+          </div>
+        )}
+      </div>
+      <p className="text-gray-500 mb-8">Bienvenido al portal de Confiabilidad G4S. Los datos muestran el período activo.</p>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+        {[
+          { label:'Total', sub:'Solicitudes', val: stats.total,   icon:'FileText',    bg:'bg-vividBlue/10',   fg:'text-vividBlue'   },
+          { label:'En Proceso', sub:'Estudios activos', val: stats.pending,  icon:'Clock',      bg:'bg-vividOrange/10', fg:'text-vividOrange' },
+          { label:'Finalizados', sub:'Estudios completados', val: stats.completed, icon:'CheckCircle', bg:'bg-vividGreen/10',  fg:'text-vividGreen'  },
+        ].map(s => (
+          <div key={s.label} onClick={() => userContext.role !== 'Cliente Creación' && setView('history')}
+            className={`card-3d p-8 relative overflow-hidden group ${userContext.role !== 'Cliente Creación' ? 'cursor-pointer' : 'opacity-80'}`}>
+            <div className={`absolute top-0 right-0 w-24 h-24 -mr-8 -mt-8 rounded-full opacity-10 transition-transform group-hover:scale-150 duration-500 ${s.bg.replace('/10','')}`}></div>
+            <div className="flex justify-between items-start mb-6 relative z-10">
+              <div className={`p-4 ${s.bg} ${s.fg} rounded-2xl shadow-inner`}><Icon name={s.icon} size={28}/></div>
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{s.label}</span>
+            </div>
+            <div className="text-4xl font-black text-gray-800 mb-1 relative z-10">{s.val}</div>
+            <div className="text-xs font-bold text-gray-500 uppercase tracking-tight relative z-10">{s.sub}</div>
+          </div>
+        ))}
+      </div>
+      {userContext.role !== 'Cliente Consulta' && (
+        <div className="animate-fade-in delay-100">
+          <h2 className="text-2xl font-black text-gray-800 mb-6 flex items-center gap-3">
+            <span className="w-1.5 h-8 bg-vividRed rounded-full"></span>
+            ¿Qué deseas hacer hoy?
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <button onClick={() => setView('create')}
+              className="group flex items-center gap-6 p-8 bg-gradient-to-br from-vividRed to-red-800 text-white rounded-3xl shadow-xl hover:shadow-vividRed/40 transition-all duration-300 transform hover:-translate-y-1 active:scale-95 btn-3d">
+              <div className="bg-white/20 p-5 rounded-2xl backdrop-blur-md group-hover:scale-110 transition-transform"><Icon name="ClipboardList" size={36}/></div>
+              <div className="text-left">
+                <div className="text-xl font-black tracking-tight">Nueva Solicitud</div>
+                <div className="text-white/80 text-sm font-medium">Registrar un estudio individual de forma rápida.</div>
+              </div>
+            </button>
+            <button onClick={() => setView('bulk')}
+              className="group flex items-center gap-6 p-8 bg-white border border-gray-100 text-gray-700 rounded-3xl shadow-xl hover:shadow-vividBlue/20 transition-all duration-300 transform hover:-translate-y-1 active:scale-95 btn-3d">
+              <div className="bg-vividBlue/10 text-vividBlue p-5 rounded-2xl group-hover:scale-110 transition-transform"><Icon name="Upload" size={36}/></div>
+              <div className="text-left">
+                <div className="text-xl font-black tracking-tight text-gray-800">Carga Masiva</div>
+                <div className="text-gray-500 text-sm font-medium">Subir múltiples registros desde archivos CSV.</div>
+              </div>
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── LISTA DE SOLICITUDES ────────────────────────────────────────────────
+const PERIODS = [
+  { key: 'today', label: 'Hoy'     },
+  { key: 'week',  label: 'Semana'  },
+  { key: 'month', label: 'Mes'     },
+  { key: 'year',  label: 'Año'     },
+];
+
+const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onChangePeriod, currentPeriod, refreshing, userContext, masterData }) => {
+  const [filter,       setFilter]       = useState('Todo');
+  const [search,       setSearch]       = useState('');
+  const [page,         setPage]         = useState(1);
+  const [dateRange,    setDateRange]    = useState({ start: '', end: '' });
+  const [clientFilter, setClientFilter] = useState('');
+  const [onlyMine,     setOnlyMine]     = useState(false);
+
+  const requests = useMemo(() => (initialData && Array.isArray(initialData.data)) ? initialData.data : [], [initialData]);
+
+  const statusTabs = useMemo(() => {
+    const displayStatuses = ['Todo', 'Cancelado', 'Confiable', 'Confiable preliminar', 'En proceso', 'Ingresada', 'No confiable', 'None'];
+    const counts = { 'Todo': requests.length };
+    requests.forEach(r => {
+      let s = r.EstadoActual;
+      if (!s || s.trim() === '') s = 'None';
+      counts[s] = (counts[s] || 0) + 1;
+    });
+    return displayStatuses.map(s => ({ name: s, count: counts[s] || 0 }));
+  }, [requests]);
+
+  const filteredRequests = useMemo(() => {
+    let result = requests;
+    if (filter !== 'Todo') {
+      if (filter === 'None') {
+        result = result.filter(r => !r.EstadoActual || r.EstadoActual.trim() === '' || r.EstadoActual === 'None');
+      } else {
+        result = result.filter(r => r.EstadoActual === filter);
+      }
+    }
+    if (onlyMine && userContext?.email) result = result.filter(r => r.UsuarioCreación === userContext.email);
+    if (search) {
+      const q = search.toLowerCase();
+      result = result.filter(r => (String(r.NSolicitud || r.ID_SolicitudesConfiabilidad) + r.Identificacion + r.NombreCompleto).toLowerCase().includes(q));
+    }
+    if (dateRange.start) {
+      const start = new Date(dateRange.start);
+      result = result.filter(r => new Date(r.FechaSolicitud?.value || r.FechaSolicitud) >= start);
+    }
+    if (dateRange.end) {
+      const end = new Date(dateRange.end); end.setHours(23,59,59);
+      result = result.filter(r => new Date(r.FechaSolicitud?.value || r.FechaSolicitud) <= end);
+    }
+    if (clientFilter) result = result.filter(r => String(r.ID_Cliente) === String(clientFilter));
+    return result;
+  }, [requests, filter, search, dateRange, clientFilter, onlyMine, userContext]);
+
+  const handleExport = () => {
+    if (!filteredRequests.length) return alert("No hay datos para exportar.");
+    const exportData = filteredRequests.filter(r => !['Creada','Ingresada'].includes((r.EstadoActual||'').trim()));
+    if (!exportData.length) return alert("No hay registros válidos para exportar.");
+    const headers = Object.keys(exportData[0]);
+    const csv = [headers.join(','), ...exportData.map(row => headers.map(f => `"${String(row[f]||'').replace(/"/g,'""')}"`).join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `historico_${new Date().toISOString().slice(0,10)}.csv`;
+    link.click();
+  };
+
+  useEffect(() => { setPage(1); }, [filter, search, dateRange, clientFilter, onlyMine, currentPeriod]);
+
+  const paginatedData = filteredRequests.slice((page - 1) * 50, page * 50);
+  const totalPages    = Math.ceil(filteredRequests.length / 50);
+
+  const isForcedMyRequests = useMemo(() => {
+    if (userContext?.isAdmin) return false;
+    if (userContext?.role === 'Cliente Perfilado') return true;
+    if (!clientFilter) return false;
+    return userContext?.clientData?.[clientFilter]?.forcedMyRequests ||
+           userContext?.userClientConfig?.[clientFilter]?.forcedMyRequests || false;
+  }, [clientFilter, userContext]);
+
+  useEffect(() => {
+    if (isForcedMyRequests) setOnlyMine(true);
+  }, [isForcedMyRequests]);
+
+  return (
+    <div className="p-4 md:p-6 h-full flex flex-col animate-fade-in overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm mb-4 overflow-hidden">
+        <div className="p-4 bg-gray-50/50 border-b border-gray-100">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="bg-appBlue p-2 rounded-lg text-white shadow-sm">
+                <Icon name="Filter" size={18}/>
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-gray-800">Filtros de Búsqueda</h2>
+                <p className="text-[10px] text-gray-500 font-medium uppercase tracking-wider">Gestión de Solicitudes</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <button onClick={handleExport} className="px-4 py-2 text-vividGreen hover:bg-vividGreen/10 border border-vividGreen/20 rounded-2xl bg-white flex items-center gap-2 text-[10px] font-black uppercase tracking-tight transition-all btn-3d shadow-gray-200">
+                <Icon name="Download" size={14}/> Exportar CSV
+              </button>
+              <button onClick={onRefresh} disabled={refreshing} className="px-4 py-2 text-vividBlue hover:bg-vividBlue/10 border border-vividBlue/20 rounded-2xl bg-white flex items-center gap-2 text-[10px] font-black uppercase tracking-tight transition-all btn-3d shadow-gray-200 disabled:opacity-50">
+                <Icon name="RefreshCw" size={14} className={refreshing ? "animate-spin" : ""}/>
+                {refreshing ? 'Sincronizando...' : 'Actualizar'}
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="p-5 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3 bg-gray-100 p-1 rounded-xl border border-gray-200">
+              {PERIODS.map(p => (
+                <button key={p.key} onClick={() => onChangePeriod(p.key)}
+                  className={`px-4 py-1.5 rounded-lg text-[11px] font-bold transition-all ${currentPeriod === p.key ? 'bg-white text-appBlue shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-4">
+               <label className={`flex items-center gap-3 p-2 px-4 rounded-xl border transition-all cursor-pointer select-none ${onlyMine ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200'}`}>
+                <div onClick={() => !isForcedMyRequests && setOnlyMine(!onlyMine)} className={`w-10 h-5 rounded-full transition-colors duration-200 flex items-center px-0.5 ${onlyMine ? 'bg-appBlue' : 'bg-gray-300'} ${isForcedMyRequests ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                  <div className={`w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-200 ${onlyMine ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                </div>
+                <span className={`text-xs font-bold ${onlyMine ? 'text-appBlue' : 'text-gray-600'}`}>Mis Solicitudes</span>
+                {isForcedMyRequests && <Icon name="ShieldCheck" size={12} className="text-appBlue" title="Forzado por administrador"/>}
+              </label>
+              <div className="bg-gray-800 text-white px-3 py-2 rounded-xl text-xs font-black shadow-lg">
+                {filteredRequests.length} <span className="text-[10px] text-gray-400 font-normal ml-1">REGISTROS</span>
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+            <div className="md:col-span-4 relative group">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-appBlue transition-colors"><Icon name="Search" size={16}/></div>
+              <input type="text" className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-appBlue/20 focus:border-appBlue transition-all"
+                placeholder="ID, Cédula o Nombre del evaluado..." value={search} onChange={e => setSearch(e.target.value)}/>
+            </div>
+            <div className="md:col-span-4 flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-1">
+              <Icon name="Calendar" size={14} className="text-gray-400"/>
+              <input type="date" value={dateRange.start} onChange={e => setDateRange({...dateRange, start: e.target.value})}
+                className="w-full bg-transparent p-1.5 text-[11px] font-medium focus:outline-none"/>
+              <span className="text-gray-300">|</span>
+              <input type="date" value={dateRange.end} onChange={e => setDateRange({...dateRange, end: e.target.value})}
+                className="w-full bg-transparent p-1.5 text-[11px] font-medium focus:outline-none"/>
+            </div>
+            <div className="md:col-span-4">
+              <select value={clientFilter} onChange={e => setClientFilter(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-appBlue/20 focus:border-appBlue transition-all appearance-none cursor-pointer">
+                <option value="">Todos los Clientes</option>
+                {userContext?.allowedClientIds?.map(id => <option key={id} value={id}>{userContext.clientNames?.[id] || id}</option>)}
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {refreshing && (
+        <div className="flex items-center justify-center p-2 mb-3 bg-blue-50 border border-blue-100 rounded-lg animate-fade-in">
+          <Icon name="RefreshCw" size={13} className="animate-spin text-blue-600 mr-2"/>
+          <span className="text-xs font-bold text-blue-600">Cargando período: {PERIODS.find(p => p.key === currentPeriod)?.label}...</span>
+        </div>
+      )}
+
+      <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
+        {statusTabs.map(tab => (
+          <button key={tab.name} onClick={() => setFilter(tab.name)}
+            className={`px-3 py-1 rounded-full text-xs font-bold transition whitespace-nowrap flex items-center gap-1.5 border btn-action ${filter === tab.name ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}>
+            {tab.name} <span className={`px-1.5 rounded-full text-[10px] ${filter === tab.name ? 'bg-gray-600 text-white' : 'bg-gray-100 text-gray-500'}`}>{tab.count}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border overflow-hidden flex-1 flex flex-col">
+        <div className="overflow-x-auto flex-1 custom-scrollbar">
+          <div className="min-w-[1000px]">
+            <div className="grid grid-cols-12 gap-2 p-3 border-b bg-gray-50 text-[10px] font-bold text-gray-400 uppercase tracking-tight sticky top-0 z-10">
+              <div className="col-span-1">N° Sol</div>
+              <div className="col-span-2">F. Solicitud</div>
+              <div className="col-span-1">Cédula</div>
+              <div className="col-span-2">Nombre / Cargo</div>
+              <div className="col-span-1 text-center">Estado</div>
+              <div className="col-span-1 text-center">Est. EP</div>
+              <div className="col-span-1 text-center">P. Vis</div>
+              <div className="col-span-1 text-center">P. Pol</div>
+              <div className="col-span-1 text-center">E. ECP</div>
+              <div className="col-span-1 text-center">E. EP</div>
+            </div>
+            <div className="divide-y divide-gray-100">
+              {paginatedData.length === 0 ? (
+                <div className="p-20 text-center flex flex-col items-center justify-center h-full">
+                  {refreshing
+                    ? <><Icon name="RefreshCw" size={32} className="animate-spin text-blue-500 mb-2"/><span className="text-gray-400 text-sm">Cargando...</span></>
+                    : <span className="text-gray-400 italic">No hay registros para el período seleccionado.</span>
+                  }
+                </div>
+              ) : paginatedData.map((req, i) => (
+                <RequestRow key={req.ID_SolicitudesConfiabilidad || i} req={req} onClick={() => { setSelectedRequest(req); setView('detail'); }} />
+              ))}
+            </div>
+          </div>
+        </div>
+        {totalPages > 1 && (
+          <div className="p-2 border-t flex justify-between bg-gray-50 items-center">
+            <button onClick={() => setPage(p => Math.max(1, p-1))} disabled={page===1} className="text-xs px-3 py-1 bg-white border rounded hover:bg-gray-100 disabled:opacity-50 btn-action">Anterior</button>
+            <span className="text-xs font-bold text-gray-600">Pág {page} de {totalPages}</span>
+            <button onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page>=totalPages} className="text-xs px-3 py-1 bg-white border rounded hover:bg-gray-100 disabled:opacity-50 btn-action">Siguiente</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ─── DETALLE DE SOLICITUD ─────────────────────────────────────────────────
+const RequestDetail = ({ requestId, onBack, preloadedData }) => {
+  const [detailData, setDetailData] = useState(null);
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState(null);
+  const [fileStates, setFileStates] = useState({});
+
+  useEffect(() => {
+    setLoading(true); setError(null);
+    runServer('getRequestDetail', { id: requestId })
+      .then(data => { setDetailData(data); setLoading(false); })
+      .catch(err => { setError(err.message); setLoading(false); });
+  }, [requestId]);
+
+  const updateFileStatus = (fileName, status, message = "") =>
+    setFileStates(prev => ({ ...prev, [fileName]: { status, message } }));
+
+  const handleDownload = (input) => {
+    let path = null;
+    if (typeof input === 'string') path = input;
+    else if (typeof input === 'object' && input !== null) path = input.Documento || input.URL || input.Archivo || input.NombreArchivo;
+    if (!path) return alert("Datos de documento inválidos o sin ruta.");
+    const filename = path.split(/[/\\]/).pop();
+    if (!filename) return alert("No se pudo obtener el nombre del archivo.");
+    updateFileStatus(filename, 'loading', 'Iniciando descarga...');
+    const iframe = document.createElement('iframe');
+    iframe.style.display = "none";
+    iframe.src = `${PROXY_URL}?filename=${encodeURIComponent(filename)}&token=${PROXY_TOKEN}`;
+    document.body.appendChild(iframe);
+    setTimeout(() => {
+      updateFileStatus(filename, 'success', 'Descarga iniciada ✓');
+      setTimeout(() => { if (document.body.contains(iframe)) document.body.removeChild(iframe); }, 60000);
+    }, 3000);
+  };
+
+  if (loading) return (
+    <div className="flex items-center justify-center h-full p-10 flex-col gap-4">
+      <div className="w-12 h-12 border-4 border-appBlue border-t-transparent rounded-full animate-spin"></div>
+      <p className="text-sm text-gray-500">Cargando detalles de la solicitud...</p>
+    </div>
+  );
+  if (error) return (
+    <div className="p-10 text-center">
+      <Icon name="AlertTriangle" size={40} className="text-red-500 mx-auto mb-3"/>
+      <p className="text-red-600 font-bold mb-2">Error al cargar detalle</p>
+      <p className="text-sm text-gray-500 mb-4">{error}</p>
+      <button onClick={onBack} className="text-blue-600 underline text-sm">Volver al listado</button>
+    </div>
+  );
+
+  const header = detailData?.header || preloadedData;
+
+  const Card = ({ title, children, count }) => (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-4 overflow-hidden">
+      <div className="px-4 py-3 border-b border-gray-100 font-bold text-gray-700 text-sm uppercase flex justify-between">
+        <span>{title}</span>
+        {count !== undefined && <span className="bg-gray-100 text-gray-600 px-2 rounded-full text-xs flex items-center">{count}</span>}
+      </div>
+      <div>{children}</div>
+    </div>
+  );
+
+  const DetailField = ({ label, value }) => (
+    <div className="border-b border-gray-50 pb-2 last:border-0">
+      <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">{label}</div>
+      <div className="text-sm text-gray-700 font-medium break-words">{value || 'N/A'}</div>
+    </div>
+  );
+
+  const GenericList = ({ items, labelKey, dateKey }) => (
+    items?.length > 0
+      ? <ul className="divide-y divide-gray-100">{items.map((item, i) => (
+          <li key={i} className="p-3 text-sm hover:bg-gray-50">
+            <div className="font-medium text-gray-700">{item[labelKey] || JSON.stringify(item)}</div>
+            {dateKey && item[dateKey] && <div className="text-xs text-gray-400">{item[dateKey]}</div>}
+          </li>
+        ))}</ul>
+      : <div className="p-4 text-center text-xs text-gray-400 italic">No hay registros.</div>
+  );
+
+  const DownloadRow = ({ path, label, date }) => {
+    if (!path) return null;
+    const filename = path.split(/[/\\]/).pop();
+    const fs = fileStates[filename] || {};
+    return (
+      <div className="flex items-center justify-between bg-blue-50 p-2.5 rounded border border-blue-100 mb-2">
+        <div className="flex items-center gap-3 overflow-hidden flex-1">
+          <div className="bg-white p-1.5 rounded-full text-blue-600 shadow-sm min-w-[28px]"><Icon name="FileText" size={14}/></div>
+          <div className="flex-1 overflow-hidden">
+            <div className="text-xs font-bold text-blue-900 truncate">{label || filename}</div>
+            {date && <div className="text-[9px] text-blue-400">{date}</div>}
+            {fs.message && <div className={`text-[9px] font-bold ${fs.status==='success'?'text-green-600':'text-blue-500'}`}>{fs.message}</div>}
+          </div>
+        </div>
+        <button onClick={() => handleDownload(path)} disabled={fs.status==='loading'}
+          className={`ml-2 p-2 rounded-lg transition ${fs.status==='loading' ? 'opacity-50 cursor-not-allowed' : 'bg-white text-blue-600 hover:bg-blue-600 hover:text-white shadow-sm'}`}>
+          <Icon name={fs.status==='loading'?'RefreshCw':'Download'} size={15} className={fs.status==='loading'?'animate-spin':''}/>
+        </button>
+      </div>
+    );
+  };
+
+  return (
+    <div className="p-4 md:p-6 max-w-7xl mx-auto animate-fade-in">
+      <button onClick={onBack} className="mb-4 text-gray-500 hover:text-gray-800 flex items-center gap-1 text-sm btn-action">
+        <Icon name="ChevronRight" className="rotate-180" size={16}/> Volver
+      </button>
+      <div className="grid grid-cols-12 gap-6">
+        <div className="col-span-12 md:col-span-8 space-y-4">
+          <Card title="Información Detallada">
+            <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <DetailField label="Cliente"  value={header.Cliente || header.RazonSocial}/>
+              <DetailField label="NIT"      value={header.NIT}/>
+              <div className="col-span-2 mt-1 border-b border-gray-200 pb-1"><h4 className="text-xs font-bold text-blue-600 uppercase">Fechas Clave</h4></div>
+              <DetailField label="Programación Visita"     value={formatDateCO(header.ProgramacionVisita)}/>
+              <DetailField label="Programación Poligrafía" value={formatDateCO(header.ProgramacionPoligrafia)}/>
+              <DetailField label="Fecha Entrega ECP"       value={formatDateCO(header.FechaEntregaECP)}/>
+              <DetailField label="Fecha Entrega EP"        value={formatDateCO(header.FechaEntregaEP)}/>
+              {header.ArchivoInforme && (
+                <>
+                  <div className="col-span-2 mt-1 border-b border-gray-200 pb-1"><h4 className="text-xs font-bold text-green-600 uppercase">Informe Final</h4></div>
+                  <div className="col-span-2"><DownloadRow path={header.ArchivoInforme} label="Informe Final"/></div>
+                </>
+              )}
+              <div className="col-span-2 mt-1 border-b border-gray-200 pb-1"><h4 className="text-xs font-bold text-appRed uppercase">Información Del Evaluado</h4></div>
+              <DetailField label="Nombre Completo"       value={header.NombreCompleto}/>
+              <DetailField label="Tipo Identificación"   value={header.TipoIdentificacion}/>
+              <DetailField label="Identificación"        value={header.Identificacion}/>
+              <DetailField label="Cargo"                 value={header.Cargo}/>
+              <DetailField label="Ciudad"                value={header.Ciudad}/>
+              <DetailField label="Dirección"             value={header.Direccion}/>
+              <DetailField label="Barrio"                value={header.Barrio}/>
+              <div className="col-span-2"><DetailField label="Notas Adicionales" value={header.Notas}/></div>
+            </div>
+          </Card>
+          <Card title="Novedades" count={detailData?.notas?.length}>
+            <GenericList items={detailData?.notas} labelKey="Nota" dateKey="FechaActualizacion"/>
+          </Card>
+          <Card title="Histórico de Estados" count={detailData?.historicoEstSolicitud?.length}>
+            <GenericList items={detailData?.historicoEstSolicitud} labelKey="EstadoSol" dateKey="FechaActualziacion"/>
+          </Card>
+          {(detailData?.poligrafia?.length > 0) && (
+            <Card title="Informe Poligrafía" count={detailData.poligrafia.length}>
+              {detailData.poligrafia.map((item, i) => (
+                <div key={i} className="p-4 border-b hover:bg-gray-50">
+                  <div className="flex justify-between mb-3">
+                    <div><div className="text-[10px] font-bold text-gray-400 uppercase">Analista</div><div className="font-bold text-gray-700">{item.AnalistaPoligrafo || 'N/A'}</div></div>
+                    <div className="text-right"><div className="text-[10px] text-gray-400 uppercase">Actualización</div><div className="text-xs text-gray-500">{item.FechaActualización || item.FechaActualizacion || ''}</div></div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-xs mb-3 bg-white p-3 rounded border border-gray-100">
+                    <div><span className="font-bold text-gray-800">Concepto:</span> {item.ConceptoEP}</div>
+                    <div><span className="font-bold text-gray-800">Nivel Riesgo:</span> <span className="bg-gray-100 px-1.5 rounded">{item.NivelRiesgo}</span></div>
+                    <div><span className="font-bold text-gray-800">Admisiones:</span> {item.Admisiones}</div>
+                    <div><span className="font-bold text-gray-800">Elaborado Por:</span> {item.ElaboradoPor}</div>
+                  </div>
+                  {item.InformeEstudioPoligrafia && <DownloadRow path={item.InformeEstudioPoligrafia} label="Informe Estudio Poligrafía"/>}
+                </div>
+              ))}
+            </Card>
+          )}
+          {(detailData?.datacredito?.length > 0) && (
+            <Card title="Consulta Datacrédito" count={detailData.datacredito.length}>
+              {detailData.datacredito.map((item, i) => (
+                <div key={i} className="px-4 py-2">
+                  <DownloadRow path={item.Archivo} label={`Consulta - ${item.FechaActualizacion || item.FechaConsulta || ''}`}/>
+                </div>
+              ))}
+            </Card>
+          )}
+        </div>
+        <div className="col-span-12 md:col-span-4 space-y-4">
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 text-center">
+            <div className="text-gray-400 text-xs font-bold mb-1">ESTADO ACTUAL</div>
+            <div className={`text-2xl font-black mb-2 uppercase ${getStatusBadgeColor(header.EstadoActual).split(' ')[1]}`}>{header.EstadoActual}</div>
+            <div className="text-gray-500 text-xs bg-gray-100 inline-block px-2 py-1 rounded">ID: {header.NSolicitud || header.ID_SolicitudesConfiabilidad}</div>
+            {header.EstadoActualEP && (
+              <div className="mt-2 pt-2 border-t border-gray-100">
+                <div className="text-xs text-gray-400 font-bold mb-1">ESTADO EP</div>
+                <span className="inline-flex items-center justify-center px-2 h-[22px] rounded text-[9px] font-bold uppercase bg-purple-100 text-purple-700 border border-purple-200">{header.EstadoActualEP}</span>
+              </div>
+            )}
+          </div>
+          <Card title="Servicios Aplicados" count={detailData?.services?.length}>
+            {detailData?.services?.length > 0
+              ? <ul className="divide-y">{detailData.services.map((s,i) => (
+                  <li key={i} className="px-4 py-3 hover:bg-gray-50">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="font-bold text-sm text-gray-700">{s.TipoServicio || s.Servicio || s.ServicioAplicar}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${s.EstadoActual === 'Finalizado' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{s.EstadoActual || s.Estado}</span>
+                    </div>
+                    <div className="text-[10px] text-gray-400 flex items-center gap-1"><Icon name="Clock" size={10}/> {s.FechaActualizacion || s.Fecha || 'Pendiente'}</div>
+                  </li>
+                ))}</ul>
+              : <div className="p-4 text-center text-xs text-gray-400 italic">No hay servicios registrados.</div>
+            }
+          </Card>
+          {detailData?.autFirmada?.length > 0 && (
+            <Card title="Autorizaciones Firmadas" count={detailData.autFirmada.length}>
+              {detailData.autFirmada.map((doc, i) => (
+                <div key={i} className="px-4 py-2">
+                  <DownloadRow path={doc.Archivo || doc.NombreArchivo} label={doc.NombreArchivo || 'Autorización Firmada'} date={doc.FechaActualizacion}/>
+                </div>
+              ))}
+            </Card>
+          )}
+          {detailData?.documents?.length > 0 && (
+            <Card title="Documentos" count={detailData.documents.length}>
+              {detailData.documents.map((doc, i) => (
+                <div key={i} className="px-4 py-2">
+                  <DownloadRow path={doc.Documento || doc.URL || doc.Archivo} label={doc.NombreDocumento || doc.Nombre || 'Documento'} date={doc.FechaActualizacion}/>
+                </div>
+              ))}
+            </Card>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── CREAR SOLICITUD ──────────────────────────────────────────────────────
+const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
+  const [step, setStep]                         = useState(1);
+  const [uploading, setUploading]               = useState(false);
+  const [uploadProgress, setUploadProgress]     = useState({ current: 0, total: 0 });
+  const [showSuccess, setShowSuccess]           = useState(false);
+  const [showValidationAlert, setShowValidationAlert] = useState(false);
+  const [missingFields, setMissingFields]       = useState([]);
+  const [createdId, setCreatedId]               = useState('');
+  const [showPersonalRefWarning, setShowPersonalRefWarning] = useState(false);
+  const [attachments, setAttachments]           = useState([]);
+  const [currentFile, setCurrentFile]           = useState(null);
+  const [currentDocName, setCurrentDocName]     = useState('');
+
+  useEffect(() => {
+    if (showPersonalRefWarning) { const t = setTimeout(() => setShowPersonalRefWarning(false), 3000); return () => clearTimeout(t); }
+  }, [showPersonalRefWarning]);
+
+  const [formData, setFormData] = useState({
+    fechaSolicitud: new Date().toLocaleString(), clientId: '', nombre: '', nit: '', razonSocial: '',
+    tipoIdentificacion: '', identificacion: '', fechaExpedicion: '', cargo: '', correo: '',
+    celular: '', ciudad: '', barrio: '', direccion: '', tipoTrabajador: 'Nuevo', centroCostos: '',
+    visitaDomiciliaria: false, modalidadVisita: '', consultaAntecedentes: false,
+    referenciacion: false, referenciaAcademica: null, referenciaLaboral: null, referenciaPersonal: null,
+    estudiosPoligrafia: false, tipoPoligrafia: '', ciudadPoligrafia: '', consultaDatacredito: false,
+    comparativoOEA: false, notas: '', clienteProyectoInterno: '', linea: '', lineaNegocio: '',
+    clienteClientesSecundarios: '', nitClienteSecundario: '', convenioClienteSecundario: '',
+    tipoCostoClienteSecundario: '', centroCostosExterno: ''
+  });
+
+  const ciudadesList           = useMemo(() => masterData?.conCiudades || [], [masterData]);
+  const ciudadesPoligrafiaList = useMemo(() => masterData?.conPoligrafias || [], [masterData]);
+  const clienteProyectoList    = useMemo(() => masterData?.ClienteProyecto || [], [masterData]);
+  const lineaCCList            = useMemo(() => masterData?.LineaCC || [], [masterData]);
+  const secondaryClientsRaw    = useMemo(() => masterData?.conClientesSecundarios || [], [masterData]);
+
+  const availableSecondaryClients = useMemo(() => {
+    if (!formData.clientId) return [];
+    return secondaryClientsRaw.filter(i => String(i.ClientePrincipal) === String(formData.clientId)).map(i => i.ClienteSecundarioNombre);
+  }, [formData.clientId, secondaryClientsRaw]);
+
+  const clientType = useMemo(() => (formData.clientId && userContext?.clientTypes) ? userContext.clientTypes[formData.clientId] : '', [formData.clientId, userContext]);
+  const isInternal = useMemo(() => clientType === 'Interno', [clientType]);
+
+  const uniqueLineas = useMemo(() => [...new Set(lineaCCList.map(i => i.Linea))].sort(), [lineaCCList]);
+  const availableLNs = useMemo(() => !formData.linea ? [] : [...new Set(lineaCCList.filter(i => i.Linea === formData.linea).map(i => i.LN_Nombre))].sort(), [formData.linea, lineaCCList]);
+  const availableCCs = useMemo(() => (!formData.linea || !formData.lineaNegocio) ? [] : [...new Set(lineaCCList.filter(i => i.Linea === formData.linea && i.LN_Nombre === formData.lineaNegocio).map(i => i.CC_Nombre))].sort(), [formData.linea, formData.lineaNegocio, lineaCCList]);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    if (name === 'clientId') {
+      const cd = userContext?.clientData?.[value];
+      setFormData(p => ({ ...p, [name]: value, nit: cd?.nit || '', razonSocial: cd?.razonSocial || '' }));
+    } else if (name === 'linea') {
+      setFormData(p => ({ ...p, [name]: value, lineaNegocio: '', centroCostos: '' }));
+    } else if (name === 'lineaNegocio') {
+      setFormData(p => ({ ...p, [name]: value, centroCostos: '' }));
+    } else {
+      setFormData(p => ({ ...p, [name]: value }));
+    }
+  };
+
+  const handleCelularChange = (e) => {
+    const val = e.target.value.replace(/\D/g, '');
+    if (val.length <= 13) setFormData(p => ({ ...p, celular: val }));
+  };
+
+  const handleIdentificacionChange = (e) => {
+    const val = e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    if (val.length <= 15) setFormData(p => ({ ...p, identificacion: val }));
+  };
+
+  // ── handleToggle con limpieza de campos hijos ──────────────────────────
+  const handleToggle = (name, val) => {
+    if (name === 'referenciaPersonal' && val === true && formData.visitaDomiciliaria) { setShowPersonalRefWarning(true); return; }
+    setFormData(p => {
+      const next = { ...p, [name]: val };
+      if (name === 'visitaDomiciliaria') {
+        if (val === true)  next.referenciaPersonal = false;
+        if (val === false) next.modalidadVisita = '';
+      }
+      if (name === 'referenciacion' && val === false) {
+        next.referenciaAcademica = null;
+        next.referenciaLaboral   = null;
+        next.referenciaPersonal  = null;
+      }
+      if (name === 'estudiosPoligrafia' && val === false) {
+        next.tipoPoligrafia   = '';
+        next.ciudadPoligrafia = '';
+      }
+      return next;
+    });
+  };
+
+  const addAttachment = () => {
+    if (!currentFile) return alert("Seleccione un archivo.");
+    if (!currentDocName.trim()) return alert("Ingrese un nombre para el documento.");
+    setAttachments(a => [...a, { id: Date.now(), file: currentFile, name: currentDocName }]);
+    setCurrentFile(null); setCurrentDocName('');
+    document.getElementById('fileInput').value = "";
+  };
+
+  const resetForm = () => {
+    setFormData({ fechaSolicitud: new Date().toLocaleString(), clientId: '', nombre: '', nit: '', razonSocial: '',
+      tipoIdentificacion: '', identificacion: '', fechaExpedicion: '', cargo: '', correo: '', celular: '',
+      ciudad: '', barrio: '', direccion: '', tipoTrabajador: 'Nuevo', centroCostos: '',
+      visitaDomiciliaria: false, modalidadVisita: '', consultaAntecedentes: false,
+      referenciacion: false, referenciaAcademica: null, referenciaLaboral: null, referenciaPersonal: null,
+      estudiosPoligrafia: false, tipoPoligrafia: '', ciudadPoligrafia: '', consultaDatacredito: false,
+      comparativoOEA: false, notas: '', clienteProyectoInterno: '', linea: '', lineaNegocio: '',
+      clienteClientesSecundarios: '', nitClienteSecundario: '', convenioClienteSecundario: '',
+      tipoCostoClienteSecundario: '', centroCostosExterno: '' });
+    setAttachments([]); setStep(1); setShowSuccess(false);
+  };
+
+  const handleSubmit = async () => {
