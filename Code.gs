@@ -694,8 +694,8 @@ function registerTempDocument(email, { requestId, docName, fileName }) {
   const docId = generateUniqueId();
   const insertSql = `
     INSERT INTO \`${tableId}\`
-    (ID_DocumentosSolicitud, ID_SolicitudesConfiabilidad, NombreDocumento, Documento, UsuarioActualizacion, \`UsuarioCreación\`, FechaActualizacion, EstadoActual)
-    VALUES (@docId, @reqId, @docName, @fileAlias, @user, @user, CAST(CURRENT_TIMESTAMP() AS STRING), 'Creada')
+    (ID_DocumentosSolicitud, ID_SolicitudesConfiabilidad, NombreDocumento, Documento, UsuarioActualziacion, FechaActualizacion, EstadoActual)
+    VALUES (@docId, @reqId, @docName, @fileAlias, @user, CAST(CURRENT_TIMESTAMP() AS STRING), 'Creada')
   `;
   bq.query(insertSql, { docId, reqId: requestId, docName, fileAlias: fileName, user: email });
   return { success: true, message: "Metadatos registrados." };
@@ -869,4 +869,11 @@ class BigQueryClient {
       return obj;
     });
   }
+}
+
+function diagnosticarTablaTemporal() {
+  const bq = new BigQueryClient();
+  const sql = `SELECT column_name FROM \`g4s-shared-tz1.Confiabilidad.INFORMATION_SCHEMA.COLUMNS\` WHERE table_name = 'conSolicitudesTemporal' ORDER BY ordinal_position`;
+  const result = bq.query(sql);
+  console.log(result.map(r => r.column_name).join('\n'));
 }
