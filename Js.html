@@ -1,4 +1,4 @@
-<script type="text/babel" data-presets="react">
+<script type="text/babel">
 const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
 // ─── CONFIG PROXY (solo URL pública del proxy de archivos) ───────────────
@@ -274,7 +274,7 @@ const LoginView = ({ onSuccess, isLoading }) => (
     <div className="flex-1 flex items-center justify-center p-4">
       <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full text-center">
         <div className="flex justify-center mb-6">
-          <img src="https://upload.wikimedia.org/wikipedia/commons/5/54/G4S_logotyp.jpg" alt="G4S Logo" className="h-20 w-auto object-contain"/>
+          <img src="https://www.g4s.com/es-co/-/media/g4s/global/images/logos/g4s---an-allied-universal-company-logo/g4s_one-company_logo_180x136.ashx" alt="G4S Logo" className="h-20 w-auto object-contain"/>
         </div>
         <h1 className="text-2xl font-bold text-gray-800 mb-2">Confiabilidad</h1>
         <p className="text-gray-500 mb-8 text-sm">Plataforma de Gestión</p>
@@ -318,7 +318,7 @@ const Sidebar = ({ currentView, setView, onLogout, userContext, syncStatus, last
       <div className={`fixed inset-y-0 left-0 z-40 ${isCollapsed ? 'w-20' : 'w-64'} bg-white border-r border-gray-200 flex flex-col shadow-lg transform transition-all duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
         <div className={`p-4 border-b border-gray-100 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
           <div className="flex items-center gap-3 cursor-pointer overflow-hidden" onClick={() => handleNav('home')}>
-            <img src="https://upload.wikimedia.org/wikipedia/commons/5/54/G4S_logotyp.jpg" alt="G4S" className="h-8 w-auto object-contain flex-shrink-0"/>
+            <img src="https://www.g4s.com/es-co/-/media/g4s/global/images/logos/g4s---an-allied-universal-company-logo/g4s_one-company_logo_180x136.ashx" alt="G4S" className="h-8 w-auto object-contain flex-shrink-0"/>
             {!isCollapsed && <span className="font-bold text-gray-800 text-lg whitespace-nowrap animate-fade-in">Confiabilidad</span>}
           </div>
           <button onClick={() => toggleSidebar(false)} className="md:hidden text-gray-400 hover:text-gray-700"><Icon name="X" size={22}/></button>
