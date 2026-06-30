@@ -521,7 +521,7 @@ const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onCh
   const totalPages    = Math.ceil(filteredRequests.length / 50);
 
   const isForcedMyRequests = useMemo(() => {
-    if (userContext?.isAdmin) return false;
+    if (userContext?.isAdmin || userContext?.role === 'Coordinador General') return false;
     if (userContext?.role === 'Cliente Perfilado') return true;
     if (!clientFilter) return false;
     return userContext?.clientData?.[clientFilter]?.forcedMyRequests ||
@@ -1699,6 +1699,7 @@ const AdminClientModal = ({ clientId, clientName, onClose, showToast }) => {
     { id: 'Cliente Creación', title: 'Creación', desc: 'Registra nuevas solicitudes (manual/masiva) y ve el dashboard de inicio.' },
     { id: 'Cliente Completo', title: 'Completo', desc: 'Acceso total y visibilidad de todas las solicitudes del cliente.' },
     { id: 'Cliente Perfilado', title: 'Perfilado', desc: 'Acceso total, pero solo visualiza sus propias solicitudes.' },
+    { id: 'Coordinador General', title: 'Coordinador', desc: 'Visualiza todos los clientes y todas las solicitudes sin restricciones.' },
   ];
 
   return (

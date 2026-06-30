@@ -94,10 +94,16 @@ function getUserContext(email) {
     };
   });
 
-  if (context.isAdmin) {
+  if (context.isAdmin || context.role === 'Coordinador General') {
     const sqlAllClients = `SELECT ID_ClientesConfiabilidad FROM \`${projectId}.${DATASET_ID}.${TABLES.CLIENT_CONF}\``;
     const allRes = bq.query(sqlAllClients);
-    context.adminClientIds = allRes.map(r => r.ID_ClientesConfiabilidad);
+    const allIds = allRes.map(r => r.ID_ClientesConfiabilidad);
+
+    // Tanto Administrador como Coordinador General ven todos los clientes
+    context.allowedClientIds = allIds;
+    if (context.isAdmin) {
+      context.adminClientIds = allIds;
+    }
   }
 
   const fetchIds = context.isAdmin ? context.adminClientIds : context.allowedClientIds;
@@ -172,7 +178,7 @@ function getRequests(email, { period = 'today', clientId = null } = {}) {
 
   // Tarea 8: Forzar "Mis Solicitudes" (Seguridad robusta)
   let securityClause = '';
-  if (!context.isAdmin) {
+  if (!context.isAdmin && context.role !== 'Coordinador General') {
     if (context.role === 'Cliente Perfilado') {
       securityClause = `\`UsuarioCreación\` = @userEmail`;
       clientParams.userEmail = email;
@@ -745,7 +751,7 @@ function updateUserConfig(email, { targetEmail, clientId, role, userForced }) {
   const bq = new BigQueryClient();
   const projectId = BQ_CREDENTIALS.project_id;
 
-  const VALID_ROLES = ['Cliente Completo', 'Cliente Creación', 'Cliente Consulta', 'Cliente Perfilado', 'Administrador'];
+  const VALID_ROLES = ['Cliente Completo', 'Cliente Creación', 'Cliente Consulta', 'Cliente Perfilado', 'Administrador', 'Coordinador General'];
 
   // 1. Actualizar Rol_Asignado en conUsuarios
   if (role) {
