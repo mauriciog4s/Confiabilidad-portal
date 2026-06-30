@@ -99,11 +99,10 @@ function getUserContext(email) {
     const allRes = bq.query(sqlAllClients);
     const allIds = allRes.map(r => r.ID_ClientesConfiabilidad);
 
+    // Tanto Administrador como Coordinador General ven todos los clientes
+    context.allowedClientIds = allIds;
     if (context.isAdmin) {
       context.adminClientIds = allIds;
-    } else {
-      // El Coordinador General ve todos los clientes en su listado normal
-      context.allowedClientIds = allIds;
     }
   }
 
