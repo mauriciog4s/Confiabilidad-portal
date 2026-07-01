@@ -1158,7 +1158,7 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
                 <label className={labelClass}>Cliente Principal <span className="text-vividRed">*</span></label>
                 <select name="clientId" value={formData.clientId} onChange={handleChange} className={inputClass}>
                   <option value="">Seleccione...</option>
-                  {userContext?.allowedClientIds?.map(id => <option key={id} value={id}>{userContext.clientNames?.[id] || id}</option>)}
+                  {userContext?.creationClientIds?.map(id => <option key={id} value={id}>{userContext.clientNames?.[id] || id}</option>)}
                 </select>
                 {clientType && <div className="mt-1.5 text-[9px] font-black text-vividBlue bg-vividBlue/5 px-2 py-0.5 rounded-lg uppercase self-start">Perfil: {clientType}</div>}
               </div>
@@ -1517,7 +1517,7 @@ const BulkUpload = ({ userContext, setView, onReload }) => {
   const [showValidationAlert, setShowValidationAlert] = useState(false);
   const [validationErrors, setValidationErrors]       = useState([]);
 
-  const clients = useMemo(() => userContext?.allowedClientIds || [], [userContext]);
+  const clients = useMemo(() => userContext?.creationClientIds || [], [userContext]);
   useEffect(() => { if (clients.length > 0 && !selectedClient) setSelectedClient(clients[0]); }, [clients]);
 
   const handleDownloadTemplate = async () => {
@@ -1700,6 +1700,8 @@ const AdminClientModal = ({ clientId, clientName, onClose, showToast }) => {
     { id: 'Cliente Completo', title: 'Completo', desc: 'Acceso total y visibilidad de todas las solicitudes del cliente.' },
     { id: 'Cliente Perfilado', title: 'Perfilado', desc: 'Acceso total, pero solo visualiza sus propias solicitudes.' },
     { id: 'Coordinador General', title: 'Coordinador', desc: 'Visualiza todos los clientes y todas las solicitudes sin restricciones.' },
+    { id: 'Coordinador EP', title: 'Coord. EP', desc: 'Crea solicitudes para todos los clientes, pero solo visualiza solicitudes de sus clientes asignados.' },
+    { id: 'Coordinador ECP', title: 'Coord. ECP', desc: 'Crea solicitudes para todos los clientes, pero solo visualiza solicitudes de sus clientes asignados.' },
   ];
 
   return (

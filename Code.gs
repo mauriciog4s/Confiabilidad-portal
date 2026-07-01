@@ -57,6 +57,7 @@ function getUserContext(email) {
     email: email,
     role: 'Cliente',
     allowedClientIds: [],
+    creationClientIds: [], // Clientes para los que puede CREAR solicitudes
     adminClientIds: [],
     clientNames: {},
     clientTypes: {},
@@ -94,19 +95,31 @@ function getUserContext(email) {
     };
   });
 
-  if (context.isAdmin || context.role === 'Coordinador General') {
+  const privilegedForCreation = ['Administrador', 'Coordinador General', 'Coordinador EP', 'Coordinador ECP'];
+  const privilegedForView     = ['Administrador', 'Coordinador General'];
+
+  if (privilegedForCreation.includes(context.role)) {
     const sqlAllClients = `SELECT ID_ClientesConfiabilidad FROM \`${projectId}.${DATASET_ID}.${TABLES.CLIENT_CONF}\``;
     const allRes = bq.query(sqlAllClients);
     const allIds = allRes.map(r => r.ID_ClientesConfiabilidad);
 
-    // Tanto Administrador como Coordinador General ven todos los clientes
-    context.allowedClientIds = allIds;
+    // Todos los privilegiados de creación ven todos los clientes para crear
+    context.creationClientIds = allIds;
+
+    // Solo los privilegiados de vista ven todos los clientes en el histórico
+    if (privilegedForView.includes(context.role)) {
+      context.allowedClientIds = allIds;
+    }
+
     if (context.isAdmin) {
       context.adminClientIds = allIds;
     }
+  } else {
+    // Para roles normales, creación = permitidos
+    context.creationClientIds = context.allowedClientIds;
   }
 
-  const fetchIds = context.isAdmin ? context.adminClientIds : context.allowedClientIds;
+  const fetchIds = [...new Set([...context.allowedClientIds, ...context.creationClientIds, ...context.adminClientIds])];
 
   if (fetchIds.length > 0) {
     const idsFormatted = fetchIds.map(id => `'${id}'`).join(',');
@@ -361,7 +374,7 @@ function createRequest(email, payload) {
 
   const context = getUserContext(email);
   if (!context.isValidUser) throw new Error("Acceso Denegado.");
-  if (!context.isAdmin && !context.allowedClientIds.includes(String(payload.clientId))) {
+  if (!context.isAdmin && !context.creationClientIds.includes(String(payload.clientId))) {
     throw new Error("No tiene permisos para crear solicitudes para este cliente.");
   }
 
@@ -425,7 +438,7 @@ function createRequest(email, payload) {
 function getTemplateName(email, { clientId }) {
   const context = getUserContext(email);
   if (!context.isValidUser) throw new Error("Acceso Denegado.");
-  if (!context.isAdmin && !context.allowedClientIds.includes(String(clientId))) {
+  if (!context.isAdmin && !context.creationClientIds.includes(String(clientId))) {
     throw new Error("No tiene permisos para descargar plantillas de este cliente.");
   }
   const bq = new BigQueryClient();
@@ -441,7 +454,7 @@ function getTemplateName(email, { clientId }) {
 function processBulkUpload(email, { csvContent, clientId }) {
   const context = getUserContext(email);
   if (!context.isValidUser) throw new Error("Acceso Denegado.");
-  if (!context.isAdmin && !context.allowedClientIds.includes(String(clientId))) {
+  if (!context.isAdmin && !context.creationClientIds.includes(String(clientId))) {
     throw new Error("No tiene permisos para cargar datos para este cliente.");
   }
 
@@ -751,7 +764,7 @@ function updateUserConfig(email, { targetEmail, clientId, role, userForced }) {
   const bq = new BigQueryClient();
   const projectId = BQ_CREDENTIALS.project_id;
 
-  const VALID_ROLES = ['Cliente Completo', 'Cliente Creación', 'Cliente Consulta', 'Cliente Perfilado', 'Administrador', 'Coordinador General'];
+  const VALID_ROLES = ['Cliente Completo', 'Cliente Creación', 'Cliente Consulta', 'Cliente Perfilado', 'Administrador', 'Coordinador General', 'Coordinador EP', 'Coordinador ECP'];
 
   // 1. Actualizar Rol_Asignado en conUsuarios
   if (role) {
