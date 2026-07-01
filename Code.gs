@@ -73,9 +73,9 @@ function getUserContext(email) {
 
   context.isValidUser = true;
   context.role = String(userResult[0].Rol_Asignado).trim();
-  if (context.role.toLowerCase() === 'administrador') {
-    context.isAdmin = true;
-  }
+  const roleLower = context.role.toLowerCase();
+
+  context.isAdmin = (roleLower === 'administrador');
 
   context.userClientConfig = {};
 
@@ -95,10 +95,15 @@ function getUserContext(email) {
     };
   });
 
-  const privilegedForCreation = ['Administrador', 'Coordinador General', 'Coordinador EP', 'Coordinador ECP'];
-  const privilegedForView     = ['Administrador', 'Coordinador General'];
+  const privilegedForCreation = ['administrador', 'coordinador general', 'coordinador ep', 'coordinador ecp'];
+  const privilegedForView     = ['administrador', 'coordinador general'];
 
-  if (privilegedForCreation.includes(context.role)) {
+  // Normalización de seguridad para flags en el context
+  context.isCoordinatorGeneral = (roleLower === 'coordinador general');
+  context.isCoordinatorEP      = (roleLower === 'coordinador ep');
+  context.isCoordinatorECP     = (roleLower === 'coordinador ecp');
+
+  if (privilegedForCreation.includes(roleLower)) {
     const sqlAllClients = `SELECT ID_ClientesConfiabilidad FROM \`${projectId}.${DATASET_ID}.${TABLES.CLIENT_CONF}\``;
     const allRes = bq.query(sqlAllClients);
     const allIds = allRes.map(r => r.ID_ClientesConfiabilidad);
@@ -107,7 +112,7 @@ function getUserContext(email) {
     context.creationClientIds = allIds;
 
     // Solo los privilegiados de vista ven todos los clientes en el histórico
-    if (privilegedForView.includes(context.role)) {
+    if (privilegedForView.includes(roleLower)) {
       context.allowedClientIds = allIds;
     }
 
@@ -191,7 +196,8 @@ function getRequests(email, { period = 'today', clientId = null } = {}) {
 
   // Tarea 8: Forzar "Mis Solicitudes" (Seguridad robusta)
   let securityClause = '';
-  if (!context.isAdmin && context.role !== 'Coordinador General') {
+  const roleLower = String(context.role || '').toLowerCase();
+  if (!context.isAdmin && roleLower !== 'coordinador general') {
     if (context.role === 'Cliente Perfilado') {
       securityClause = `\`UsuarioCreación\` = @userEmail`;
       clientParams.userEmail = email;
