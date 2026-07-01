@@ -223,6 +223,65 @@ const ToggleSwitch = ({ value, onChange, label, subLabel }) => (
   </div>
 );
 
+// ─── SEARCHABLE SELECT ───────────────────────────────────────────────────
+const SearchableSelect = ({ options, value, onChange, placeholder = "Seleccionar...", label, required }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch]   = useState('');
+  const containerRef = useRef(null);
+
+  const filteredOptions = useMemo(() => {
+    const sorted = [...options].sort((a, b) => a.label.localeCompare(b.label));
+    if (!search) return sorted;
+    const q = search.toLowerCase();
+    return sorted.filter(o => o.label.toLowerCase().includes(q) || String(o.value).toLowerCase().includes(q));
+  }, [options, search]);
+
+  const selectedLabel = useMemo(() => options.find(o => String(o.value) === String(value))?.label || "", [options, value]);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.ref?.current?.contains?.(e.target) && !containerRef.current.contains(e.target)) setIsOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div className="flex flex-col relative" ref={containerRef}>
+      {label && <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider mb-1.5 block">{label} {required && <span className="text-vividRed">*</span>}</label>}
+      <div onClick={() => setIsOpen(!isOpen)}
+        className="w-full border border-gray-200 rounded-xl p-2.5 text-xs bg-white flex items-center justify-between cursor-pointer hover:border-gray-300 transition-all min-h-[38px]">
+        <span className={selectedLabel ? "text-gray-800 font-bold" : "text-gray-400"}>{selectedLabel || placeholder}</span>
+        <Icon name="ChevronRight" size={14} className={`text-gray-400 transition-transform ${isOpen ? 'rotate-90' : 'rotate-0'}`}/>
+      </div>
+
+      {isOpen && (
+        <div className="absolute z-[60] top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden animate-fade-in flex flex-col max-h-64">
+          <div className="p-2 border-b border-gray-100 bg-gray-50">
+            <div className="relative">
+              <Icon name="Search" size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400"/>
+              <input autoFocus type="text" value={search} onChange={e => setSearch(e.target.value)}
+                placeholder="Buscar..." className="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:ring-1 focus:ring-vividBlue outline-none"/>
+            </div>
+          </div>
+          <div className="overflow-y-auto flex-1 custom-scrollbar">
+            {filteredOptions.length === 0 ? (
+              <div className="p-4 text-center text-gray-400 text-xs italic">No hay resultados.</div>
+            ) : (
+              filteredOptions.map(o => (
+                <div key={o.value} onClick={() => { onChange(o.value); setIsOpen(false); setSearch(''); }}
+                  className={`px-4 py-2 text-xs cursor-pointer transition-colors ${String(o.value) === String(value) ? 'bg-vividBlue text-white font-bold' : 'text-gray-700 hover:bg-gray-100'}`}>
+                  {o.label}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── SECCIÓN DIVISORA DEL FORMULARIO ─────────────────────────────────────
 // Sección minimalista: línea divisora + ícono + título, sin tarjeta propia
 const FormSection = ({ icon, title, children }) => (
@@ -1154,14 +1213,13 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
           <div className="p-6">
           <FormSection icon="Building" title="1. Información del Cliente">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              <div className={fieldClass}>
-                <label className={labelClass}>Cliente Principal <span className="text-vividRed">*</span></label>
-                <select name="clientId" value={formData.clientId} onChange={handleChange} className={inputClass}>
-                  <option value="">Seleccione...</option>
-                  {userContext?.creationClientIds?.map(id => <option key={id} value={id}>{userContext.clientNames?.[id] || id}</option>)}
-                </select>
-                {clientType && <div className="mt-1.5 text-[9px] font-black text-vividBlue bg-vividBlue/5 px-2 py-0.5 rounded-lg uppercase self-start">Perfil: {clientType}</div>}
-              </div>
+              <SearchableSelect
+                label="Cliente"
+                required
+                value={formData.clientId}
+                onChange={val => handleChange({ target: { name: 'clientId', value: val } })}
+                options={userContext?.creationClientIds?.map(id => ({ value: id, label: userContext.clientNames?.[id] || id })) || []}
+              />
               <div className={fieldClass}>
                 <label className={labelClass}>NIT</label>
                 <input type="text" readOnly value={formData.nit} className={`${inputClass} bg-gray-50 font-mono font-bold cursor-not-allowed`}/>
@@ -1618,11 +1676,14 @@ const BulkUpload = ({ userContext, setView, onReload }) => {
     <div className="p-6 md:p-8 max-w-4xl mx-auto animate-fade-in">
       <h2 className="text-2xl font-bold text-gray-800 mb-6">Carga Masiva</h2>
       <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200">
-        <div className="mb-8 max-w-xs"><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Cliente</label>
-          <select value={selectedClient} onChange={e => setSelectedClient(e.target.value)} className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-1 focus:ring-appBlue outline-none">
-            <option value="">Seleccione...</option>
-            {clients.map(id => <option key={id} value={id}>{userContext?.clientNames?.[id] || id}</option>)}
-          </select>
+        <div className="mb-8 max-w-sm">
+          <SearchableSelect
+            label="Cliente"
+            required
+            value={selectedClient}
+            onChange={val => setSelectedClient(val)}
+            options={clients.map(id => ({ value: id, label: userContext?.clientNames?.[id] || id }))}
+          />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div className="border-r border-gray-100 pr-6">
