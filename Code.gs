@@ -241,7 +241,7 @@ function getRequests(email, { period = 'today', clientId = null } = {}) {
     Fecha_Entrega_EP AS FechaEntregaEP, 
     ID_Cliente, UsuarioActualizacion, \`UsuarioCreación\`
   `;
-  const sqlView = `SELECT ${sqlColumns} FROM \`${tableView}\` ${buildWhere()} ORDER BY FechaSolicitud DESC LIMIT 500`;
+  const sqlView = `SELECT ${sqlColumns} FROM \`${tableView}\` ${buildWhere()} ORDER BY FechaSolicitud DESC LIMIT 5000`;
   let rowsView = [];
   try {
     rowsView = bq.query(sqlView, clientParams);
