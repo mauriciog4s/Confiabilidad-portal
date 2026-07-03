@@ -983,6 +983,12 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
   });
 
   const ciudadesList           = useMemo(() => masterData?.conCiudades || [], [masterData]);
+  const searchableCiudadesList = useMemo(() => {
+    const list = ciudadesList.length > 0
+      ? ciudadesList.map(c => ({ value: c.Ciudades, label: c.Ciudades }))
+      : ['Bogotá','Medellín','Cali','Barranquilla','Otra'].map(c => ({ value: c, label: c }));
+    return list;
+  }, [ciudadesList]);
   const ciudadesPoligrafiaList = useMemo(() => masterData?.conPoligrafias || [], [masterData]);
   const clienteProyectoList    = useMemo(() => masterData?.ClienteProyecto || [], [masterData]);
   const lineaCCList            = useMemo(() => masterData?.LineaCC || [], [masterData]);
@@ -1343,15 +1349,13 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
           <div className="p-6">
           <FormSection icon="MapPin" title="3. Ubicación">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
-              <div className={fieldClass}>
-                <label className={labelClass}>Ciudad <span className="text-vividRed">*</span></label>
-                <select name="ciudad" value={formData.ciudad} onChange={handleChange} className={inputClass}>
-                  <option value="">Seleccione...</option>
-                  {ciudadesList.length > 0
-                    ? ciudadesList.map((c,i) => <option key={i} value={c.Ciudades}>{c.Ciudades}</option>)
-                    : ['Bogotá','Medellín','Cali','Barranquilla','Otra'].map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
+              <SearchableSelect
+                label="Ciudad"
+                required
+                value={formData.ciudad}
+                onChange={val => handleChange({ target: { name: 'ciudad', value: val } })}
+                options={searchableCiudadesList}
+              />
               <div className={fieldClass}>
                 <label className={labelClass}>Barrio</label>
                 <input type="text" name="barrio" value={formData.barrio} onChange={handleChange} className={inputClass}/>
