@@ -40,6 +40,11 @@ function apiHandler(request) {
       case 'updateClientConfig': return updateClientConfig(userEmail, payload);
       case 'getClientUsers':    return getClientUsers(userEmail, payload);
       case 'updateUserConfig':  return updateUserConfig(userEmail, payload);
+      case 'getFileBase64': return getFileBase64(payload);
+      
+      // 👉 AQUÍ AGREGAMOS LA NUEVA RUTA PARA LA VISTA PREVIA:
+      case 'getFileIdByName':   return getFileIdByName(payload);
+      
       default: throw new Error(`Endpoint desconocido: ${endpoint}`);
     }
   } catch (err) {
@@ -901,4 +906,158 @@ function diagnosticarTablaTemporal() {
   const sql = `SELECT column_name FROM \`g4s-shared-tz1.Confiabilidad.INFORMATION_SCHEMA.COLUMNS\` WHERE table_name = 'conSolicitudesTemporal' ORDER BY ordinal_position`;
   const result = bq.query(sql);
   console.log(result.map(r => r.column_name).join('\n'));
+}
+
+
+
+function buscarInformesEnVistaPrincipal() {
+  const bq = new BigQueryClient();
+  const projectId = BQ_CREDENTIALS.project_id;
+  
+  // Usamos las variables dinámicas de tu Config.gs para ir a la vista correcta
+  const vistaPrincipal = `${projectId}.${DATASET_ID}.${TABLES.READ_VIEW}`;
+  
+  const sql = `
+    SELECT 
+      Identificacion,
+      NombreCompleto, 
+      EstadoActual,
+      ArchivoInforme 
+    FROM \`${vistaPrincipal}\`
+    WHERE ArchivoInforme IS NOT NULL 
+      AND ArchivoInforme != '' 
+      AND ArchivoInforme != 'None'
+      AND ArchivoInforme != 'null'
+    LIMIT 5
+  `;
+  
+  try {
+    console.log(`Buscando en la vista histórica: ${vistaPrincipal}...`);
+    const result = bq.query(sql);
+    
+    if (result.length === 0) {
+      console.log("No se encontraron PDFs válidos tampoco en la vista principal.");
+    } else {
+      console.log("✅ Registros con Informe Final en el histórico:");
+      console.log(JSON.stringify(result, null, 2));
+    }
+  } catch (err) {
+    console.error("Error consultando la vista principal:", err.message);
+  }
+}
+
+function validarCedulaEnVistaPrincipal() {
+  const bq = new BigQueryClient();
+  const projectId = BQ_CREDENTIALS.project_id;
+  
+  // Apuntamos directo a la vista que ya sabemos que tiene los datos finales
+  const vistaPrincipal = `${projectId}.${DATASET_ID}.${TABLES.READ_VIEW}`;
+  const numeroCedula = '1062311344';
+  
+  const sql = `
+    SELECT 
+      Identificacion,
+      NombreCompleto, 
+      EstadoActual,
+      ArchivoInforme 
+    FROM \`${vistaPrincipal}\`
+    WHERE Identificacion = @cedula
+  `;
+  
+  try {
+    console.log(`Buscando la cédula ${numeroCedula} en el histórico final...`);
+    const result = bq.query(sql, { cedula: numeroCedula });
+    
+    if (result.length === 0) {
+      console.log(`❌ La cédula no existe en el histórico. Sigue en temporal o fue borrada.`);
+    } else {
+      console.log(`✅ Resultado de la cédula:`);
+      console.log(JSON.stringify(result, null, 2));
+    }
+  } catch (err) {
+    console.error("Error consultando la base de datos:", err.message);
+  }
+}
+
+function verIDsDeLaCedula() {
+  const bq = new BigQueryClient();
+  const projectId = BQ_CREDENTIALS.project_id;
+  const vistaPrincipal = `${projectId}.${DATASET_ID}.${TABLES.READ_VIEW}`;
+  
+  const sql = `
+    SELECT 
+      ID_SolicitudesConfiabilidad,
+      NSolicitud,
+      Identificacion,
+      EstadoActual,
+      ArchivoInforme,
+      FechaSolicitud
+    FROM \`${vistaPrincipal}\`
+    WHERE Identificacion = '1123414899'
+  `;
+  
+  try {
+    const result = bq.query(sql);
+    console.log(JSON.stringify(result, null, 2));
+  } catch (err) {
+    console.error("Error:", err.message);
+  }
+}
+
+
+function api_getFileBase64(payload) {
+  try {
+    const filename = payload.filename;
+    
+    const base64 = Utilities.base64Encode(file.getBlob().getBytes());
+    const mimeType = file.getMimeType();
+    
+    return { success: true, base64: base64, mimeType: mimeType };
+  } catch (e) {
+    return { error: true, message: e.message };
+  }
+}
+
+function getFileBase64(payload) {
+  try {
+    const filename = payload.filename;
+    const files = DriveApp.getFilesByName(filename);
+    
+    if (files.hasNext()) {
+      const file = files.next();
+      // Convierte el archivo a texto (Base64)
+      const base64 = Utilities.base64Encode(file.getBlob().getBytes());
+      const mimeType = file.getMimeType();
+      
+      return { success: true, base64: base64, mimeType: mimeType };
+    } else {
+      return { success: false, message: "Archivo no encontrado en Drive" };
+    }
+  } catch (error) {
+    return { success: false, message: error.message };
+  }
+}
+
+
+
+// Añade esto en tu backend (Code.gs)
+function getFileIdByName(payload) {
+  try {
+    const filename = payload.filename;
+    // Busca el archivo en Drive por su nombre exacto
+    const files = DriveApp.getFilesByName(filename);
+    
+    if (files.hasNext()) {
+      const file = files.next();
+      return { success: true, id: file.getId() };
+    } else {
+      return { success: false, message: "Archivo no encontrado en Drive" };
+    }
+  } catch (error) {
+    return { success: false, message: error.message };
+  }
+}
+
+function forzarPermisos() {
+  DriveApp.getFiles();
 }
