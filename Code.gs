@@ -232,6 +232,7 @@ function getRequests(email, { period = 'today', clientId = null } = {}) {
     if (clientClause)   parts.push(clientClause);
     if (dateClause)     parts.push(dateClause);
     if (securityClause) parts.push(securityClause);
+    parts.push(`(EstadoActual IS NULL OR EstadoActual != 'Depurada')`);
     if (extra)          parts.push(extra);
     return parts.length > 0 ? `WHERE ${parts.join(' AND ')}` : '';
   };
