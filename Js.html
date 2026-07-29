@@ -732,12 +732,141 @@ const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onCh
   );
 };
 
+
+
+// ─── MODAL DE VISTA PREVIA DE ARCHIVOS (VERSIÓN HÍBRIDA) ──────────────
+const FilePreviewModal = ({ file, onClose }) => {
+  const [fileUrl, setFileUrl] = React.useState(null);
+  const [fileType, setFileType] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState(null);
+
+  React.useEffect(() => {
+    if (!file || !file.name) return;
+    
+    let urlToRevoke = null;
+    setLoading(true);
+    setError(null);
+    setFileUrl(null);
+    setFileType(null);
+
+    // Pedimos el archivo en Base64 al backend
+    runServer('getFileBase64', { filename: file.name })
+      .then(response => {
+        if (response.success && response.base64) {
+          const mime = response.mimeType || 'application/pdf';
+          setFileType(mime);
+          
+          // 1. Convertimos el texto Base64 a un Array Binario
+          const byteCharacters = atob(response.base64);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          
+          // 2. Creamos un "Blob"
+          const blob = new Blob([byteArray], { type: mime });
+          
+          // 3. Generamos la URL local
+          urlToRevoke = URL.createObjectURL(blob);
+          setFileUrl(urlToRevoke);
+        } else {
+          throw new Error(response.message || "No se obtuvieron datos del archivo.");
+        }
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setError("Error al procesar el archivo. Es posible que el formato no sea compatible.");
+        setLoading(false);
+      });
+
+    return () => {
+      if (urlToRevoke) URL.revokeObjectURL(urlToRevoke);
+    };
+  }, [file]);
+
+  if (!file || !file.name) return null;
+
+  // Verificamos si es una imagen
+  const isImage = fileType && fileType.startsWith('image/');
+
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 md:p-6 bg-black/70 backdrop-blur-sm animate-fade-in">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl h-full max-h-[90vh] flex flex-col overflow-hidden animate-scale-in">
+        
+        <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-100 text-blue-600 rounded-lg shadow-sm">
+              <Icon name="FileText" size={18}/>
+            </div>
+            <h3 className="font-bold text-gray-800 truncate max-w-md">
+              {file.label || file.name}
+            </h3>
+          </div>
+          <button onClick={onClose} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors">
+            <Icon name="X" size={24}/>
+          </button>
+        </div>
+        
+        <div className="flex-1 bg-gray-200 relative flex items-center justify-center overflow-hidden">
+          {loading && (
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+              <span className="text-gray-500 font-bold text-sm">Preparando documento...</span>
+            </div>
+          )}
+          
+          {error && (
+            <div className="flex flex-col items-center gap-2 text-red-500 bg-white p-6 rounded-2xl shadow-sm">
+              <Icon name="AlertTriangle" size={32} />
+              <span className="font-bold text-center">{error}</span>
+            </div>
+          )}
+          
+          {(!loading && !error && fileUrl) && (
+            isImage ? (
+              // Si es imagen, la pintamos (Chrome no bloquea esto)
+              <div className="p-4 w-full h-full flex justify-center items-center">
+                <img src={fileUrl} alt="Vista Previa" className="max-w-full max-h-full object-contain shadow-lg rounded-lg" />
+              </div>
+            ) : (
+              // Si es PDF o documento, mostramos interfaz amigable en vez del iframe bloqueado
+              <div className="flex flex-col items-center justify-center p-8 text-center h-full w-full bg-white">
+                <Icon name="FileText" size={64} className="text-gray-300 mb-4" />
+                <h4 className="text-xl font-bold text-gray-700 mb-2">Documento Listo</h4>
+                <p className="text-sm text-gray-500 max-w-md mb-8">
+                  Por políticas de seguridad del navegador, este tipo de documento no se puede incrustar aquí. Elige una opción:
+                </p>
+                <div className="flex flex-col md:flex-row gap-4">
+                  <a href={fileUrl} target="_blank" rel="noreferrer" 
+                     className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black uppercase text-[11px] flex items-center gap-2 shadow-lg transition-all">
+                    <Icon name="Search" size={16} /> Abrir en nueva pestaña
+                  </a>
+                  <a href={fileUrl} download={file.name} 
+                     className="px-6 py-3 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl font-black uppercase text-[11px] flex items-center gap-2 shadow-sm transition-all">
+                    <Icon name="Download" size={16} /> Descargar Archivo
+                  </a>
+                </div>
+              </div>
+            )
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
+
 // ─── DETALLE DE SOLICITUD ─────────────────────────────────────────────────
 const RequestDetail = ({ requestId, onBack, preloadedData }) => {
   const [detailData, setDetailData] = useState(null);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState(null);
   const [fileStates, setFileStates] = useState({});
+  const [previewFile, setPreviewFile] = useState(null); // Estado para el modal
 
   useEffect(() => {
     setLoading(true); setError(null);
@@ -753,18 +882,21 @@ const RequestDetail = ({ requestId, onBack, preloadedData }) => {
     let path = null;
     if (typeof input === 'string') path = input;
     else if (typeof input === 'object' && input !== null) path = input.Documento || input.URL || input.Archivo || input.NombreArchivo;
+    
     if (!path) return alert("Datos de documento inválidos o sin ruta.");
     const filename = path.split(/[/\\]/).pop();
     if (!filename) return alert("No se pudo obtener el nombre del archivo.");
+    
     updateFileStatus(filename, 'loading', 'Iniciando descarga...');
-    const iframe = document.createElement('iframe');
-    iframe.style.display = "none";
-    iframe.src = `${PROXY_URL}?filename=${encodeURIComponent(filename)}&token=${PROXY_TOKEN}`;
-    document.body.appendChild(iframe);
-    setTimeout(() => {
-      updateFileStatus(filename, 'success', 'Descarga iniciada ✓');
-      setTimeout(() => { if (document.body.contains(iframe)) document.body.removeChild(iframe); }, 60000);
-    }, 3000);
+    const urlDescarga = `${PROXY_URL}?filename=${encodeURIComponent(filename)}&token=${PROXY_TOKEN}`;
+    
+    try {
+      window.open(urlDescarga, '_blank');
+      updateFileStatus(filename, 'success', 'Descarga solicitada ✓');
+    } catch (error) {
+      alert("Error al intentar abrir la descarga: " + error.message);
+      updateFileStatus(filename, 'error', 'Falló la descarga');
+    }
   };
 
   if (loading) return (
@@ -816,6 +948,12 @@ const RequestDetail = ({ requestId, onBack, preloadedData }) => {
     if (!path) return null;
     const filename = path.split(/[/\\]/).pop();
     const fs = fileStates[filename] || {};
+    
+    // Dispara el modal con el nombre del archivo para pedir el Base64
+    const handlePreview = () => {
+      setPreviewFile({ name: filename, label: label || filename });
+    };
+
     return (
       <div className="flex items-center justify-between bg-blue-50 p-2.5 rounded border border-blue-100 mb-2">
         <div className="flex items-center gap-3 overflow-hidden flex-1">
@@ -826,10 +964,18 @@ const RequestDetail = ({ requestId, onBack, preloadedData }) => {
             {fs.message && <div className={`text-[9px] font-bold ${fs.status==='success'?'text-green-600':'text-blue-500'}`}>{fs.message}</div>}
           </div>
         </div>
-        <button onClick={() => handleDownload(path)} disabled={fs.status==='loading'}
-          className={`ml-2 p-2 rounded-lg transition ${fs.status==='loading' ? 'opacity-50 cursor-not-allowed' : 'bg-white text-blue-600 hover:bg-blue-600 hover:text-white shadow-sm'}`}>
-          <Icon name={fs.status==='loading'?'RefreshCw':'Download'} size={15} className={fs.status==='loading'?'animate-spin':''}/>
-        </button>
+        
+        <div className="flex items-center gap-2 ml-2">
+          <button onClick={handlePreview} title="Previsualizar archivo"
+            className="p-2 rounded-lg bg-white text-blue-600 hover:bg-blue-100 shadow-sm transition">
+            <Icon name="Search" size={15} />
+          </button>
+          
+          <button onClick={() => handleDownload(path)} disabled={fs.status==='loading'} title="Descargar archivo"
+            className={`p-2 rounded-lg transition ${fs.status==='loading' ? 'opacity-50 cursor-not-allowed' : 'bg-white text-blue-600 hover:bg-blue-600 hover:text-white shadow-sm'}`}>
+            <Icon name={fs.status==='loading'?'RefreshCw':'Download'} size={15} className={fs.status==='loading'?'animate-spin':''}/>
+          </button>
+        </div>
       </div>
     );
   };
@@ -850,7 +996,7 @@ const RequestDetail = ({ requestId, onBack, preloadedData }) => {
               <DetailField label="Programación Poligrafía" value={formatDateCO(header.ProgramacionPoligrafia)}/>
               <DetailField label="Fecha Entrega ECP"       value={formatDateCO(header.FechaEntregaECP)}/>
               <DetailField label="Fecha Entrega EP"        value={formatDateCO(header.FechaEntregaEP)}/>
-              {header.ArchivoInforme && (
+              {header.ArchivoInforme && header.ArchivoInforme !== 'None' && header.ArchivoInforme !== 'null' && (
                 <>
                   <div className="col-span-2 mt-1 border-b border-gray-200 pb-1"><h4 className="text-xs font-bold text-green-600 uppercase">Informe Final</h4></div>
                   <div className="col-span-2"><DownloadRow path={header.ArchivoInforme} label="Informe Final"/></div>
@@ -948,9 +1094,18 @@ const RequestDetail = ({ requestId, onBack, preloadedData }) => {
           )}
         </div>
       </div>
+
+      {/* Renderizamos el modal de vista previa aquí mismo */}
+      <FilePreviewModal 
+        file={previewFile} 
+        onClose={() => setPreviewFile(null)} 
+      />
+
     </div>
   );
 };
+
+
 
 // ─── CREAR SOLICITUD ──────────────────────────────────────────────────────
 const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
