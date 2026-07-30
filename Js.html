@@ -1006,6 +1006,7 @@ const RequestDetail = ({ requestId, onBack, preloadedData }) => {
               <DetailField label="Nombre Completo"       value={header.NombreCompleto}/>
               <DetailField label="Tipo Identificación"   value={header.TipoIdentificacion}/>
               <DetailField label="Identificación"        value={header.Identificacion}/>
+              <DetailField label="Fecha Expedición"      value={formatDateCO(header.FechaExpedicion, false)}/>
               <DetailField label="Cargo"                 value={header.Cargo}/>
               <DetailField label="Ciudad"                value={header.Ciudad}/>
               <DetailField label="Dirección"             value={header.Direccion}/>
