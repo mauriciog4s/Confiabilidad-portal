@@ -74,7 +74,84 @@ const formatDateCO = (dateInput, includeTime = true) => {
 const runServer = (endpoint, payload = {}) => {
   return new Promise((resolve, reject) => {
     if (typeof google === 'undefined' || !google.script) {
-      setTimeout(() => resolve({ success: true, message: 'Mock', data: [], total: 0 }), 400);
+      setTimeout(() => {
+        if (endpoint === 'getUserContext') {
+          resolve({
+            isValidUser: true,
+            role: 'Administrador',
+            isAdmin: true,
+            email: 'mock.admin@g4s.com',
+            allowedClientIds: ['client-1'],
+            creationClientIds: ['client-1'],
+            clientNames: {'client-1': 'CLIENTE DE PRUEBA G4S'},
+            clientTypes: {'client-1': 'Externo'},
+            userClientConfig: {'client-1': {forcedMyRequests: false}}
+          });
+        } else if (endpoint === 'getMasterData') {
+          resolve({
+            conCiudades: [{ Ciudad: 'BOGOTA D.C.-BOGOTA D.C.' }, { Ciudad: 'MEDELLIN' }],
+            conPoligrafias: [{ Ciudad: 'Bogotá' }, { Ciudad: 'Medellín' }, { Ciudad: 'Cali' }]
+          });
+        } else if (endpoint === 'getRequests') {
+          resolve({
+            data: [
+              {
+                ID_Solicitud: 'SOL-001',
+                ID_SolicitudesConfiabilidad: 'SOL-001',
+                ID_Cliente: 'client-1',
+                UsuarioCreación: 'mock.admin@g4s.com',
+                NombreCompleto: 'JUAN PEREZ',
+                Identificacion: '12345678',
+                TipoIdentificacion: 'Cédula de Ciudadanía',
+                EstadoActual: 'Ingresada',
+                FechaSolicitud: new Date().toISOString().replace('T', ' ').slice(0, 19),
+                RazonSocial: 'CLIENTE DE PRUEBA G4S',
+                EstudiosPoligrafia: 'SI',
+                TipoPoligrafia: 'Preempleo',
+                CiudadP: 'Bogotá'
+              }
+            ],
+            total: 1,
+            period: payload.period || 'today'
+          });
+        } else if (endpoint === 'getRequestDetail') {
+          resolve({
+            success: true,
+            header: {
+              ID_Solicitud: 'SOL-001',
+              ID_SolicitudesConfiabilidad: 'SOL-001',
+              ID_Cliente: 'client-1',
+              UsuarioCreación: 'mock.admin@g4s.com',
+              NombreCompleto: 'JUAN PEREZ',
+              Identificacion: '12345678',
+              TipoIdentificacion: 'Cédula de Ciudadanía',
+              EstadoActual: 'Ingresada',
+              FechaSolicitud: new Date().toISOString().replace('T', ' ').slice(0, 19),
+              RazonSocial: 'CLIENTE DE PRUEBA G4S',
+              EstudiosPoligrafia: 'SI',
+              TipoPoligrafia: 'Preempleo',
+              CiudadP: 'Bogotá'
+            },
+            documents: [
+              {
+                Documento: 'https://example.com/documento1.pdf',
+                NombreDocumento: 'Cédula de Ciudadanía PDF',
+                FechaActualizacion: '2026-05-15'
+              }
+            ],
+            autFirmada: [
+              {
+                Archivo: 'https://example.com/autorizacion.pdf',
+                NombreArchivo: 'Autorización Firmada PDF',
+                FechaActualizacion: '2026-05-15'
+              }
+            ],
+            services: []
+          });
+        } else {
+          resolve({ success: true, message: 'Mock', data: [], total: 0 });
+        }
+      }, 400);
       return;
     }
     google.script.run
@@ -944,7 +1021,7 @@ const RequestDetail = ({ requestId, onBack, preloadedData }) => {
       : <div className="p-4 text-center text-xs text-gray-400 italic">No hay registros.</div>
   );
 
-  const DownloadRow = ({ path, label, date }) => {
+  const DownloadRow = ({ path, label, date, hidePreview }) => {
     if (!path) return null;
     const filename = path.split(/[/\\]/).pop();
     const fs = fileStates[filename] || {};
@@ -966,10 +1043,12 @@ const RequestDetail = ({ requestId, onBack, preloadedData }) => {
         </div>
         
         <div className="flex items-center gap-2 ml-2">
-          <button onClick={handlePreview} title="Previsualizar archivo"
-            className="p-2 rounded-lg bg-white text-blue-600 hover:bg-blue-100 shadow-sm transition">
-            <Icon name="Search" size={15} />
-          </button>
+          {!hidePreview && (
+            <button onClick={handlePreview} title="Previsualizar archivo"
+              className="p-2 rounded-lg bg-white text-blue-600 hover:bg-blue-100 shadow-sm transition">
+              <Icon name="Search" size={15} />
+            </button>
+          )}
           
           <button onClick={() => handleDownload(path)} disabled={fs.status==='loading'} title="Descargar archivo"
             className={`p-2 rounded-lg transition ${fs.status==='loading' ? 'opacity-50 cursor-not-allowed' : 'bg-white text-blue-600 hover:bg-blue-600 hover:text-white shadow-sm'}`}>
@@ -1088,7 +1167,7 @@ const RequestDetail = ({ requestId, onBack, preloadedData }) => {
             <Card title="Documentos" count={detailData.documents.length}>
               {detailData.documents.map((doc, i) => (
                 <div key={i} className="px-4 py-2">
-                  <DownloadRow path={doc.Documento || doc.URL || doc.Archivo} label={doc.NombreDocumento || doc.Nombre || 'Documento'} date={doc.FechaActualizacion}/>
+                  <DownloadRow path={doc.Documento || doc.URL || doc.Archivo} label={doc.NombreDocumento || doc.Nombre || 'Documento'} date={doc.FechaActualizacion} hidePreview={true}/>
                 </div>
               ))}
             </Card>
@@ -1469,7 +1548,7 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
                   <option value="">Seleccione...</option>
                   <option value="Cédula de Ciudadanía">Cédula de Ciudadanía</option>
                   <option value="Tarjeta de Identidad">Tarjeta de Identidad</option>
-                  <option value="Cédula de Extranjería">Cédula de Extranjería</option>
+                  <option value="Cédula Extranjeria">Cédula Extranjeria</option>
                   <option value="Pasaporte">Pasaporte</option>
                   <option value="Permiso Especial">Permiso Especial</option>
                   <option value="Permiso Permanente de Trabajo">Permiso Permanente de Trabajo</option>
