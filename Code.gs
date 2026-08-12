@@ -510,7 +510,8 @@ function processBulkUpload(email, { csvContent, clientId }) {
     else if (tipo === 'ClienteProyecto') validProyectos.add(normalizeStr(row.Descripcion));
   });
 
-  const validTiposID = new Set(['CEDULA DE CIUDADANIA','TARJETA DE IDENTIDAD','CEDULA DE EXTRANJERIA','PASAPORTE','PERMISO ESPECIAL','PERMISO PERMANENTE DE TRABAJO','PEP','OTRO']);
+  const validTiposID = new Set(['CEDULA DE CIUDADANIA','TARJETA DE IDENTIDAD','CEDULA DE EXTRANJERIA','CEDULA EXTRANJERIA','PASAPORTE','PERMISO ESPECIAL','PERMISO PERMANENTE DE TRABAJO','PEP','OTRO']);
+  const validTiposPoligrafia = new Set(['PREEMPLEO', 'RUTINA', 'ESPECIFICA', 'VERIFEYE PREEMPLEO', 'VERIFEYE RUTINA', 'VERIFEYE ESPECIFICA', 'VSA PREEMPLEO', 'VSA RUTINA', 'VSA ESPECIFICA']);
 
   // Procesar CSV
   let csvString = Utilities.newBlob(Utilities.base64Decode(csvContent)).getDataAsString('UTF-8');
@@ -631,7 +632,11 @@ if (!hasData) continue;
   if (!alMenosUnaRef) validationErrors.push(`Fila ${rowNum}: Referenciacion activa pero todas las referencias están en NO — debe tener al menos una en SI`);
 }
     if (rowData.EstudiosPoligrafia === 'SI') {
-      if (!rowData.TipoPoligrafia) validationErrors.push(`Fila ${rowNum}: TipoPoligrafia es obligatorio cuando aplica EstudiosPoligrafia`);
+      if (!rowData.TipoPoligrafia) {
+        validationErrors.push(`Fila ${rowNum}: TipoPoligrafia es obligatorio cuando aplica EstudiosPoligrafia`);
+      } else if (!validTiposPoligrafia.has(normalizeStr(rowData.TipoPoligrafia))) {
+        validationErrors.push(`Fila ${rowNum}: TipoPoligrafia "${rowData.TipoPoligrafia}" no es válido`);
+      }
       if (!rowData.CiudadP)        validationErrors.push(`Fila ${rowNum}: CiudadP es obligatoria cuando aplica EstudiosPoligrafia`);
     }
 
