@@ -1036,25 +1036,54 @@ function getFileBase64(payload) {
     try { cleanName = decodeURIComponent(cleanName); } catch (e) {}
     cleanName = cleanName.split(/[/\\]/).pop().trim();
 
-    // 4. Buscar por nombre exacto en Drive
+    // 4. Buscar por nombre exacto en Drive usando getFilesByName
     if (!file && cleanName) {
       const files = DriveApp.getFilesByName(cleanName);
       if (files.hasNext()) { file = files.next(); }
     }
 
-    // 5. Buscar por entrada original si difiere
     if (!file && rawInput !== cleanName) {
       const files = DriveApp.getFilesByName(rawInput);
       if (files.hasNext()) { file = files.next(); }
     }
 
-    // 6. Búsqueda parcial en Drive si aún no se encuentra
-    if (!file && cleanName.length > 3) {
+    // 5. Buscar en Drive usando query 'title = ...' (busca en subcarpetas de AppSheet)
+    if (!file && cleanName) {
       try {
-        const query = `title contains '${cleanName.replace(/'/g, "\\'")}' and trashed = false`;
-        const searchResults = DriveApp.searchFiles(query);
-        if (searchResults.hasNext()) { file = searchResults.next(); }
-      } catch (e) { console.warn("Error en búsqueda parcial en Drive:", e.message); }
+        const queryExact = `title = '${cleanName.replace(/'/g, "\\'")}' and trashed = false`;
+        const searchRes = DriveApp.searchFiles(queryExact);
+        if (searchRes.hasNext()) { file = searchRes.next(); }
+      } catch (e) { console.warn("Error buscando por title = :", e.message); }
+    }
+
+    // 6. Búsqueda por tokens (e.g., AppSheet ID '8daa2c21', columna 'InformeEstudioPoligrafia', o sufijo '115307')
+    if (!file && cleanName) {
+      const tokens = cleanName.split(/[\._\-\/\s]+/).filter(t => t.length >= 4 && !['pdf','doc','docx','png','jpg','jpeg'].includes(t.toLowerCase()));
+      for (const token of tokens) {
+        if (file) break;
+        try {
+          const queryToken = `title contains '${token.replace(/'/g, "\\'")}' and trashed = false`;
+          const searchRes = DriveApp.searchFiles(queryToken);
+          while (searchRes.hasNext()) {
+            const candidate = searchRes.next();
+            const candName = candidate.getName().toLowerCase();
+            const targetLower = cleanName.toLowerCase();
+            // Verificar si el candidato coincide con cleanName o contiene los tokens clave
+            if (candName === targetLower || candName.includes(targetLower) || targetLower.includes(candName)) {
+              file = candidate;
+              break;
+            }
+            // Si el nombre del candidato contiene al menos 2 tokens del archivo buscado
+            const matchingTokens = tokens.filter(tok => candName.includes(tok.toLowerCase()));
+            if (matchingTokens.length >= 2) {
+              file = candidate;
+              break;
+            }
+          }
+        } catch (e) {
+          console.warn(`Error buscando token '${token}':`, e.message);
+        }
+      }
     }
 
     if (file) {

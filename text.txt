@@ -1,4 +1,0 @@
-Valida si es por una actualizacion, o cual es la razon por al que el sisitema no permite descargar archivos, estoy en al seccion: Información Detallada al descargar: Informe Poligrafía o Documentos falla y genera el siguiente mensaje: El motor de tiempo de ejecución de JavaScript seleccionado para esta secuencia de comandos no admite la depuración. El campo "runtimeVersion" del archivo de manifiesto de secuencia de comandos appsscript.json se estableció en "V8".
-
-
-
