@@ -1013,20 +1013,60 @@ function verIDsDeLaCedula() {
 
 function getFileBase64(payload) {
   try {
-    const filename = payload.filename;
-    const files = DriveApp.getFilesByName(filename);
-    
-    if (files.hasNext()) {
-      const file = files.next();
-      // Convierte el archivo a texto (Base64)
+    let rawInput = String(payload.filename || payload.path || payload.id || '').trim();
+    if (!rawInput) return { success: false, message: "No se proporcionó un nombre o ID de archivo." };
+
+    let file = null;
+
+    // 1. Extraer ID de Drive si viene en formato URL (e.g., /d/1ABC.../view o id=1ABC...)
+    const driveIdMatch = rawInput.match(/\/d\/([a-zA-Z0-9_-]{20,})/i) || rawInput.match(/[?&]id=([a-zA-Z0-9_-]{20,})/i);
+    if (driveIdMatch && driveIdMatch[1]) {
+      try { file = DriveApp.getFileById(driveIdMatch[1]); }
+      catch (e) { console.warn("No se pudo obtener archivo por ID extraído:", e.message); }
+    }
+
+    // 2. Si rawInput es directamente un ID de Drive
+    if (!file && /^[a-zA-Z0-9_-]{25,}$/.test(rawInput)) {
+      try { file = DriveApp.getFileById(rawInput); }
+      catch (e) { console.warn("No se pudo obtener archivo por ID directo:", e.message); }
+    }
+
+    // 3. Limpiar el nombre del archivo (decodificar URL y remover rutas)
+    let cleanName = rawInput;
+    try { cleanName = decodeURIComponent(cleanName); } catch (e) {}
+    cleanName = cleanName.split(/[/\\]/).pop().trim();
+
+    // 4. Buscar por nombre exacto en Drive
+    if (!file && cleanName) {
+      const files = DriveApp.getFilesByName(cleanName);
+      if (files.hasNext()) { file = files.next(); }
+    }
+
+    // 5. Buscar por entrada original si difiere
+    if (!file && rawInput !== cleanName) {
+      const files = DriveApp.getFilesByName(rawInput);
+      if (files.hasNext()) { file = files.next(); }
+    }
+
+    // 6. Búsqueda parcial en Drive si aún no se encuentra
+    if (!file && cleanName.length > 3) {
+      try {
+        const query = `title contains '${cleanName.replace(/'/g, "\\'")}' and trashed = false`;
+        const searchResults = DriveApp.searchFiles(query);
+        if (searchResults.hasNext()) { file = searchResults.next(); }
+      } catch (e) { console.warn("Error en búsqueda parcial en Drive:", e.message); }
+    }
+
+    if (file) {
       const base64 = Utilities.base64Encode(file.getBlob().getBytes());
       const mimeType = file.getMimeType();
-      
-      return { success: true, base64: base64, mimeType: mimeType };
+      const fileName = file.getName();
+      return { success: true, base64: base64, mimeType: mimeType, fileName: fileName };
     } else {
-      return { success: false, message: "Archivo no encontrado en Drive" };
+      return { success: false, message: `Archivo no encontrado en Drive ("${cleanName}")` };
     }
   } catch (error) {
+    console.error("Error en getFileBase64:", error.message);
     return { success: false, message: error.message };
   }
 }
