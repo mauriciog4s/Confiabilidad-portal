@@ -1011,19 +1011,6 @@ function verIDsDeLaCedula() {
 }
 
 
-function api_getFileBase64(payload) {
-  try {
-    const filename = payload.filename;
-    
-    const base64 = Utilities.base64Encode(file.getBlob().getBytes());
-    const mimeType = file.getMimeType();
-    
-    return { success: true, base64: base64, mimeType: mimeType };
-  } catch (e) {
-    return { error: true, message: e.message };
-  }
-}
-
 function getFileBase64(payload) {
   try {
     const filename = payload.filename;
