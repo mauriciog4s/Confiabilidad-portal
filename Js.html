@@ -955,24 +955,46 @@ const RequestDetail = ({ requestId, onBack, preloadedData }) => {
   const updateFileStatus = (fileName, status, message = "") =>
     setFileStates(prev => ({ ...prev, [fileName]: { status, message } }));
 
-  const handleDownload = (input) => {
+  const handleDownload = async (input) => {
     let path = null;
     if (typeof input === 'string') path = input;
-    else if (typeof input === 'object' && input !== null) path = input.Documento || input.URL || input.Archivo || input.NombreArchivo;
+    else if (typeof input === 'object' && input !== null) path = input.InformeEstudioPoligrafia || input.Documento || input.URL || input.Archivo || input.NombreArchivo;
     
     if (!path) return alert("Datos de documento inválidos o sin ruta.");
     const filename = path.split(/[/\\]/).pop();
     if (!filename) return alert("No se pudo obtener el nombre del archivo.");
     
     updateFileStatus(filename, 'loading', 'Iniciando descarga...');
-    const urlDescarga = `${PROXY_URL}?filename=${encodeURIComponent(filename)}&token=${PROXY_TOKEN}`;
     
     try {
-      window.open(urlDescarga, '_blank');
-      updateFileStatus(filename, 'success', 'Descarga solicitada ✓');
+      const response = await runServer('getFileBase64', { filename: path });
+      if (response && response.success && response.base64) {
+        const mime = response.mimeType || 'application/octet-stream';
+        const downloadName = response.fileName || filename;
+        const byteCharacters = atob(response.base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: mime });
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = downloadName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+        updateFileStatus(filename, 'success', 'Descargado ✓');
+      } else {
+        const errMsg = response?.message || "Archivo no disponible en el almacenamiento.";
+        alert("Error al descargar el archivo: " + errMsg);
+        updateFileStatus(filename, 'error', errMsg);
+      }
     } catch (error) {
-      alert("Error al intentar abrir la descarga: " + error.message);
-      updateFileStatus(filename, 'error', 'Falló la descarga');
+      alert("Error en la solicitud de descarga: " + error.message);
+      updateFileStatus(filename, 'error', error.message);
     }
   };
 
@@ -1834,9 +1856,35 @@ const BulkUpload = ({ userContext, setView, onReload }) => {
     try {
       const response = await runServer('getTemplateName', { clientId: selectedClient });
       if (!response.success) throw new Error(response.message || "Error al obtener plantilla.");
+      const filename = response.filename;
+      try {
+        const fileRes = await runServer('getFileBase64', { filename });
+        if (fileRes && fileRes.success && fileRes.base64) {
+          const mime = fileRes.mimeType || 'text/csv';
+          const byteCharacters = atob(fileRes.base64);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: mime });
+          const blobUrl = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = blobUrl;
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+          setDownloading(false);
+          return;
+        }
+      } catch (e) {
+        console.warn("Fallo descarga directa de plantilla, usando iframe proxy...", e);
+      }
       const iframe = document.createElement('iframe');
       iframe.style.display = "none";
-      iframe.src = `${PROXY_URL}?filename=${encodeURIComponent(response.filename)}&token=${PROXY_TOKEN}`;
+      iframe.src = `${PROXY_URL}?filename=${encodeURIComponent(filename)}&token=${PROXY_TOKEN}`;
       document.body.appendChild(iframe);
       setTimeout(() => { setDownloading(false); setTimeout(() => { if(document.body.contains(iframe)) document.body.removeChild(iframe); }, 60000); }, 3000);
     } catch (e) { alert("Error: " + e.message); setDownloading(false); }
