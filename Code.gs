@@ -1011,35 +1011,114 @@ function verIDsDeLaCedula() {
 }
 
 
-function api_getFileBase64(payload) {
-  try {
-    const filename = payload.filename;
-    
-    const base64 = Utilities.base64Encode(file.getBlob().getBytes());
-    const mimeType = file.getMimeType();
-    
-    return { success: true, base64: base64, mimeType: mimeType };
-  } catch (e) {
-    return { error: true, message: e.message };
+function findFileInFolder(rootFolder, pathOrFilename) {
+  if (!rootFolder) return null;
+
+  let rawInput = String(pathOrFilename || '').trim();
+  if (!rawInput) return null;
+
+  let subfolderName = "";
+  let cleanName = rawInput;
+  try { cleanName = decodeURIComponent(cleanName); } catch (e) {}
+
+  if (cleanName.includes('/')) {
+    const parts = cleanName.split('/');
+    subfolderName = parts[0].trim();
+    cleanName = parts[parts.length - 1].trim();
+  } else if (cleanName.includes('\\')) {
+    const parts = cleanName.split('\\');
+    subfolderName = parts[0].trim();
+    cleanName = parts[parts.length - 1].trim();
   }
+
+  // 1. Si la ruta incluye una subcarpeta de AppSheet (e.g. conInformePoligrafia_Files/nombre.pdf)
+  if (subfolderName) {
+    const subfolders = rootFolder.getFoldersByName(subfolderName);
+    if (subfolders.hasNext()) {
+      const targetSubfolder = subfolders.next();
+      const files = targetSubfolder.getFilesByName(cleanName);
+      if (files.hasNext()) return files.next();
+    }
+  }
+
+  // 2. Buscar por nombre exacto en la carpeta raíz
+  const directFiles = rootFolder.getFilesByName(cleanName);
+  if (directFiles.hasNext()) return directFiles.next();
+
+  // 3. Buscar en todas las subcarpetas inmediatas de la carpeta raíz
+  const subfoldersIter = rootFolder.getFolders();
+  while (subfoldersIter.hasNext()) {
+    const sub = subfoldersIter.next();
+    const filesInSub = sub.getFilesByName(cleanName);
+    if (filesInSub.hasNext()) return filesInSub.next();
+  }
+
+  // 4. Búsqueda por query en subcarpetas de la carpeta raíz
+  try {
+    const rootId = rootFolder.getId();
+    const query = `'${rootId}' in parents and title = '${cleanName.replace(/'/g, "\\'")}' and trashed = false`;
+    const searchRes = DriveApp.searchFiles(query);
+    if (searchRes.hasNext()) return searchRes.next();
+  } catch (e) {
+    console.warn("Error buscando archivo en parents de Drive:", e.message);
+  }
+
+  return null;
 }
 
 function getFileBase64(payload) {
   try {
-    const filename = payload.filename;
-    const files = DriveApp.getFilesByName(filename);
-    
-    if (files.hasNext()) {
-      const file = files.next();
-      // Convierte el archivo a texto (Base64)
+    let rawInput = String(payload.filename || payload.path || payload.id || '').trim();
+    if (!rawInput) return { success: false, message: "No se proporcionó un nombre o ID de archivo." };
+
+    let file = null;
+
+    // 1. Si hay carpeta raíz configurada en Config.gs, buscar estrictamente dentro de ella
+    if (typeof ROOT_DRIVE_FOLDER_ID !== 'undefined' && ROOT_DRIVE_FOLDER_ID) {
+      try {
+        const rootFolder = DriveApp.getFolderById(ROOT_DRIVE_FOLDER_ID);
+        file = findFileInFolder(rootFolder, rawInput);
+      } catch (e) {
+        console.warn("Error accediendo a ROOT_DRIVE_FOLDER_ID:", e.message);
+      }
+    }
+
+    // 2. Si rawInput es un ID directo de Drive
+    if (!file && /^[a-zA-Z0-9_-]{25,}$/.test(rawInput)) {
+      try { file = DriveApp.getFileById(rawInput); }
+      catch (e) { console.warn("No se pudo obtener archivo por ID directo:", e.message); }
+    }
+
+    // 3. Extraer ID de Drive si viene en formato URL (e.g., /d/1ABC.../view)
+    if (!file) {
+      const driveIdMatch = rawInput.match(/\/d\/([a-zA-Z0-9_-]{20,})/i) || rawInput.match(/[?&]id=([a-zA-Z0-9_-]{20,})/i);
+      if (driveIdMatch && driveIdMatch[1]) {
+        try { file = DriveApp.getFileById(driveIdMatch[1]); }
+        catch (e) { console.warn("No se pudo obtener archivo por ID extraído:", e.message); }
+      }
+    }
+
+    // 4. Fallback por nombre directo sólo si no se configuró carpeta raíz
+    if (!file && (!ROOT_DRIVE_FOLDER_ID)) {
+      let cleanName = rawInput;
+      try { cleanName = decodeURIComponent(cleanName); } catch (e) {}
+      cleanName = cleanName.split(/[/\\]/).pop().trim();
+
+      const files = DriveApp.getFilesByName(cleanName);
+      if (files.hasNext()) { file = files.next(); }
+    }
+
+    if (file) {
       const base64 = Utilities.base64Encode(file.getBlob().getBytes());
       const mimeType = file.getMimeType();
-      
-      return { success: true, base64: base64, mimeType: mimeType };
+      const fileName = file.getName();
+      return { success: true, base64: base64, mimeType: mimeType, fileName: fileName };
     } else {
-      return { success: false, message: "Archivo no encontrado en Drive" };
+      let cleanName = rawInput.split(/[/\\]/).pop().trim();
+      return { success: false, message: `Archivo no encontrado en Drive ("${cleanName}")` };
     }
   } catch (error) {
+    console.error("Error en getFileBase64:", error.message);
     return { success: false, message: error.message };
   }
 }
