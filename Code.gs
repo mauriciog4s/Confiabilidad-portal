@@ -1011,57 +1011,67 @@ function verIDsDeLaCedula() {
 }
 
 
+function searchFileInFolderRecursive(folder, fileName, currentDepth, maxDepth) {
+  if (currentDepth > maxDepth) return null;
+
+  const subfolders = folder.getFolders();
+  while (subfolders.hasNext()) {
+    const sub = subfolders.next();
+    const filesInSub = sub.getFilesByName(fileName);
+    if (filesInSub.hasNext()) return filesInSub.next();
+
+    if (currentDepth < maxDepth) {
+      const foundInNested = searchFileInFolderRecursive(sub, fileName, currentDepth + 1, maxDepth);
+      if (foundInNested) return foundInNested;
+    }
+  }
+  return null;
+}
+
 function findFileInFolder(rootFolder, pathOrFilename) {
   if (!rootFolder) return null;
 
   let rawInput = String(pathOrFilename || '').trim();
   if (!rawInput) return null;
 
-  let subfolderName = "";
-  let cleanName = rawInput;
-  try { cleanName = decodeURIComponent(cleanName); } catch (e) {}
+  let cleanPath = rawInput;
+  try { cleanPath = decodeURIComponent(cleanPath); } catch (e) {}
+  cleanPath = cleanPath.replace(/\\/g, '/');
 
-  if (cleanName.includes('/')) {
-    const parts = cleanName.split('/');
-    subfolderName = parts[0].trim();
-    cleanName = parts[parts.length - 1].trim();
-  } else if (cleanName.includes('\\')) {
-    const parts = cleanName.split('\\');
-    subfolderName = parts[0].trim();
-    cleanName = parts[parts.length - 1].trim();
-  }
+  const parts = cleanPath.split('/').map(p => p.trim()).filter(p => p.length > 0);
+  if (parts.length === 0) return null;
 
-  // 1. Si la ruta incluye una subcarpeta de AppSheet (e.g. conInformePoligrafia_Files/nombre.pdf)
-  if (subfolderName) {
-    const subfolders = rootFolder.getFoldersByName(subfolderName);
-    if (subfolders.hasNext()) {
-      const targetSubfolder = subfolders.next();
-      const files = targetSubfolder.getFilesByName(cleanName);
+  const fileName = parts[parts.length - 1];
+
+  // 1. Si hay partes de ruta (e.g. Files/9053869/Informe Final.pdf o InformePoligrafia_Files_/xxx.pdf)
+  if (parts.length > 1) {
+    const folderParts = parts.slice(0, -1);
+    let currentFolder = rootFolder;
+    let pathFound = true;
+
+    for (const folderName of folderParts) {
+      const subfolders = currentFolder.getFoldersByName(folderName);
+      if (subfolders.hasNext()) {
+        currentFolder = subfolders.next();
+      } else {
+        pathFound = false;
+        break;
+      }
+    }
+
+    if (pathFound) {
+      const files = currentFolder.getFilesByName(fileName);
       if (files.hasNext()) return files.next();
     }
   }
 
   // 2. Buscar por nombre exacto en la carpeta raíz
-  const directFiles = rootFolder.getFilesByName(cleanName);
+  const directFiles = rootFolder.getFilesByName(fileName);
   if (directFiles.hasNext()) return directFiles.next();
 
-  // 3. Buscar en todas las subcarpetas inmediatas de la carpeta raíz
-  const subfoldersIter = rootFolder.getFolders();
-  while (subfoldersIter.hasNext()) {
-    const sub = subfoldersIter.next();
-    const filesInSub = sub.getFilesByName(cleanName);
-    if (filesInSub.hasNext()) return filesInSub.next();
-  }
-
-  // 4. Búsqueda por query en subcarpetas de la carpeta raíz
-  try {
-    const rootId = rootFolder.getId();
-    const query = `'${rootId}' in parents and title = '${cleanName.replace(/'/g, "\\'")}' and trashed = false`;
-    const searchRes = DriveApp.searchFiles(query);
-    if (searchRes.hasNext()) return searchRes.next();
-  } catch (e) {
-    console.warn("Error buscando archivo en parents de Drive:", e.message);
-  }
+  // 3. Búsqueda recursiva en subcarpetas (hasta profundidad 3)
+  const foundRecursive = searchFileInFolderRecursive(rootFolder, fileName, 1, 3);
+  if (foundRecursive) return foundRecursive;
 
   return null;
 }

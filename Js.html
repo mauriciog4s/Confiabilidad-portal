@@ -1050,7 +1050,7 @@ const RequestDetail = ({ requestId, onBack, preloadedData }) => {
     
     // Dispara el modal con el nombre del archivo para pedir el Base64
     const handlePreview = () => {
-      setPreviewFile({ name: filename, label: label || filename });
+      setPreviewFile({ name: path, label: label || filename });
     };
 
     return (
