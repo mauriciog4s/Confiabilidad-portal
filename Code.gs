@@ -785,12 +785,17 @@ function registerTempDocument(email, { requestId, docName, fileName }) {
   const projectId = BQ_CREDENTIALS.project_id;
   const tableId = `${projectId}.${DATASET_ID}.${TABLES.DOCS_TEMP}`;
   const docId = generateUniqueId();
+
+  const formattedPath = (fileName && String(fileName).startsWith('Documentos/'))
+    ? String(fileName)
+    : 'Documentos/' + String(fileName || '');
+
   const insertSql = `
     INSERT INTO \`${tableId}\`
     (ID_DocumentosSolicitud, ID_SolicitudesConfiabilidad, NombreDocumento, Documento, UsuarioActualziacion, FechaActualizacion, EstadoActual)
     VALUES (@docId, @reqId, @docName, @fileAlias, @user, CAST(CURRENT_TIMESTAMP() AS STRING), 'Creada')
   `;
-  bq.query(insertSql, { docId, reqId: requestId, docName, fileAlias: fileName, user: email });
+  bq.query(insertSql, { docId, reqId: requestId, docName, fileAlias: formattedPath, user: email });
   return { success: true, message: "Metadatos registrados." };
 }
 
@@ -1100,7 +1105,16 @@ function findFileInFolder(rootFolder, pathOrFilename) {
 
   const fileName = parts[parts.length - 1];
 
-  // 1. Si hay partes de ruta (e.g. Files/9053869/Informe Final.pdf o InformePoligrafia_Files_/xxx.pdf)
+  // 1. Búsqueda directa por index en la carpeta y sus subcarpetas (Rápido)
+  try {
+    const escapedName = fileName.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const searchRes = rootFolder.searchFiles(`title = '${escapedName}' and trashed = false`);
+    if (searchRes.hasNext()) return searchRes.next();
+  } catch (e) {
+    console.warn("searchFiles error:", e.message);
+  }
+
+  // 2. Si hay partes de ruta (e.g. Files/9053869/Informe Final.pdf o Documentos/xxx.pdf)
   if (parts.length > 1) {
     const folderParts = parts.slice(0, -1);
     let currentFolder = rootFolder;
@@ -1122,15 +1136,12 @@ function findFileInFolder(rootFolder, pathOrFilename) {
     }
   }
 
-  // 2. Buscar por nombre exacto en la carpeta raíz
+  // 3. Buscar por nombre exacto en la carpeta raíz
   const directFiles = rootFolder.getFilesByName(fileName);
   if (directFiles.hasNext()) return directFiles.next();
 
-  // 3. Búsqueda recursiva en subcarpetas (hasta profundidad 5)
-  const foundRecursive = searchFileInFolderRecursive(rootFolder, fileName, 1, 5);
-  if (foundRecursive) return foundRecursive;
-
-  return null;
+  // 4. Búsqueda recursiva suave como último recurso
+  return searchFileInFolderRecursive(rootFolder, fileName, 1, 3);
 }
 
 function getFileBase64(payload) {
@@ -1140,30 +1151,32 @@ function getFileBase64(payload) {
 
     let file = null;
 
-    // 1. Si hay carpetas configuradas en Config.gs, buscar en cada una (incluyendo subcarpetas)
-    const targetFolderIds = [
-      typeof ROOT_DRIVE_FOLDER_ID !== 'undefined' ? ROOT_DRIVE_FOLDER_ID : null,
-      typeof DOCS_DRIVE_FOLDER_ID !== 'undefined' ? DOCS_DRIVE_FOLDER_ID : null,
-      typeof REPORTS_DRIVE_FOLDER_ID !== 'undefined' ? REPORTS_DRIVE_FOLDER_ID : null
-    ].filter(Boolean);
+    let cleanName = rawInput;
+    try { cleanName = decodeURIComponent(cleanName); } catch (e) {}
+    cleanName = cleanName.split(/[/\\]/).pop().trim();
 
-    for (const folderId of targetFolderIds) {
-      if (file) break;
+    // 1. Búsqueda rápida por nombre global mediante índice de Drive (Mili-segundos)
+    if (cleanName) {
       try {
-        const folder = DriveApp.getFolderById(folderId);
-        file = findFileInFolder(folder, rawInput);
+        const files = DriveApp.getFilesByName(cleanName);
+        while (files.hasNext()) {
+          const candidate = files.next();
+          if (!candidate.isTrashed()) {
+            file = candidate;
+            break;
+          }
+        }
       } catch (e) {
-        console.warn(`Error accediendo a carpeta Drive (${folderId}):`, e.message);
+        console.warn("DriveApp.getFilesByName error:", e.message);
       }
     }
 
-    // 2. Si rawInput es un ID directo de Drive
+    // 2. Si es un ID directo o URL de Drive
     if (!file && /^[a-zA-Z0-9_-]{25,}$/.test(rawInput)) {
       try { file = DriveApp.getFileById(rawInput); }
       catch (e) { console.warn("No se pudo obtener archivo por ID directo:", e.message); }
     }
 
-    // 3. Extraer ID de Drive si viene en formato URL (e.g., /d/1ABC.../view)
     if (!file) {
       const driveIdMatch = rawInput.match(/\/d\/([a-zA-Z0-9_-]{20,})/i) || rawInput.match(/[?&]id=([a-zA-Z0-9_-]{20,})/i);
       if (driveIdMatch && driveIdMatch[1]) {
@@ -1172,14 +1185,23 @@ function getFileBase64(payload) {
       }
     }
 
-    // 4. Fallback por nombre directo en Drive si no se encontró en la carpeta raíz
+    // 3. Si no se encontró globalmente, buscar dentro de las carpetas configuradas
     if (!file) {
-      let cleanName = rawInput;
-      try { cleanName = decodeURIComponent(cleanName); } catch (e) {}
-      cleanName = cleanName.split(/[/\\]/).pop().trim();
+      const targetFolderIds = [
+        typeof DOCS_DRIVE_FOLDER_ID !== 'undefined' ? DOCS_DRIVE_FOLDER_ID : null,
+        typeof REPORTS_DRIVE_FOLDER_ID !== 'undefined' ? REPORTS_DRIVE_FOLDER_ID : null,
+        typeof ROOT_DRIVE_FOLDER_ID !== 'undefined' ? ROOT_DRIVE_FOLDER_ID : null
+      ].filter(Boolean);
 
-      const files = DriveApp.getFilesByName(cleanName);
-      if (files.hasNext()) { file = files.next(); }
+      for (const folderId of targetFolderIds) {
+        if (file) break;
+        try {
+          const folder = DriveApp.getFolderById(folderId);
+          file = findFileInFolder(folder, rawInput);
+        } catch (e) {
+          console.warn(`Error accediendo a carpeta Drive (${folderId}):`, e.message);
+        }
+      }
     }
 
     if (file) {
@@ -1188,7 +1210,6 @@ function getFileBase64(payload) {
       const fileName = file.getName();
       return { success: true, base64: base64, mimeType: mimeType, fileName: fileName };
     } else {
-      let cleanName = rawInput.split(/[/\\]/).pop().trim();
       return { success: false, message: `Archivo no encontrado en Drive ("${cleanName}")` };
     }
   } catch (error) {
