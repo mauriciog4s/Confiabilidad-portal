@@ -37,6 +37,7 @@ function apiHandler(request) {
       case 'getTemplateName':   return getTemplateName(userEmail, payload);
       case 'processBulkUpload': return processBulkUpload(userEmail, payload);
       case 'registerTempDocument': return registerTempDocument(userEmail, payload);
+      case 'uploadDocument':       return uploadDocument(userEmail, payload);
       case 'updateClientConfig': return updateClientConfig(userEmail, payload);
       case 'getClientUsers':    return getClientUsers(userEmail, payload);
       case 'updateUserConfig':  return updateUserConfig(userEmail, payload);
@@ -355,11 +356,36 @@ function getRequestDetail(email, { id }) {
     } catch (e) { console.warn(`[getRequestDetail] Error en ${tableName}: ${e.message}`); return []; }
   };
 
+  const getCombinedDocuments = () => {
+    const mainDocs = getChildren('conDocumentosSolicitud');
+    const tempDocs = getChildren('conDocumentosSolicitudTemporal');
+    const seen = new Set();
+    const combined = [];
+
+    mainDocs.forEach(d => {
+      const key = d.ID_DocumentosSolicitud || d.Documento;
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        combined.push(d);
+      }
+    });
+
+    tempDocs.forEach(d => {
+      const key = d.ID_DocumentosSolicitud || d.Documento;
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        combined.push(d);
+      }
+    });
+
+    return combined;
+  };
+
   return {
     header,
     services:             getChildren('conServiciosAplicar'),
     history:              getChildren('conEstadosSolicitud'),
-    documents:            getChildren('conDocumentosSolicitud'),
+    documents:            getCombinedDocuments(),
     autFirmada:           getChildren('conAutFirmada'),
     datacredito:          getChildren('conConsultaDatacredito'),
     notas:                getChildren('conNotasSolicitudes'),
@@ -721,6 +747,37 @@ if (!hasData) continue;
   };
 }
 
+function uploadDocument(email, payload) {
+  const context = getUserContext(email);
+  if (!context.isValidUser) throw new Error("Usuario no autorizado.");
+
+  const { filename, base64, mimetype } = payload;
+  if (!filename || !base64) throw new Error("Faltan datos de archivo para guardar en Drive.");
+
+  const decoded = Utilities.base64Decode(base64);
+  const blob = Utilities.newBlob(decoded, mimetype || 'application/pdf', filename);
+
+  let targetFolder = null;
+
+  if (typeof DOCS_DRIVE_FOLDER_ID !== 'undefined' && DOCS_DRIVE_FOLDER_ID) {
+    try { targetFolder = DriveApp.getFolderById(DOCS_DRIVE_FOLDER_ID); }
+    catch (e) { console.warn("Error accediendo a DOCS_DRIVE_FOLDER_ID:", e.message); }
+  }
+  if (!targetFolder && typeof ROOT_DRIVE_FOLDER_ID !== 'undefined' && ROOT_DRIVE_FOLDER_ID) {
+    try { targetFolder = DriveApp.getFolderById(ROOT_DRIVE_FOLDER_ID); }
+    catch (e) { console.warn("Error accediendo a ROOT_DRIVE_FOLDER_ID:", e.message); }
+  }
+
+  let file;
+  if (targetFolder) {
+    file = targetFolder.createFile(blob);
+  } else {
+    file = DriveApp.createFile(blob);
+  }
+
+  return { success: true, fileId: file.getId(), fileName: file.getName() };
+}
+
 function registerTempDocument(email, { requestId, docName, fileName }) {
   const context = getUserContext(email);
   if (!context.isValidUser) throw new Error("Usuario no autorizado.");
@@ -1069,8 +1126,8 @@ function findFileInFolder(rootFolder, pathOrFilename) {
   const directFiles = rootFolder.getFilesByName(fileName);
   if (directFiles.hasNext()) return directFiles.next();
 
-  // 3. Búsqueda recursiva en subcarpetas (hasta profundidad 3)
-  const foundRecursive = searchFileInFolderRecursive(rootFolder, fileName, 1, 3);
+  // 3. Búsqueda recursiva en subcarpetas (hasta profundidad 5)
+  const foundRecursive = searchFileInFolderRecursive(rootFolder, fileName, 1, 5);
   if (foundRecursive) return foundRecursive;
 
   return null;
@@ -1083,13 +1140,20 @@ function getFileBase64(payload) {
 
     let file = null;
 
-    // 1. Si hay carpeta raíz configurada en Config.gs, buscar estrictamente dentro de ella
-    if (typeof ROOT_DRIVE_FOLDER_ID !== 'undefined' && ROOT_DRIVE_FOLDER_ID) {
+    // 1. Si hay carpetas configuradas en Config.gs, buscar en cada una (incluyendo subcarpetas)
+    const targetFolderIds = [
+      typeof ROOT_DRIVE_FOLDER_ID !== 'undefined' ? ROOT_DRIVE_FOLDER_ID : null,
+      typeof DOCS_DRIVE_FOLDER_ID !== 'undefined' ? DOCS_DRIVE_FOLDER_ID : null,
+      typeof REPORTS_DRIVE_FOLDER_ID !== 'undefined' ? REPORTS_DRIVE_FOLDER_ID : null
+    ].filter(Boolean);
+
+    for (const folderId of targetFolderIds) {
+      if (file) break;
       try {
-        const rootFolder = DriveApp.getFolderById(ROOT_DRIVE_FOLDER_ID);
-        file = findFileInFolder(rootFolder, rawInput);
+        const folder = DriveApp.getFolderById(folderId);
+        file = findFileInFolder(folder, rawInput);
       } catch (e) {
-        console.warn("Error accediendo a ROOT_DRIVE_FOLDER_ID:", e.message);
+        console.warn(`Error accediendo a carpeta Drive (${folderId}):`, e.message);
       }
     }
 
@@ -1108,8 +1172,8 @@ function getFileBase64(payload) {
       }
     }
 
-    // 4. Fallback por nombre directo sólo si no se configuró carpeta raíz
-    if (!file && (!ROOT_DRIVE_FOLDER_ID)) {
+    // 4. Fallback por nombre directo en Drive si no se encontró en la carpeta raíz
+    if (!file) {
       let cleanName = rawInput;
       try { cleanName = decodeURIComponent(cleanName); } catch (e) {}
       cleanName = cleanName.split(/[/\\]/).pop().trim();
