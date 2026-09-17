@@ -355,11 +355,36 @@ function getRequestDetail(email, { id }) {
     } catch (e) { console.warn(`[getRequestDetail] Error en ${tableName}: ${e.message}`); return []; }
   };
 
+  const getCombinedDocuments = () => {
+    const mainDocs = getChildren('conDocumentosSolicitud');
+    const tempDocs = getChildren('conDocumentosSolicitudTemporal');
+    const seen = new Set();
+    const combined = [];
+
+    mainDocs.forEach(d => {
+      const key = d.ID_DocumentosSolicitud || d.Documento;
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        combined.push(d);
+      }
+    });
+
+    tempDocs.forEach(d => {
+      const key = d.ID_DocumentosSolicitud || d.Documento;
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        combined.push(d);
+      }
+    });
+
+    return combined;
+  };
+
   return {
     header,
     services:             getChildren('conServiciosAplicar'),
     history:              getChildren('conEstadosSolicitud'),
-    documents:            getChildren('conDocumentosSolicitud'),
+    documents:            getCombinedDocuments(),
     autFirmada:           getChildren('conAutFirmada'),
     datacredito:          getChildren('conConsultaDatacredito'),
     notas:                getChildren('conNotasSolicitudes'),
@@ -1069,8 +1094,8 @@ function findFileInFolder(rootFolder, pathOrFilename) {
   const directFiles = rootFolder.getFilesByName(fileName);
   if (directFiles.hasNext()) return directFiles.next();
 
-  // 3. Búsqueda recursiva en subcarpetas (hasta profundidad 3)
-  const foundRecursive = searchFileInFolderRecursive(rootFolder, fileName, 1, 3);
+  // 3. Búsqueda recursiva en subcarpetas (hasta profundidad 5)
+  const foundRecursive = searchFileInFolderRecursive(rootFolder, fileName, 1, 5);
   if (foundRecursive) return foundRecursive;
 
   return null;
@@ -1108,8 +1133,8 @@ function getFileBase64(payload) {
       }
     }
 
-    // 4. Fallback por nombre directo sólo si no se configuró carpeta raíz
-    if (!file && (!ROOT_DRIVE_FOLDER_ID)) {
+    // 4. Fallback por nombre directo en Drive si no se encontró en la carpeta raíz
+    if (!file) {
       let cleanName = rawInput;
       try { cleanName = decodeURIComponent(cleanName); } catch (e) {}
       cleanName = cleanName.split(/[/\\]/).pop().trim();
