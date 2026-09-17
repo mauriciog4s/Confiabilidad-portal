@@ -15,6 +15,8 @@ const CONFIG = {
 // Globales de acceso rápido
 const DATASET_ID = CONFIG.DATASET_ID;
 const ROOT_DRIVE_FOLDER_ID = "1hvTk7O1CZMr6jmlKy3lT2z-8vDDq1Ajd";
+const DOCS_DRIVE_FOLDER_ID = "1Wpudsa9YY487zpnem5ioq7vYqN-SlYYc";
+const REPORTS_DRIVE_FOLDER_ID = "1W3k6yVXSv7of8qsH9Wj2DD6urYF0Ydcd";
 
 const TABLES = {
   READ_VIEW:   "vistaSolicitudesCompletasFechas",

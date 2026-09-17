@@ -1108,13 +1108,20 @@ function getFileBase64(payload) {
 
     let file = null;
 
-    // 1. Si hay carpeta raíz configurada en Config.gs, buscar estrictamente dentro de ella
-    if (typeof ROOT_DRIVE_FOLDER_ID !== 'undefined' && ROOT_DRIVE_FOLDER_ID) {
+    // 1. Si hay carpetas configuradas en Config.gs, buscar en cada una (incluyendo subcarpetas)
+    const targetFolderIds = [
+      typeof ROOT_DRIVE_FOLDER_ID !== 'undefined' ? ROOT_DRIVE_FOLDER_ID : null,
+      typeof DOCS_DRIVE_FOLDER_ID !== 'undefined' ? DOCS_DRIVE_FOLDER_ID : null,
+      typeof REPORTS_DRIVE_FOLDER_ID !== 'undefined' ? REPORTS_DRIVE_FOLDER_ID : null
+    ].filter(Boolean);
+
+    for (const folderId of targetFolderIds) {
+      if (file) break;
       try {
-        const rootFolder = DriveApp.getFolderById(ROOT_DRIVE_FOLDER_ID);
-        file = findFileInFolder(rootFolder, rawInput);
+        const folder = DriveApp.getFolderById(folderId);
+        file = findFileInFolder(folder, rawInput);
       } catch (e) {
-        console.warn("Error accediendo a ROOT_DRIVE_FOLDER_ID:", e.message);
+        console.warn(`Error accediendo a carpeta Drive (${folderId}):`, e.message);
       }
     }
 
