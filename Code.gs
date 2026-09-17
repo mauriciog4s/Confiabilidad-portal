@@ -37,6 +37,7 @@ function apiHandler(request) {
       case 'getTemplateName':   return getTemplateName(userEmail, payload);
       case 'processBulkUpload': return processBulkUpload(userEmail, payload);
       case 'registerTempDocument': return registerTempDocument(userEmail, payload);
+      case 'uploadDocument':       return uploadDocument(userEmail, payload);
       case 'updateClientConfig': return updateClientConfig(userEmail, payload);
       case 'getClientUsers':    return getClientUsers(userEmail, payload);
       case 'updateUserConfig':  return updateUserConfig(userEmail, payload);
@@ -744,6 +745,37 @@ if (!hasData) continue;
     message: `Proceso finalizado. Cargados: ${successCount}, Errores técnicos: ${insertErrors}`,
     technicalErrors: insertErrorDetails
   };
+}
+
+function uploadDocument(email, payload) {
+  const context = getUserContext(email);
+  if (!context.isValidUser) throw new Error("Usuario no autorizado.");
+
+  const { filename, base64, mimetype } = payload;
+  if (!filename || !base64) throw new Error("Faltan datos de archivo para guardar en Drive.");
+
+  const decoded = Utilities.base64Decode(base64);
+  const blob = Utilities.newBlob(decoded, mimetype || 'application/pdf', filename);
+
+  let targetFolder = null;
+
+  if (typeof DOCS_DRIVE_FOLDER_ID !== 'undefined' && DOCS_DRIVE_FOLDER_ID) {
+    try { targetFolder = DriveApp.getFolderById(DOCS_DRIVE_FOLDER_ID); }
+    catch (e) { console.warn("Error accediendo a DOCS_DRIVE_FOLDER_ID:", e.message); }
+  }
+  if (!targetFolder && typeof ROOT_DRIVE_FOLDER_ID !== 'undefined' && ROOT_DRIVE_FOLDER_ID) {
+    try { targetFolder = DriveApp.getFolderById(ROOT_DRIVE_FOLDER_ID); }
+    catch (e) { console.warn("Error accediendo a ROOT_DRIVE_FOLDER_ID:", e.message); }
+  }
+
+  let file;
+  if (targetFolder) {
+    file = targetFolder.createFile(blob);
+  } else {
+    file = DriveApp.createFile(blob);
+  }
+
+  return { success: true, fileId: file.getId(), fileName: file.getName() };
 }
 
 function registerTempDocument(email, { requestId, docName, fileName }) {

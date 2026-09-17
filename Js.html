@@ -148,6 +148,13 @@ const runServer = (endpoint, payload = {}) => {
             ],
             services: []
           });
+        } else if (endpoint === 'getFileBase64') {
+          resolve({
+            success: true,
+            base64: 'JVBERi0xLjANCjEgMCBvYmo8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4gZW5kb2JqDQoyIDAgb2JqPDwgL1R5cGUgL1BhZ2VzIC9Db3VudCAwIC9LaWRzIFtdID4+IGVuZG9iag0KdHJhaWxlcjw8IC9Sb290IDEgMCBSID4+DQolRU9G',
+            mimeType: 'application/pdf',
+            fileName: payload.filename || 'documento.pdf'
+          });
         } else {
           resolve({ success: true, message: 'Mock', data: [], total: 0 });
         }
@@ -1390,9 +1397,23 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
       if (!response.success) throw new Error(response.message || "Error al crear solicitud.");
       const newId = response.requestId;
       let processed = 0;
+
+      const readFileAsBase64 = (file) => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.toString().replace(/^data:(.*,)?/, ''));
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
       for (const att of attachments) {
         const aliasName = `${newId}_${att.file.name}`;
-        await uploadFileViaProxy(att.file, aliasName);
+        try {
+          const base64Str = await readFileAsBase64(att.file);
+          await runServer('uploadDocument', { filename: aliasName, base64: base64Str, mimetype: att.file.type });
+        } catch (e) {
+          console.warn("Fallback upload via proxy:", e.message);
+          try { await uploadFileViaProxy(att.file, aliasName); } catch (pe) { console.warn("Proxy upload error:", pe.message); }
+        }
         await runServer('registerTempDocument', { requestId: newId, docName: att.name, fileName: aliasName });
         processed++;
         setUploadProgress(p => ({ ...p, current: processed }));
