@@ -785,12 +785,17 @@ function registerTempDocument(email, { requestId, docName, fileName }) {
   const projectId = BQ_CREDENTIALS.project_id;
   const tableId = `${projectId}.${DATASET_ID}.${TABLES.DOCS_TEMP}`;
   const docId = generateUniqueId();
+
+  const formattedPath = (fileName && String(fileName).startsWith('Documentos/'))
+    ? String(fileName)
+    : 'Documentos/' + String(fileName || '');
+
   const insertSql = `
     INSERT INTO \`${tableId}\`
     (ID_DocumentosSolicitud, ID_SolicitudesConfiabilidad, NombreDocumento, Documento, UsuarioActualziacion, FechaActualizacion, EstadoActual)
     VALUES (@docId, @reqId, @docName, @fileAlias, @user, CAST(CURRENT_TIMESTAMP() AS STRING), 'Creada')
   `;
-  bq.query(insertSql, { docId, reqId: requestId, docName, fileAlias: fileName, user: email });
+  bq.query(insertSql, { docId, reqId: requestId, docName, fileAlias: formattedPath, user: email });
   return { success: true, message: "Metadatos registrados." };
 }
 
