@@ -23,3 +23,17 @@ al parecer lo esta guardando en lugares distintos que ve appsheet y el portal es
 Url de Documento de una solicitud: https://drive.google.com/drive/folders/1hvTk7O1CZMr6jmlKy3lT2z-8vDDq1Ajd
 Url de reportes finales: https://drive.google.com/drive/folders/1W3k6yVXSv7of8qsH9Wj2DD6urYF0Ydcd y crea sub carpetas
 Url de las imagenes: https://drive.google.com/drive/folders/14cFp2DmUYsTtC2-GNGQ2ODyBqpcKGyJ7
+
+
+Pruebas:
+
+Url intentando abrila desde appsheet: https://www.appsheet.com/template/gettablefileurl?appName=ConfiabilidadCoordinadorV31-908904729&tableName=DocumentosSolicitud&fileName=Documentos%2FUL75YXOG_Hoja%20de%20vida%20Mauricio%20gaitan.pdf&appVersion=1.000782&signature=3a46de6a8b57ae9e3efffacddc8d08aad940ae1956658eca78d26212764c27496568fbc76e97d932c00e2f17e20ce0d2
+
+Genero: File not found
+
+Al consultar reportes anteriores de semanas atras si se puedesn descrgar y consultar sin problema
+
+Desde el portal se visualiza un Documento en el detalle pero al intentar abrirlo queda cargando y no enceuntra el documento
+
+otra prueba fue subir un documento desde appsheet, la url que se construyo fue: https://www.appsheet.com/template/gettablefileurl?appName=ConfiabilidadCoordinadorV31-908904729&tableName=DocumentosSolicitud&fileName=DocumentosSolicitud_Files_%2Fda03686c.Documento.213256.pdf&appVersion=1.000782&signature=5879c84c67aad0cd12c6bb6b37de4e4dfd1d8553ffaf594678e83b1c0b4051e4b9f6f637918a2265887d84bade19f89f la Url del Drive donde se guardo fue: https://drive.google.com/drive/folders/1U_ho50bW5rN4AOOLS39O8X9V1i6vajTl al consultarlo en el portal se ve sin inconveniente 
+
