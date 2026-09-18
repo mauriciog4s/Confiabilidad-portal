@@ -37,7 +37,6 @@ function apiHandler(request) {
       case 'getTemplateName':   return getTemplateName(userEmail, payload);
       case 'processBulkUpload': return processBulkUpload(userEmail, payload);
       case 'registerTempDocument': return registerTempDocument(userEmail, payload);
-      case 'uploadDocument':       return uploadDocument(userEmail, payload);
       case 'updateClientConfig': return updateClientConfig(userEmail, payload);
       case 'getClientUsers':    return getClientUsers(userEmail, payload);
       case 'updateUserConfig':  return updateUserConfig(userEmail, payload);
@@ -747,33 +746,9 @@ if (!hasData) continue;
   };
 }
 
-function uploadDocument(email, payload) {
-  const context = getUserContext(email);
-  if (!context.isValidUser) throw new Error("Usuario no autorizado.");
-
-  const { filename, base64, mimetype } = payload;
-  if (!filename || !base64) throw new Error("Faltan datos de archivo para guardar en Drive.");
-
-  const decoded = Utilities.base64Decode(base64);
-  const blob = Utilities.newBlob(decoded, mimetype || 'application/pdf', filename);
-
-  // Usar la MISMA carpeta que usa AppSheet según el tipo de archivo,
-  // para que el portal y AppSheet vean siempre los mismos documentos.
-  const isImage = String(mimetype || '').toLowerCase().startsWith('image/');
-  const targetFolderId = isImage ? APPSHEET_DOCS_IMAGE_FOLDER_ID : APPSHEET_DOCS_PDF_FOLDER_ID;
-
-  let targetFolder = null;
-  try {
-    targetFolder = DriveApp.getFolderById(targetFolderId);
-  } catch (e) {
-    console.warn("Error accediendo a la carpeta de AppSheet:", e.message);
-  }
-
-  const file = targetFolder ? targetFolder.createFile(blob) : DriveApp.createFile(blob);
-
-  return { success: true, fileId: file.getId(), fileName: file.getName() };
-}
-
+// NOTA: el guardado real del archivo en Drive lo hace el script "proxy"
+// (PROXY_URL en Js.html), que ya tiene permisos correctos sobre las carpetas
+// de AppSheet. Este script solo registra los metadatos del documento.
 function registerTempDocument(email, { requestId, docName, fileName }) {
   const context = getUserContext(email);
   if (!context.isValidUser) throw new Error("Usuario no autorizado.");
