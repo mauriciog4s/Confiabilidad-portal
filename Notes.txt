@@ -17,3 +17,8 @@ Como lo hace appsheet:
 - Si es una imagem lo encuentro en la carpeta: https://drive.google.com/drive/folders/14cFp2DmUYsTtC2-GNGQ2ODyBqpcKGyJ7, y genera esta Url al abrirlo: https://www.appsheet.com/template/gettablefileurl?appName=ConfiabilidadCoordinadorV31-908904729&tableName=DocumentosSolicitud&fileName=DocumentosSolicitud_Images%2F62dcd22b.Documento.150312.png&appVersion=1.000782&signature=1ae4f5a120157af705064b43a3f687f82af1559bbf56c830e9f9b60602cf14103ab36ce909b5a2f67266ee95b95944c3
 
 al parecer lo esta guardando en lugares distintos que ve appsheet y el portal es diferente, deberia usarce las rutas que usa appsheet para qeu todo coverja
+
+
+
+Url de Documento de una solicitud: https://drive.google.com/drive/folders/1hvTk7O1CZMr6jmlKy3lT2z-8vDDq1Ajd
+Url de reportes finales: https://drive.google.com/drive/folders/1W3k6yVXSv7of8qsH9Wj2DD6urYF0Ydcd y crea sub carpetas
