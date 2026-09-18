@@ -37,3 +37,11 @@ Desde el portal se visualiza un Documento en el detalle pero al intentar abrirlo
 
 otra prueba fue subir un documento desde appsheet, la url que se construyo fue: https://www.appsheet.com/template/gettablefileurl?appName=ConfiabilidadCoordinadorV31-908904729&tableName=DocumentosSolicitud&fileName=DocumentosSolicitud_Files_%2Fda03686c.Documento.213256.pdf&appVersion=1.000782&signature=5879c84c67aad0cd12c6bb6b37de4e4dfd1d8553ffaf594678e83b1c0b4051e4b9f6f637918a2265887d84bade19f89f la Url del Drive donde se guardo fue: https://drive.google.com/drive/folders/1U_ho50bW5rN4AOOLS39O8X9V1i6vajTl al consultarlo en el portal se ve sin inconveniente 
 
+Pruebas 2:
+
+Este es un docuemnto de ejemplo que si funciona en ambos lados: 3TFR15EP_doc02264020260915145231.pdf appsheet y portal , genera la Url: https://www.appsheet.com/template/gettablefileurl?appName=ConfiabilidadCoordinadorV31-908904729&tableName=DocumentosSolicitud&fileName=3TFR15EP_doc02264020260915145231.pdf&appVersion=1.000782&signature=9b16ac9e3cefb3158db535a7d82abc63b7d1e7a9c24deb8db67fa02b5399c8b51e860f45c87544d3b78d5967a62e66d0 y se guarda en el folder: https://drive.google.com/drive/folders/1hvTk7O1CZMr6jmlKy3lT2z-8vDDq1Ajd
+
+
+
+
+
