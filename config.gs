@@ -17,6 +17,10 @@ const DATASET_ID = CONFIG.DATASET_ID;
 const ROOT_DRIVE_FOLDER_ID = "1hvTk7O1CZMr6jmlKy3lT2z-8vDDq1Ajd";
 const DOCS_DRIVE_FOLDER_ID = "1Wpudsa9YY487zpnem5ioq7vYqN-SlYYc";
 const REPORTS_DRIVE_FOLDER_ID = "1W3k6yVXSv7of8qsH9Wj2DD6urYF0Ydcd";
+// Carpetas reales donde AppSheet guarda los adjuntos de conDocumentosSolicitud.
+// El portal debe usar las mismas para que ambos sistemas vean los mismos archivos.
+const APPSHEET_DOCS_PDF_FOLDER_ID   = "1U_ho50bW5rN4AOOLS39O8X9V1i6vajTl";
+const APPSHEET_DOCS_IMAGE_FOLDER_ID = "14cFp2DmUYsTtC2-GNGQ2ODyBqpcKGyJ7";
 
 const TABLES = {
   READ_VIEW:   "vistaSolicitudesCompletasFechas",
