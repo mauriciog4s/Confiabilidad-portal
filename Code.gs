@@ -1157,13 +1157,18 @@ function getFileBase64(payload) {
     }
 
     // 3. Si no se encontró globalmente, buscar dentro de las carpetas configuradas
+    // Orden según Notes.txt (confirmado por el cliente):
+    //   1) ROOT_DRIVE_FOLDER_ID    -> Documentos de una solicitud
+    //   2) REPORTS_DRIVE_FOLDER_ID -> Informes finales (con subcarpetas por solicitud)
+    //   3) APPSHEET_DOCS_IMAGE_FOLDER_ID -> Imágenes
+    // Las demás quedan como respaldo adicional por si el archivo no está en las anteriores.
     if (!file) {
       const targetFolderIds = [
-        typeof APPSHEET_DOCS_PDF_FOLDER_ID !== 'undefined' ? APPSHEET_DOCS_PDF_FOLDER_ID : null,
-        typeof APPSHEET_DOCS_IMAGE_FOLDER_ID !== 'undefined' ? APPSHEET_DOCS_IMAGE_FOLDER_ID : null,
-        typeof DOCS_DRIVE_FOLDER_ID !== 'undefined' ? DOCS_DRIVE_FOLDER_ID : null,
+        typeof ROOT_DRIVE_FOLDER_ID !== 'undefined' ? ROOT_DRIVE_FOLDER_ID : null,
         typeof REPORTS_DRIVE_FOLDER_ID !== 'undefined' ? REPORTS_DRIVE_FOLDER_ID : null,
-        typeof ROOT_DRIVE_FOLDER_ID !== 'undefined' ? ROOT_DRIVE_FOLDER_ID : null
+        typeof APPSHEET_DOCS_IMAGE_FOLDER_ID !== 'undefined' ? APPSHEET_DOCS_IMAGE_FOLDER_ID : null,
+        typeof APPSHEET_DOCS_PDF_FOLDER_ID !== 'undefined' ? APPSHEET_DOCS_PDF_FOLDER_ID : null,
+        typeof DOCS_DRIVE_FOLDER_ID !== 'undefined' ? DOCS_DRIVE_FOLDER_ID : null
       ].filter(Boolean);
 
       for (const folderId of targetFolderIds) {
