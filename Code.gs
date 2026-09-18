@@ -757,48 +757,19 @@ function uploadDocument(email, payload) {
   const decoded = Utilities.base64Decode(base64);
   const blob = Utilities.newBlob(decoded, mimetype || 'application/pdf', filename);
 
-  let rootFolder = null;
+  // Usar la MISMA carpeta que usa AppSheet según el tipo de archivo,
+  // para que el portal y AppSheet vean siempre los mismos documentos.
+  const isImage = String(mimetype || '').toLowerCase().startsWith('image/');
+  const targetFolderId = isImage ? APPSHEET_DOCS_IMAGE_FOLDER_ID : APPSHEET_DOCS_PDF_FOLDER_ID;
 
-  if (typeof DOCS_DRIVE_FOLDER_ID !== 'undefined' && DOCS_DRIVE_FOLDER_ID) {
-    try { rootFolder = DriveApp.getFolderById(DOCS_DRIVE_FOLDER_ID); }
-    catch (e) { console.warn("Error accediendo a DOCS_DRIVE_FOLDER_ID:", e.message); }
+  let targetFolder = null;
+  try {
+    targetFolder = DriveApp.getFolderById(targetFolderId);
+  } catch (e) {
+    console.warn("Error accediendo a la carpeta de AppSheet:", e.message);
   }
 
-  if (!targetFolder && typeof ROOT_DRIVE_FOLDER_ID !== 'undefined' && ROOT_DRIVE_FOLDER_ID) {
-    try {
-      const rootFolder = DriveApp.getFolderById(ROOT_DRIVE_FOLDER_ID);
-      const subfolders = rootFolder.getFoldersByName('Documentos');
-      if (subfolders.hasNext()) {
-        targetFolder = subfolders.next();
-      } else {
-        targetFolder = rootFolder.createFolder('Documentos');
-      }
-    } catch (e) {
-      console.warn("Error accediendo a ROOT_DRIVE_FOLDER_ID:", e.message);
-    }
-  }
-
-  let targetFolder = rootFolder;
-  if (rootFolder) {
-    try {
-      const subfolders = rootFolder.getFoldersByName('Documentos');
-      if (subfolders.hasNext()) {
-        targetFolder = subfolders.next();
-      } else {
-        targetFolder = rootFolder.createFolder('Documentos');
-      }
-    } catch (e) {
-      console.warn("Error accediendo o creando subcarpeta Documentos:", e.message);
-      targetFolder = rootFolder;
-    }
-  }
-
-  let file;
-  if (targetFolder) {
-    file = targetFolder.createFile(blob);
-  } else {
-    file = DriveApp.createFile(blob);
-  }
+  const file = targetFolder ? targetFolder.createFile(blob) : DriveApp.createFile(blob);
 
   return { success: true, fileId: file.getId(), fileName: file.getName() };
 }
@@ -1213,6 +1184,8 @@ function getFileBase64(payload) {
     // 3. Si no se encontró globalmente, buscar dentro de las carpetas configuradas
     if (!file) {
       const targetFolderIds = [
+        typeof APPSHEET_DOCS_PDF_FOLDER_ID !== 'undefined' ? APPSHEET_DOCS_PDF_FOLDER_ID : null,
+        typeof APPSHEET_DOCS_IMAGE_FOLDER_ID !== 'undefined' ? APPSHEET_DOCS_IMAGE_FOLDER_ID : null,
         typeof DOCS_DRIVE_FOLDER_ID !== 'undefined' ? DOCS_DRIVE_FOLDER_ID : null,
         typeof REPORTS_DRIVE_FOLDER_ID !== 'undefined' ? REPORTS_DRIVE_FOLDER_ID : null,
         typeof ROOT_DRIVE_FOLDER_ID !== 'undefined' ? ROOT_DRIVE_FOLDER_ID : null
