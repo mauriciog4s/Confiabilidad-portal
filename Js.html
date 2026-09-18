@@ -1000,8 +1000,9 @@ const RequestDetail = ({ requestId, onBack, preloadedData }) => {
         updateFileStatus(filename, 'error', errMsg);
       }
     } catch (error) {
-      alert("Error en la solicitud de descarga: " + error.message);
-      updateFileStatus(filename, 'error', error.message);
+      const errorMsg = error?.message || String(error || "Error desconocido");
+      alert("Error en la solicitud de descarga: " + errorMsg);
+      updateFileStatus(filename, 'error', errorMsg);
     }
   };
 
