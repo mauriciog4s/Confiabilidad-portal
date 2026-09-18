@@ -757,15 +757,30 @@ function uploadDocument(email, payload) {
   const decoded = Utilities.base64Decode(base64);
   const blob = Utilities.newBlob(decoded, mimetype || 'application/pdf', filename);
 
-  let targetFolder = null;
+  let rootFolder = null;
 
   if (typeof DOCS_DRIVE_FOLDER_ID !== 'undefined' && DOCS_DRIVE_FOLDER_ID) {
-    try { targetFolder = DriveApp.getFolderById(DOCS_DRIVE_FOLDER_ID); }
+    try { rootFolder = DriveApp.getFolderById(DOCS_DRIVE_FOLDER_ID); }
     catch (e) { console.warn("Error accediendo a DOCS_DRIVE_FOLDER_ID:", e.message); }
   }
-  if (!targetFolder && typeof ROOT_DRIVE_FOLDER_ID !== 'undefined' && ROOT_DRIVE_FOLDER_ID) {
-    try { targetFolder = DriveApp.getFolderById(ROOT_DRIVE_FOLDER_ID); }
+  if (!rootFolder && typeof ROOT_DRIVE_FOLDER_ID !== 'undefined' && ROOT_DRIVE_FOLDER_ID) {
+    try { rootFolder = DriveApp.getFolderById(ROOT_DRIVE_FOLDER_ID); }
     catch (e) { console.warn("Error accediendo a ROOT_DRIVE_FOLDER_ID:", e.message); }
+  }
+
+  let targetFolder = rootFolder;
+  if (rootFolder) {
+    try {
+      const subfolders = rootFolder.getFoldersByName('Documentos');
+      if (subfolders.hasNext()) {
+        targetFolder = subfolders.next();
+      } else {
+        targetFolder = rootFolder.createFolder('Documentos');
+      }
+    } catch (e) {
+      console.warn("Error accediendo o creando subcarpeta Documentos:", e.message);
+      targetFolder = rootFolder;
+    }
   }
 
   let file;
