@@ -37,6 +37,7 @@ function apiHandler(request) {
       case 'getTemplateName':   return getTemplateName(userEmail, payload);
       case 'processBulkUpload': return processBulkUpload(userEmail, payload);
       case 'registerTempDocument': return registerTempDocument(userEmail, payload);
+      case 'uploadDocument':       return uploadDocument(userEmail, payload);
       case 'updateClientConfig': return updateClientConfig(userEmail, payload);
       case 'getClientUsers':    return getClientUsers(userEmail, payload);
       case 'updateUserConfig':  return updateUserConfig(userEmail, payload);
@@ -746,9 +747,10 @@ if (!hasData) continue;
   };
 }
 
-// NOTA: el guardado real del archivo en Drive lo hace el script "proxy"
-// (PROXY_URL en Js.html), que ya tiene permisos correctos sobre las carpetas
-// de AppSheet. Este script solo registra los metadatos del documento.
+// El campo Documento debe llevar SOLO el nombre del archivo, sin prefijo de
+// carpeta: AppSheet arma su Url (gettablefileurl) con este valor tal cual,
+// y un prefijo como "Documentos/" hace que AppSheet responda "File not found"
+// (confirmado con pruebas reales, ver Notes.txt).
 function registerTempDocument(email, { requestId, docName, fileName }) {
   const context = getUserContext(email);
   if (!context.isValidUser) throw new Error("Usuario no autorizado.");
@@ -757,17 +759,38 @@ function registerTempDocument(email, { requestId, docName, fileName }) {
   const tableId = `${projectId}.${DATASET_ID}.${TABLES.DOCS_TEMP}`;
   const docId = generateUniqueId();
 
-  const formattedPath = (fileName && String(fileName).startsWith('Documentos/'))
-    ? String(fileName)
-    : 'Documentos/' + String(fileName || '');
+  const cleanFileName = String(fileName || '').split(/[/\\]/).pop();
 
   const insertSql = `
     INSERT INTO \`${tableId}\`
     (ID_DocumentosSolicitud, ID_SolicitudesConfiabilidad, NombreDocumento, Documento, UsuarioActualziacion, FechaActualizacion, EstadoActual)
     VALUES (@docId, @reqId, @docName, @fileAlias, @user, CAST(CURRENT_TIMESTAMP() AS STRING), 'Creada')
   `;
-  bq.query(insertSql, { docId, reqId: requestId, docName, fileAlias: formattedPath, user: email });
+  bq.query(insertSql, { docId, reqId: requestId, docName, fileAlias: cleanFileName, user: email });
   return { success: true, message: "Metadatos registrados." };
+}
+
+// Guarda el archivo directamente en la misma carpeta de Drive donde AppSheet
+// deja sus propios adjuntos (confirmado con pruebas: un archivo subido desde
+// AppSheet en esta carpeta se ve sin problema desde el portal).
+function uploadDocument(email, payload) {
+  const context = getUserContext(email);
+  if (!context.isValidUser) throw new Error("Usuario no autorizado.");
+
+  const { filename, base64, mimetype } = payload;
+  if (!filename || !base64) throw new Error("Faltan datos de archivo para guardar en Drive.");
+
+  const decoded = Utilities.base64Decode(base64);
+  const cleanFileName = String(filename).split(/[/\\]/).pop();
+  const blob = Utilities.newBlob(decoded, mimetype || 'application/pdf', cleanFileName);
+
+  const isImage = String(mimetype || '').toLowerCase().startsWith('image/');
+  const targetFolderId = isImage ? APPSHEET_DOCS_IMAGE_FOLDER_ID : APPSHEET_DOCS_PDF_FOLDER_ID;
+
+  const targetFolder = DriveApp.getFolderById(targetFolderId);
+  const file = targetFolder.createFile(blob);
+
+  return { success: true, fileId: file.getId(), fileName: file.getName() };
 }
 
 function updateClientConfig(email, { clientId, forcedMyRequests }) {
