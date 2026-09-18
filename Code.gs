@@ -763,9 +763,19 @@ function uploadDocument(email, payload) {
     try { rootFolder = DriveApp.getFolderById(DOCS_DRIVE_FOLDER_ID); }
     catch (e) { console.warn("Error accediendo a DOCS_DRIVE_FOLDER_ID:", e.message); }
   }
-  if (!rootFolder && typeof ROOT_DRIVE_FOLDER_ID !== 'undefined' && ROOT_DRIVE_FOLDER_ID) {
-    try { rootFolder = DriveApp.getFolderById(ROOT_DRIVE_FOLDER_ID); }
-    catch (e) { console.warn("Error accediendo a ROOT_DRIVE_FOLDER_ID:", e.message); }
+
+  if (!targetFolder && typeof ROOT_DRIVE_FOLDER_ID !== 'undefined' && ROOT_DRIVE_FOLDER_ID) {
+    try {
+      const rootFolder = DriveApp.getFolderById(ROOT_DRIVE_FOLDER_ID);
+      const subfolders = rootFolder.getFoldersByName('Documentos');
+      if (subfolders.hasNext()) {
+        targetFolder = subfolders.next();
+      } else {
+        targetFolder = rootFolder.createFolder('Documentos');
+      }
+    } catch (e) {
+      console.warn("Error accediendo a ROOT_DRIVE_FOLDER_ID:", e.message);
+    }
   }
 
   let targetFolder = rootFolder;
