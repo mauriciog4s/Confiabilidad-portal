@@ -1,0 +1,19 @@
+Esto es una portal para clientes finales donde generan una solicitud, con un docuemnto adjunto a la solicutd, esta hecho en appscript esto debido a 
+que por politicas de seguridad los clientes no deben ingresar a appsheet.
+
+1. Appsheet es la herramienta donde ingresan los colaboradores a gestionar una solicitud, tenemos una tabla relacionanada a las solicitudes llamada: conDocumentosSolicitud
+con los campos: 
+
+Issues:
+
+1. el portal no esta guardando el documento
+
+
+Como lo hace appsheet: 
+- tabla, DocumentosSolicitud, campo: Documento Type: File | Image/File folder path: "Documentos/" & [ID_SolicitudesConfiabilidad].[NSolicitud]
+- Como lo almaceno: 3TFR15EP_doc02264020260915145231.pdf
+- Que Url construye para este caso por ejemplo: solciitud: 9452285, Url: https://www.appsheet.com/template/gettablefileurl?appName=ConfiabilidadCoordinadorV31-908904729&tableName=DocumentosSolicitud&fileName=3TFR15EP_doc02264020260915145231.pdf&appVersion=1.000782&signature=9b16ac9e3cefb3158db535a7d82abc63b7d1e7a9c24deb8db67fa02b5399c8b51e860f45c87544d3b78d5967a62e66d0
+- Si lo busco un Pdf en Drive lo encuentro en: https://drive.google.com/drive/folders/1hvTk7O1CZMr6jmlKy3lT2z-8vDDq1Ajd si subo un documento desde appsheet lo guarda aqui: https://drive.google.com/drive/folders/1U_ho50bW5rN4AOOLS39O8X9V1i6vajTl
+- Si es una imagem lo encuentro en la carpeta: https://drive.google.com/drive/folders/14cFp2DmUYsTtC2-GNGQ2ODyBqpcKGyJ7, y genera esta Url al abrirlo: https://www.appsheet.com/template/gettablefileurl?appName=ConfiabilidadCoordinadorV31-908904729&tableName=DocumentosSolicitud&fileName=DocumentosSolicitud_Images%2F62dcd22b.Documento.150312.png&appVersion=1.000782&signature=1ae4f5a120157af705064b43a3f687f82af1559bbf56c830e9f9b60602cf14103ab36ce909b5a2f67266ee95b95944c3
+
+al parecer lo esta guardando en lugares distintos que ve appsheet y el portal es diferente, deberia usarce las rutas que usa appsheet para qeu todo coverja
