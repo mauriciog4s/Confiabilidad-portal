@@ -22,3 +22,4 @@ al parecer lo esta guardando en lugares distintos que ve appsheet y el portal es
 
 Url de Documento de una solicitud: https://drive.google.com/drive/folders/1hvTk7O1CZMr6jmlKy3lT2z-8vDDq1Ajd
 Url de reportes finales: https://drive.google.com/drive/folders/1W3k6yVXSv7of8qsH9Wj2DD6urYF0Ydcd y crea sub carpetas
+Url de las imagenes: https://drive.google.com/drive/folders/14cFp2DmUYsTtC2-GNGQ2ODyBqpcKGyJ7
