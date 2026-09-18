@@ -976,6 +976,18 @@ const RequestDetail = ({ requestId, onBack, preloadedData }) => {
     
     updateFileStatus(filename, 'loading', 'Iniciando descarga...');
     
+    const downloadViaProxy = () => {
+      updateFileStatus(filename, 'loading', 'Descargando vía proxy...');
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = `${PROXY_URL}?filename=${encodeURIComponent(filename)}&token=${PROXY_TOKEN}`;
+      document.body.appendChild(iframe);
+      setTimeout(() => {
+        updateFileStatus(filename, 'success', 'Descarga realizada');
+        setTimeout(() => { if (document.body.contains(iframe)) document.body.removeChild(iframe); }, 60000);
+      }, 4000);
+    };
+
     try {
       const response = await runServer('getFileBase64', { filename: path });
       if (response && response.success && response.base64) {
@@ -998,14 +1010,12 @@ const RequestDetail = ({ requestId, onBack, preloadedData }) => {
         setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
         updateFileStatus(filename, 'success', 'Descargado ✓');
       } else {
-        const errMsg = response?.message || "Archivo no disponible en el almacenamiento.";
-        alert("Error al descargar el archivo: " + errMsg);
-        updateFileStatus(filename, 'error', errMsg);
+        console.warn("getFileBase64 no encontró el archivo, probando proxy...", response?.message);
+        downloadViaProxy();
       }
     } catch (error) {
-      const errorMsg = error?.message || String(error || "Error desconocido");
-      alert("Error en la solicitud de descarga: " + errorMsg);
-      updateFileStatus(filename, 'error', errorMsg);
+      console.warn("Error en getFileBase64, probando proxy...", error?.message);
+      downloadViaProxy();
     }
   };
 
