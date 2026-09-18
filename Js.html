@@ -516,9 +516,6 @@ const Sidebar = ({ currentView, setView, onLogout, userContext, syncStatus, last
           <button onClick={onLogout} title={isCollapsed ? "Salir" : ""} className={`w-full py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition flex items-center justify-center gap-2 btn-3d-gray ${isCollapsed ? 'px-0' : 'px-3'}`}>
             <Icon name="LogIn" size={14} className="rotate-180"/> {!isCollapsed && "Cerrar Sesión"}
           </button>
-          <div className="mt-2 text-center text-[9px] text-gray-400 font-mono select-none opacity-70">
-            V 2.3 | 26
-          </div>
         </div>
       </div>
     </>
