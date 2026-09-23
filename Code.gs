@@ -773,6 +773,8 @@ function registerTempDocument(email, { requestId, docName, fileName }) {
 // Guarda el archivo directamente en la misma carpeta de Drive donde AppSheet
 // deja sus propios adjuntos (confirmado con pruebas: un archivo subido desde
 // AppSheet en esta carpeta se ve sin problema desde el portal).
+// La validación de tipo y tamaño se repite aquí porque la del navegador se
+// puede evitar llamando el endpoint directamente.
 function uploadDocument(email, payload) {
   const context = getUserContext(email);
   if (!context.isValidUser) throw new Error("Usuario no autorizado.");
@@ -780,14 +782,19 @@ function uploadDocument(email, payload) {
   const { filename, base64, mimetype } = payload;
   if (!filename || !base64) throw new Error("Faltan datos de archivo para guardar en Drive.");
 
-  const decoded = Utilities.base64Decode(base64);
   const cleanFileName = String(filename).split(/[/\\]/).pop();
-  const blob = Utilities.newBlob(decoded, mimetype || 'application/pdf', cleanFileName);
 
-  const isImage = String(mimetype || '').toLowerCase().startsWith('image/');
-  const targetFolderId = isImage ? APPSHEET_DOCS_IMAGE_FOLDER_ID : APPSHEET_DOCS_PDF_FOLDER_ID;
+  const esPdf = String(mimetype || '').toLowerCase() === 'application/pdf' || /\.pdf$/i.test(cleanFileName);
+  if (!esPdf) throw new Error("Solo se permiten archivos en formato PDF.");
 
-  const targetFolder = DriveApp.getFolderById(targetFolderId);
+  const decoded = Utilities.base64Decode(base64);
+  if (decoded.length === 0) throw new Error("El archivo está vacío.");
+  if (decoded.length > MAX_DOC_BYTES) {
+    throw new Error(`El archivo supera el máximo permitido de ${Math.round(MAX_DOC_BYTES / 1024 / 1024)} MB.`);
+  }
+
+  const blob = Utilities.newBlob(decoded, 'application/pdf', cleanFileName);
+  const targetFolder = DriveApp.getFolderById(APPSHEET_DOCS_PDF_FOLDER_ID);
   const file = targetFolder.createFile(blob);
 
   return { success: true, fileId: file.getId(), fileName: file.getName() };
