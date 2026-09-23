@@ -22,6 +22,10 @@ const REPORTS_DRIVE_FOLDER_ID = "1W3k6yVXSv7of8qsH9Wj2DD6urYF0Ydcd";
 const APPSHEET_DOCS_PDF_FOLDER_ID   = "1hvTk7O1CZMr6jmlKy3lT2z-8vDDq1Ajd";
 const APPSHEET_DOCS_IMAGE_FOLDER_ID = "14cFp2DmUYsTtC2-GNGQ2ODyBqpcKGyJ7";
 
+// Tamaño máximo permitido por documento de soporte (10 MB).
+// Debe coincidir con MAX_DOC_MB en Js.html.
+const MAX_DOC_BYTES = 10 * 1024 * 1024;
+
 const TABLES = {
   READ_VIEW:   "vistaSolicitudesCompletasFechas",
   WRITE_TABLE: "conSolicitudesTemporal",
