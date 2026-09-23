@@ -1,0 +1,6 @@
+1. Para algunos usuarios el portal funciona perfecto en cuestión de adjuntar un documento PDF en una solicitud; para otros no
+2. La fuente o el folder donde almacenamos los documentos es un Drive; claramente, el Drive tiene unos accesos y permisos. Lo que he notado es que a quienes tienen esos permisos para escribir en él, cuando suben una solicitud con documentos adjuntos, les funciona; a los demás no.
+3. Esta app web hecha con App Script está implementada así: Ejecutar como = Usuario que accede a la app web. ¿Esto por qué así? Porque si lo implemento como yo (a mí sí me funciona jhoan.gaitan@co.g4s.com), voy a exceder la cuota de escritura en el Drive y esta plataforma puede llegar a recibir más de 100 archivos y datos en simultaneo
+Por lo que el drive se bloquearía y fallaría, pero si se ejecuta como usuario que accede a la app web, cada uno tiene su propia cuota y el fallo en simultáneo se reduce casi al 100%
+4. Actualmente, el portal funciona perfecto, pero para otros usuarios los adjuntos no se están guardando (quizá porque no tienen permiso sobre el folder), pero no lo se.
+5. Necesito resolver esto porque cada solicitud que suben con un adjunto, simplemente el archivo no se guarda en el folder (solo algunos usuarios)
