@@ -5,6 +5,9 @@ const { useState, useEffect, useMemo, useRef, useCallback } = React;
 const PROXY_URL   = "https://script.google.com/a/macros/co.g4s.com/s/AKfycbxQB6XNAaKr8gXmzUNBsu4lLwjc9NwK_XjHSJmw37HVRNvBHDM5sQOIg6NLcXXs0Im4/exec";
 const PROXY_TOKEN = "G4S-ACCESS-KEY-2025";
 
+// Tamaño máximo por documento de soporte (en MB)
+const MAX_DOC_MB = 10;
+
 // ─── SEGURIDAD BÁSICA ────────────────────────────────────────────────────
 (function applySecurityMeasures() {
   document.addEventListener('contextmenu', e => e.preventDefault());
@@ -1327,10 +1330,37 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
     });
   };
 
+  // Solo PDF y máximo 10 MB: evita archivos pesados que hagan fallar la carga.
+  const validarArchivoSoporte = (file) => {
+    if (!file) return "Seleccione un archivo.";
+    const esPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+    if (!esPdf) return "Solo se permiten archivos en formato PDF.";
+    if (file.size === 0) return "El archivo está vacío.";
+    if (file.size > MAX_DOC_MB * 1024 * 1024) {
+      return `El archivo pesa ${(file.size / 1024 / 1024).toFixed(1)} MB y el máximo permitido es ${MAX_DOC_MB} MB.`;
+    }
+    return null;
+  };
+
+  const seleccionarArchivo = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const error = validarArchivoSoporte(file);
+    if (error) { alert(error); e.target.value = ""; setCurrentFile(null); return; }
+    setCurrentFile(file);
+  };
+
   const addAttachment = () => {
     if (!currentFile) return alert("Seleccione un archivo.");
+    const error = validarArchivoSoporte(currentFile);
+    if (error) {
+      alert(error);
+      setCurrentFile(null);
+      document.getElementById('fileInput').value = "";
+      return;
+    }
     if (!currentDocName.trim()) return alert("Ingrese un nombre para el documento.");
-    setAttachments(a => [...a, { id: Date.now(), file: currentFile, name: currentDocName }]);
+    setAttachments(a => [...a, { id: Date.now(), file: currentFile, name: currentDocName.trim() }]);
     setCurrentFile(null); setCurrentDocName('');
     document.getElementById('fileInput').value = "";
   };
@@ -1384,6 +1414,11 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
     }
     const hasService = formData.visitaDomiciliaria || formData.consultaAntecedentes || formData.referenciacion || formData.estudiosPoligrafia || formData.consultaDatacredito || formData.comparativoOEA;
     if (!hasService) missing.push("Debe seleccionar al menos un servicio a aplicar");
+
+    // Evita que un documento diligenciado pero no agregado se pierda al guardar
+    if (currentFile || currentDocName.trim()) {
+      missing.push("Documento de Soporte sin agregar: presione el botón AGREGAR para adjuntarlo, o borre el nombre y el archivo seleccionado");
+    }
 
     if (missing.length > 0) { setMissingFields(missing); setShowValidationAlert(true); return; }
 
@@ -1802,12 +1837,12 @@ const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
                 <input type="text" value={currentDocName} onChange={e => setCurrentDocName(e.target.value)} className={inputClass} placeholder="Ej: Cédula, Diploma..."/>
               </div>
               <div className="md:col-span-5">
-                <label className={labelClass}>Archivo</label>
+                <label className={labelClass}>Archivo <span className="text-gray-400 normal-case font-normal">(solo PDF, máx. {MAX_DOC_MB} MB)</span></label>
                 <div className="relative">
-                  <input id="fileInput" type="file" onChange={e => e.target.files?.[0] && setCurrentFile(e.target.files[0])}
+                  <input id="fileInput" type="file" accept=".pdf,application/pdf" onChange={seleccionarArchivo}
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"/>
                   <div className="w-full border border-gray-200 rounded-xl p-2.5 text-xs bg-white flex items-center justify-between text-gray-500 hover:border-gray-300 transition-all">
-                    <span className="truncate">{currentFile ? currentFile.name : "Seleccionar archivo..."}</span>
+                    <span className="truncate">{currentFile ? currentFile.name : "Seleccionar archivo PDF..."}</span>
                     <Icon name="FileText" size={14} className="text-gray-400 flex-shrink-0 ml-2"/>
                   </div>
                 </div>
