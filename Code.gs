@@ -45,6 +45,7 @@ function apiHandler(request) {
       
       // 👉 AQUÍ AGREGAMOS LA NUEVA RUTA PARA LA VISTA PREVIA:
       case 'getFileIdByName':   return getFileIdByName(payload);
+      case 'getNovedades':      return getNovedades(userEmail, payload || {});
       
       default: throw new Error(`Endpoint desconocido: ${endpoint}`);
     }
@@ -289,6 +290,108 @@ function getRequests(email, { period = 'today', clientId = null } = {}) {
   });
 
   return { data: uniqueRows, total: uniqueRows.length, period };
+}
+
+// ─── OBTENER NOVEDADES Y NOTAS DE SOLICITUDES PERMITIDAS ────────────────
+function getNovedades(email) {
+  const context = getUserContext(email);
+  if (!context.isValidUser) throw new Error("Acceso Denegado.");
+
+  const reqResult = getRequests(email, { period: 'all' });
+  const requests = reqResult.data || [];
+  if (requests.length === 0) return { novedades: [], total: 0 };
+
+  const reqMap = {};
+  const reqIds = [];
+  requests.forEach(r => {
+    const id = r.ID_SolicitudesConfiabilidad;
+    if (id) {
+      reqIds.push(id);
+      reqMap[id] = r;
+    }
+  });
+
+  if (reqIds.length === 0) return { novedades: [], total: 0 };
+
+  const bq = new BigQueryClient();
+  const projectId = BQ_CREDENTIALS.project_id;
+  const ds = DATASET_ID;
+
+  // BigQuery IN limit handles up to thousands easily. Divide into chunks of 500 if needed.
+  const chunkSize = 500;
+  let allNovedades = [];
+
+  for (let i = 0; i < reqIds.length; i += chunkSize) {
+    const chunkIds = reqIds.slice(i, i + chunkSize);
+    const inClause = chunkIds.map(id => `'${id}'`).join(',');
+
+    // 1. conNotasSolicitudes
+    try {
+      const sqlNotas = `
+        SELECT ID_SolicitudesConfiabilidad, Nota AS Detalle, FechaActualizacion, UsuarioActualizacion
+        FROM \`${projectId}.${ds}.conNotasSolicitudes\`
+        WHERE ID_SolicitudesConfiabilidad IN (${inClause})
+      `;
+      const rowsNotas = bq.query(sqlNotas);
+      rowsNotas.forEach(r => {
+        const req = reqMap[r.ID_SolicitudesConfiabilidad] || {};
+        const fecha = r.FechaActualizacion?.value || r.FechaActualizacion || '';
+        allNovedades.push({
+          idNovedad: `nota_${r.ID_SolicitudesConfiabilidad}_${fecha}_${Math.random().toString(36).substr(2, 5)}`,
+          idSolicitud: r.ID_SolicitudesConfiabilidad,
+          nSolicitud: req.NSolicitud || r.ID_SolicitudesConfiabilidad,
+          identificacion: req.Identificacion || '',
+          nombreCompleto: req.NombreCompleto || 'Desconocido',
+          razonSocial: req.RazonSocial || req.Cliente || '',
+          estadoActual: req.EstadoActual || 'En proceso',
+          detalle: r.Detalle || '',
+          fecha: fecha,
+          usuario: r.UsuarioActualizacion || 'Sistema',
+          tipo: 'Nota'
+        });
+      });
+    } catch (e) {
+      console.warn("Error leyendo conNotasSolicitudes:", e.message);
+    }
+
+    // 2. conNovedades
+    try {
+      const sqlNov = `
+        SELECT ID_SolicitudesConfiabilidad, Novedad AS Detalle, FechaActualizacion, UsuarioActualizacion
+        FROM \`${projectId}.${ds}.conNovedades\`
+        WHERE ID_SolicitudesConfiabilidad IN (${inClause})
+      `;
+      const rowsNov = bq.query(sqlNov);
+      rowsNov.forEach(r => {
+        const req = reqMap[r.ID_SolicitudesConfiabilidad] || {};
+        const fecha = r.FechaActualizacion?.value || r.FechaActualizacion || '';
+        allNovedades.push({
+          idNovedad: `nov_${r.ID_SolicitudesConfiabilidad}_${fecha}_${Math.random().toString(36).substr(2, 5)}`,
+          idSolicitud: r.ID_SolicitudesConfiabilidad,
+          nSolicitud: req.NSolicitud || r.ID_SolicitudesConfiabilidad,
+          identificacion: req.Identificacion || '',
+          nombreCompleto: req.NombreCompleto || 'Desconocido',
+          razonSocial: req.RazonSocial || req.Cliente || '',
+          estadoActual: req.EstadoActual || 'En proceso',
+          detalle: r.Detalle || '',
+          fecha: fecha,
+          usuario: r.UsuarioActualizacion || 'Sistema',
+          tipo: 'Novedad'
+        });
+      });
+    } catch (e) {
+      console.warn("Error leyendo conNovedades:", e.message);
+    }
+  }
+
+  // Ordenar por fecha DESC
+  allNovedades.sort((a, b) => {
+    const dA = new Date(a.fecha || 0);
+    const dB = new Date(b.fecha || 0);
+    return dB - dA;
+  });
+
+  return { novedades: allNovedades, total: allNovedades.length };
 }
 
 // ─── DATOS MAESTROS (solo tablas de referencia para formularios) ─────────
