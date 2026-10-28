@@ -158,6 +158,28 @@ const runServer = (endpoint, payload = {}) => {
             mimeType: 'application/pdf',
             fileName: payload.filename || 'documento.pdf'
           });
+        } else if (endpoint === 'getNovedades') {
+          resolve({
+            novedades: [
+              {
+                idNovedad: 'nov_mock_1',
+                idSolicitud: 'SOL-001',
+                nSolicitud: 'SOL-001',
+                identificacion: '12345678',
+                nombreCompleto: 'JUAN PEREZ',
+                razonSocial: 'CLIENTE DE PRUEBA G4S',
+                estadoActual: 'Ingresada',
+                detalle: 'Se requiere documento de antecedentes actualizado por inconsistencia de datos.',
+                fecha: new Date().toISOString(),
+                usuario: 'soporte@g4s.com',
+                tipo: 'Novedad'
+              }
+            ],
+            total: 1,
+            readIds: []
+          });
+        } else if (endpoint === 'marcarNovedadLeida' || endpoint === 'marcarTodasNovedadesLeidas') {
+          resolve({ success: true });
         } else {
           resolve({ success: true, message: 'Mock', data: [], total: 0 });
         }
@@ -242,6 +264,8 @@ const Icon = ({ name, size = 20, className = "" }) => {
     Briefcase: <><rect width="20" height="14" x="2" y="7" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></>,
     Phone: <><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.15 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.16 6.16l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></>,
     Wrench: <><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></>,
+    Bell: <><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></>,
+    BellRing: <><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path d="M4 2C2.8 3.7 2 5.7 2 8"/><path d="M22 8c0-2.3-.8-4.3-2-6"/></>,
   };
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24"
@@ -441,23 +465,26 @@ const LoginView = ({ onSuccess, isLoading }) => (
 );
 
 // ─── SIDEBAR ──────────────────────────────────────────────────────────────
-const Sidebar = ({ currentView, setView, onLogout, userContext, syncStatus, lastSync, isOpen, toggleSidebar, isCollapsed, toggleCollapse }) => {
+const Sidebar = ({ currentView, setView, onLogout, userContext, syncStatus, lastSync, isOpen, toggleSidebar, isCollapsed, toggleCollapse, unreadCount = 0 }) => {
   const menuItems = useMemo(() => {
     const all = [
-      { id: 'home',    icon: 'Home',          title: 'Inicio' },
-      { id: 'create',  icon: 'ClipboardList', title: 'Nueva Solicitud' },
-      { id: 'bulk',    icon: 'Upload',        title: 'Carga Masiva' },
-      { id: 'history', icon: 'History',       title: 'Histórico' },
+      { id: 'home',      icon: 'Home',          title: 'Inicio' },
+      { id: 'create',    icon: 'ClipboardList', title: 'Nueva Solicitud' },
+      { id: 'bulk',      icon: 'Upload',        title: 'Carga Masiva' },
+      { id: 'history',   icon: 'History',       title: 'Histórico' },
+      { id: 'novedades', icon: 'Bell',          title: 'Novedades' },
     ];
     const role = userContext?.role || '';
-    if (role === 'Cliente Creación') return all.filter(i => ['home', 'create', 'bulk'].includes(i.id));
-    if (role === 'Cliente Consulta') return all.filter(i => ['history'].includes(i.id));
+    if (role === 'Cliente Creación') return all.filter(i => ['home', 'create', 'bulk', 'novedades'].includes(i.id));
+    if (role === 'Cliente Consulta') return all.filter(i => ['history', 'novedades'].includes(i.id));
     return all;
   }, [userContext]);
+
   const handleNav = (id) => {
     setView(id);
     if (window.innerWidth < 768 && toggleSidebar) toggleSidebar(false);
   };
+
   return (
     <>
       {isOpen && <div className="fixed inset-0 bg-black/50 z-30 md:hidden" onClick={() => toggleSidebar(false)}></div>}
@@ -482,13 +509,33 @@ const Sidebar = ({ currentView, setView, onLogout, userContext, syncStatus, last
           </div>
         )}
         <div className="flex-1 overflow-y-auto py-3 space-y-2 px-2">
-          {menuItems.map((item) => (
-            <div key={item.id} onClick={() => handleNav(item.id)} title={isCollapsed ? item.title : ""}
-              className={`px-3 py-3 cursor-pointer transition-all duration-200 rounded-2xl flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} ${currentView === item.id ? 'bg-vividRed text-white shadow-lg shadow-red-500/30 scale-[1.02]' : 'text-gray-500 hover:bg-gray-100'}`}>
-              <Icon name={item.icon} className={currentView === item.id ? 'text-white' : 'text-gray-400'} size={isCollapsed ? 24 : 20}/>
-              {!isCollapsed && <span className={`font-bold text-xs tracking-wide uppercase ${currentView === item.id ? 'text-white' : ''}`}>{item.title}</span>}
-            </div>
-          ))}
+          {menuItems.map((item) => {
+            const isNovedades = item.id === 'novedades';
+            const hasUnread = isNovedades && unreadCount > 0;
+            return (
+              <div key={item.id} onClick={() => handleNav(item.id)} title={isCollapsed ? (item.title + (hasUnread ? ` (${unreadCount} nuevas)` : '')) : ""}
+                className={`px-3 py-3 cursor-pointer transition-all duration-200 rounded-2xl flex items-center relative ${isCollapsed ? 'justify-center' : 'gap-3'} ${currentView === item.id ? 'bg-vividRed text-white shadow-lg shadow-red-500/30 scale-[1.02]' : 'text-gray-500 hover:bg-gray-100'}`}>
+                <div className="relative">
+                  <Icon name={isNovedades && hasUnread ? 'BellRing' : item.icon} className={`${currentView === item.id ? 'text-white' : (hasUnread ? 'text-vividRed bell-ring' : 'text-gray-400')}`} size={isCollapsed ? 24 : 20}/>
+                  {hasUnread && isCollapsed && (
+                    <span className="absolute -top-1 -right-2 bg-vividRed text-white text-[9px] font-black rounded-full h-4 min-w-[16px] px-1 flex items-center justify-center border-2 border-white animate-pulse">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
+                </div>
+                {!isCollapsed && (
+                  <div className="flex-1 flex items-center justify-between">
+                    <span className={`font-bold text-xs tracking-wide uppercase ${currentView === item.id ? 'text-white' : ''}`}>{item.title}</span>
+                    {hasUnread && (
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${currentView === item.id ? 'bg-white text-vividRed' : 'bg-vividRed text-white shadow-sm'}`}>
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
           <div className="my-4 border-t border-gray-100 mx-2"></div>
           <div onClick={() => handleNav('config')} title={isCollapsed ? "Configuración" : ""}
             className={`px-3 py-3 cursor-pointer transition-all duration-200 rounded-2xl flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} ${currentView === 'config' ? 'bg-vividBlue text-white shadow-lg shadow-blue-500/30 scale-[1.02]' : 'text-gray-500 hover:bg-gray-100'}`}>
@@ -2084,6 +2131,300 @@ const BulkUpload = ({ userContext, setView, onReload }) => {
   );
 };
 
+// ─── VISTA DE NOVEDADES ───────────────────────────────────────────────────
+const NovedadesView = ({ userContext, setSelectedRequest, setView, novedadesList, loading, onRefresh, readIds, setReadIds }) => {
+  const [filterRead, setFilterRead]   = useState('all');
+  const [timeFilter, setTimeFilter]   = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [typeFilter, setTypeFilter]   = useState('all');
+
+  const userEmail = userContext?.email || 'user';
+  const localStorageKey = `g4s_read_novedades_${userEmail}`;
+
+  const isRead = useCallback((idNovedad) => {
+    return readIds.includes(idNovedad);
+  }, [readIds]);
+
+  const toggleRead = (idNovedad) => {
+    const isCurrentlyRead = isRead(idNovedad);
+    const newReadState = !isCurrentlyRead;
+    let updated;
+    if (isCurrentlyRead) {
+      updated = readIds.filter(id => id !== idNovedad);
+    } else {
+      updated = [...readIds, idNovedad];
+    }
+    setReadIds(updated);
+
+    runServer('marcarNovedadLeida', { idNovedad, read: newReadState })
+      .catch(err => console.warn("Error guardando estado de lectura en BQ:", err));
+  };
+
+  const markAllAsRead = () => {
+    const unreadItems = novedadesList.filter(n => !isRead(n.idNovedad));
+    if (unreadItems.length === 0) return;
+    const unreadIds = unreadItems.map(n => n.idNovedad);
+    const updated = [...new Set([...readIds, ...unreadIds])];
+    setReadIds(updated);
+
+    runServer('marcarTodasNovedadesLeidas', { idNovedades: unreadIds })
+      .catch(err => console.warn("Error guardando lecturas masivas en BQ:", err));
+  };
+
+  const stats = useMemo(() => {
+    const total = novedadesList.length;
+    const unread = novedadesList.filter(n => !isRead(n.idNovedad)).length;
+    const read = total - unread;
+    const now = new Date();
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    const todayCount = novedadesList.filter(n => {
+      if (!n.fecha) return false;
+      return new Date(n.fecha).toISOString().slice(0, 10) === todayStr;
+    }).length;
+
+    const weekCount = novedadesList.filter(n => {
+      if (!n.fecha) return false;
+      const diffDays = (now - new Date(n.fecha)) / (1000 * 60 * 60 * 24);
+      return diffDays <= 7;
+    }).length;
+
+    return { total, unread, read, todayCount, weekCount };
+  }, [novedadesList, isRead]);
+
+  const filteredNovedades = useMemo(() => {
+    let result = novedadesList;
+
+    if (filterRead === 'unread') {
+      result = result.filter(n => !isRead(n.idNovedad));
+    } else if (filterRead === 'read') {
+      result = result.filter(n => isRead(n.idNovedad));
+    }
+
+    if (typeFilter !== 'all') {
+      result = result.filter(n => n.tipo === typeFilter);
+    }
+
+    const now = new Date();
+    if (timeFilter === 'today') {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      result = result.filter(n => n.fecha && new Date(n.fecha).toISOString().slice(0, 10) === todayStr);
+    } else if (timeFilter === 'week') {
+      result = result.filter(n => n.fecha && (now - new Date(n.fecha)) / (1000 * 60 * 60 * 24) <= 7);
+    } else if (timeFilter === 'month') {
+      result = result.filter(n => n.fecha && (now - new Date(n.fecha)) / (1000 * 60 * 60 * 24) <= 30);
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(n =>
+        (n.nSolicitud || '').toLowerCase().includes(q) ||
+        (n.identificacion || '').toLowerCase().includes(q) ||
+        (n.nombreCompleto || '').toLowerCase().includes(q) ||
+        (n.razonSocial || '').toLowerCase().includes(q) ||
+        (n.detalle || '').toLowerCase().includes(q)
+      );
+    }
+
+    return result;
+  }, [novedadesList, filterRead, typeFilter, timeFilter, searchQuery, isRead]);
+
+  return (
+    <div className="p-4 md:p-8 max-w-7xl mx-auto animate-fade-in pb-20">
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-3">
+          <div className="bg-appRed p-3 rounded-2xl text-white shadow-lg shadow-red-500/30">
+            <Icon name="Bell" size={24} className={stats.unread > 0 ? "bell-ring" : ""}/>
+          </div>
+          <div>
+            <h1 className="text-2xl font-black text-gray-800 tracking-tight">Centro de Novedades</h1>
+            <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">Seguimiento y actualizaciones de solicitudes</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          {stats.unread > 0 && (
+            <button onClick={markAllAsRead} className="px-4 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-200 rounded-2xl flex items-center gap-2 text-xs font-bold uppercase tracking-tight shadow-sm transition btn-action">
+              <Icon name="CheckCircle" size={16} className="text-vividGreen"/> Marcar todas como leídas
+            </button>
+          )}
+          <button onClick={onRefresh} disabled={loading} className="px-4 py-2 bg-vividBlue text-white hover:bg-blue-900 rounded-2xl flex items-center gap-2 text-xs font-black uppercase tracking-tight shadow-lg shadow-blue-500/20 transition btn-3d disabled:opacity-50">
+            <Icon name="RefreshCw" size={16} className={loading ? "animate-spin" : ""}/>
+            {loading ? 'Cargando...' : 'Actualizar'}
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
+          <div className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">Total Novedades</div>
+          <div className="text-3xl font-black text-gray-800">{stats.total}</div>
+        </div>
+
+        <div className={`p-5 rounded-2xl border shadow-sm transition-all ${stats.unread > 0 ? 'bg-red-50/60 border-red-200' : 'bg-white border-gray-200'}`}>
+          <div className="text-[10px] font-black text-vividRed uppercase tracking-wider mb-1 flex items-center justify-between">
+            <span>Sin Leer</span>
+            {stats.unread > 0 && <span className="w-2 h-2 rounded-full bg-vividRed animate-ping"></span>}
+          </div>
+          <div className="text-3xl font-black text-vividRed">{stats.unread}</div>
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
+          <div className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">Hoy</div>
+          <div className="text-3xl font-black text-gray-800">{stats.todayCount}</div>
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
+          <div className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">Esta Semana</div>
+          <div className="text-3xl font-black text-gray-800">{stats.weekCount}</div>
+        </div>
+      </div>
+
+      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm mb-6 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-1.5 bg-gray-100 p-1 rounded-xl border border-gray-200">
+            {[
+              { id: 'all', label: 'Todas', count: stats.total },
+              { id: 'unread', label: 'Sin Leer', count: stats.unread },
+              { id: 'read', label: 'Leídas', count: stats.read }
+            ].map(tab => (
+              <button key={tab.id} onClick={() => setFilterRead(tab.id)}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${filterRead === tab.id ? 'bg-white text-appBlue shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>
+                {tab.label}
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${filterRead === tab.id ? 'bg-appBlue text-white' : 'bg-gray-200 text-gray-600'}`}>{tab.count}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl border border-gray-200">
+            {[
+              { id: 'all', label: 'Histórico' },
+              { id: 'today', label: 'Hoy' },
+              { id: 'week', label: 'Semana' },
+              { id: 'month', label: 'Mes' }
+            ].map(t => (
+              <button key={t.id} onClick={() => setTimeFilter(t.id)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${timeFilter === t.id ? 'bg-appBlue text-white shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+          <div className="md:col-span-9 relative">
+            <Icon name="Search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
+            <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Buscar por N° Solicitud, Cédula, Candidato, Cliente o detalle..."
+              className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-appBlue/20 focus:border-appBlue transition-all"/>
+          </div>
+
+          <div className="md:col-span-3">
+            <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)}
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-appBlue/20 focus:border-appBlue transition-all">
+              <option value="all">Todos los Tipos</option>
+              <option value="Novedad">Novedades</option>
+              <option value="Nota">Notas de Solicitud</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="p-16 text-center bg-white rounded-2xl border border-gray-200 flex flex-col items-center justify-center">
+          <div className="w-10 h-10 border-4 border-appBlue border-t-transparent rounded-full animate-spin mb-3"></div>
+          <span className="text-gray-500 font-bold text-sm">Cargando novedades...</span>
+        </div>
+      ) : filteredNovedades.length === 0 ? (
+        <div className="p-16 text-center bg-white rounded-2xl border border-gray-200 flex flex-col items-center justify-center">
+          <Icon name="Bell" size={40} className="text-gray-300 mb-3"/>
+          <span className="text-gray-600 font-bold text-base mb-1">No hay novedades registradas</span>
+          <span className="text-gray-400 text-xs">No se encontraron resultados para los filtros seleccionados.</span>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filteredNovedades.map((item) => {
+            const read = isRead(item.idNovedad);
+            return (
+              <div key={item.idNovedad}
+                className={`p-5 rounded-2xl border transition-all duration-200 shadow-sm relative overflow-hidden ${read ? 'bg-white border-gray-200 opacity-90 hover:opacity-100' : 'bg-gradient-to-r from-blue-50/80 via-white to-white border-blue-200 ring-1 ring-blue-100'}`}>
+
+                {!read && <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-vividRed"></div>}
+
+                <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      {!read && (
+                        <span className="bg-vividRed text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-md shadow-sm">NUEVO</span>
+                      )}
+                      <span className="bg-blue-100 text-blue-800 text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-md">
+                        {item.tipo}
+                      </span>
+                      <span className="font-mono font-black text-appBlue text-xs">
+                        {item.nSolicitud}
+                      </span>
+                      <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${getStatusBadgeColor(item.estadoActual)}`}>
+                        {item.estadoActual}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-3">
+                      <span className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
+                        <Icon name="User" size={14} className="text-gray-400"/> {item.nombreCompleto}
+                      </span>
+                      {item.identificacion && (
+                        <span className="text-xs text-gray-500 font-mono flex items-center gap-1">
+                          <Icon name="IdCard" size={13} className="text-gray-400"/> C.C. {item.identificacion}
+                        </span>
+                      )}
+                      {item.razonSocial && (
+                        <span className="text-xs text-gray-500 font-medium flex items-center gap-1">
+                          <Icon name="Building" size={13} className="text-gray-400"/> {item.razonSocial}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="bg-gray-50/80 border border-gray-100 p-3.5 rounded-xl text-xs text-gray-700 leading-relaxed font-medium mb-3">
+                      {item.detalle || 'Sin detalle de novedad.'}
+                    </div>
+
+                    <div className="flex items-center gap-4 text-[10px] text-gray-400">
+                      <span className="flex items-center gap-1"><Icon name="Clock" size={11}/> {formatDateCO(item.fecha)}</span>
+                      {item.usuario && <span className="flex items-center gap-1"><Icon name="User" size={11}/> {item.usuario}</span>}
+                    </div>
+                  </div>
+
+                  <div className="flex md:flex-col items-center justify-end gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-gray-100">
+                    <button onClick={() => {
+                      setSelectedRequest({
+                        ID_SolicitudesConfiabilidad: item.idSolicitud,
+                        NSolicitud: item.nSolicitud,
+                        NombreCompleto: item.nombreCompleto,
+                        Identificacion: item.identificacion,
+                        EstadoActual: item.estadoActual,
+                        RazonSocial: item.razonSocial
+                      });
+                      setView('detail');
+                    }} className="px-3.5 py-2 bg-appBlue hover:bg-blue-900 text-white rounded-xl text-[11px] font-bold uppercase tracking-tight flex items-center gap-1.5 shadow-sm transition btn-action w-full md:w-auto justify-center">
+                      <Icon name="Search" size={13}/> Ver Solicitud
+                    </button>
+
+                    <button onClick={() => toggleRead(item.idNovedad)}
+                      className={`px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-tight flex items-center gap-1.5 transition w-full md:w-auto justify-center ${read ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-green-50 text-vividGreen border border-vividGreen/30 hover:bg-green-100'}`}>
+                      <Icon name={read ? "X" : "Check"} size={12}/>
+                      {read ? 'Marcar no leída' : 'Marcar leída'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── CONFIGURACIÓN ────────────────────────────────────────────────────────
 const AdminClientModal = ({ clientId, clientName, onClose, showToast }) => {
   const [users, setUsers]     = useState([]);
@@ -2332,7 +2673,40 @@ const App = () => {
   const [period,        setPeriod]        = useState('today');
   const [isLoading,     setIsLoading]     = useState(true);
 
+  // Novedades State
+  const [novedadesList,    setNovedadesList]    = useState([]);
+  const [loadingNovedades, setLoadingNovedades] = useState(false);
+  const [readIds,          setReadIds]          = useState([]);
+
   const showToast = (message, type = 'info') => setToast({ message, type });
+
+  // Load readIds from localStorage
+  useEffect(() => {
+    if (userCtx?.email) {
+      try {
+        const stored = localStorage.getItem(`g4s_read_novedades_${userCtx.email}`);
+        if (stored) setReadIds(JSON.parse(stored));
+      } catch (e) { console.warn("Error leyendo readIds de localStorage", e); }
+    }
+  }, [userCtx]);
+
+  const loadNovedades = useCallback(async () => {
+    if (!userCtx) return;
+    setLoadingNovedades(true);
+    try {
+      const res = await runServer('getNovedades', {});
+      setNovedadesList(res.novedades || []);
+      if (Array.isArray(res.readIds)) setReadIds(res.readIds);
+    } catch (e) {
+      console.warn("Error cargando novedades:", e.message);
+    } finally {
+      setLoadingNovedades(false);
+    }
+  }, [userCtx]);
+
+  const unreadCount = useMemo(() => {
+    return novedadesList.filter(n => !readIds.includes(n.idNovedad)).length;
+  }, [novedadesList, readIds]);
 
   const loadRequests = useCallback(async (periodKey = period) => {
     if (syncStatus !== 'idle') return;
@@ -2369,6 +2743,7 @@ const App = () => {
       setSyncStatus('master');
       const master = await runServer('getMasterData', {});
       setMasterData(master);
+      loadNovedades();
       setLastSync(Date.now());
       if (manual) showToast("Datos actualizados.", 'success');
     } catch (e) {
@@ -2407,7 +2782,11 @@ const App = () => {
         setView(ctx.role === 'Cliente Consulta' ? 'history' : 'home');
         Promise.all([
           runServer('getRequests', { period: defaultPeriod }).then(r => { setInitialData(r); }),
-          runServer('getMasterData', {}).then(m => { setMasterData(m); })
+          runServer('getMasterData', {}).then(m => { setMasterData(m); }),
+          runServer('getNovedades', {}).then(n => {
+            setNovedadesList(n.novedades || []);
+            if (Array.isArray(n.readIds)) setReadIds(n.readIds);
+          })
         ]).then(() => setLastSync(Date.now())).catch(console.warn);
       } else {
         setView('unauthorized');
@@ -2480,6 +2859,8 @@ const App = () => {
       case 'bulk':
         if (role === 'Cliente Consulta') return <RequestList setView={setView} setSelectedRequest={setSelectedRequest} initialData={initialData} onRefresh={() => refreshAll(true)} onChangePeriod={handleChangePeriod} currentPeriod={period} refreshing={syncStatus !== 'idle'} userContext={userCtx} masterData={masterData}/>;
         return <BulkUpload userContext={userCtx} setView={setView} onReload={() => loadRequests()}/>;
+      case 'novedades':
+        return <NovedadesView userContext={userCtx} setSelectedRequest={setSelectedRequest} setView={setView} novedadesList={novedadesList} loading={loadingNovedades} onRefresh={loadNovedades} readIds={readIds} setReadIds={setReadIds}/>;
       case 'config':
         return <ConfigurationView userContext={userCtx} onForceSync={() => refreshAll(true)} syncStatus={syncStatus} lastSync={lastSync} onRefreshClients={handleRefreshClients} showToast={showToast}/>;
       default:
@@ -2493,9 +2874,16 @@ const App = () => {
       <div className="md:hidden fixed top-0 left-0 right-0 h-14 bg-white border-b border-gray-200 z-20 flex items-center px-4 justify-between shadow-sm">
         <button onClick={() => setSidebarOpen(true)} className="p-2 -ml-2 text-gray-600 btn-action"><Icon name="Menu" size={23}/></button>
         <span className="font-bold text-gray-800">Confiabilidad</span>
-        <div className="w-8"></div>
+        <button onClick={() => setView('novedades')} className="p-2 text-gray-600 relative btn-action">
+          <Icon name={unreadCount > 0 ? "BellRing" : "Bell"} size={20} className={unreadCount > 0 ? "text-vividRed bell-ring" : "text-gray-600"}/>
+          {unreadCount > 0 && (
+            <span className="absolute top-1 right-1 bg-vividRed text-white text-[9px] font-black rounded-full h-4 min-w-[16px] px-1 flex items-center justify-center border border-white">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
+        </button>
       </div>
-      <Sidebar currentView={view} setView={setView} onLogout={handleLogout} userContext={userCtx} syncStatus={syncStatus} lastSync={lastSync} isOpen={sidebarOpen} toggleSidebar={setSidebarOpen} isCollapsed={isSidebarCollapsed} toggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}/>
+      <Sidebar currentView={view} setView={setView} onLogout={handleLogout} userContext={userCtx} syncStatus={syncStatus} lastSync={lastSync} isOpen={sidebarOpen} toggleSidebar={setSidebarOpen} isCollapsed={isSidebarCollapsed} toggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)} unreadCount={unreadCount}/>
       <div className={`flex-1 ${isSidebarCollapsed ? 'md:ml-20' : 'md:ml-64'} transition-all duration-300 w-full h-full overflow-y-auto pt-14 md:pt-0`}>
         <ErrorBoundary>{renderView()}</ErrorBoundary>
       </div>
