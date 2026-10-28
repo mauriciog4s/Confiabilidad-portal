@@ -46,6 +46,8 @@ function apiHandler(request) {
       // 👉 AQUÍ AGREGAMOS LA NUEVA RUTA PARA LA VISTA PREVIA:
       case 'getFileIdByName':   return getFileIdByName(payload);
       case 'getNovedades':      return getNovedades(userEmail, payload || {});
+      case 'marcarNovedadLeida':           return marcarNovedadLeida(userEmail, payload || {});
+      case 'marcarTodasNovedadesLeidas': return marcarTodasNovedadesLeidas(userEmail, payload || {});
       
       default: throw new Error(`Endpoint desconocido: ${endpoint}`);
     }
@@ -336,8 +338,9 @@ function getNovedades(email) {
       rowsNotas.forEach(r => {
         const req = reqMap[r.ID_SolicitudesConfiabilidad] || {};
         const fecha = r.FechaActualizacion?.value || r.FechaActualizacion || '';
+        const cleanFecha = String(fecha).replace(/[^a-zA-Z0-9]/g, '');
         allNovedades.push({
-          idNovedad: `nota_${r.ID_SolicitudesConfiabilidad}_${fecha}_${Math.random().toString(36).substr(2, 5)}`,
+          idNovedad: `nota_${r.ID_SolicitudesConfiabilidad}_${cleanFecha}`,
           idSolicitud: r.ID_SolicitudesConfiabilidad,
           nSolicitud: req.NSolicitud || r.ID_SolicitudesConfiabilidad,
           identificacion: req.Identificacion || '',
@@ -365,8 +368,9 @@ function getNovedades(email) {
       rowsNov.forEach(r => {
         const req = reqMap[r.ID_SolicitudesConfiabilidad] || {};
         const fecha = r.FechaActualizacion?.value || r.FechaActualizacion || '';
+        const cleanFecha = String(fecha).replace(/[^a-zA-Z0-9]/g, '');
         allNovedades.push({
-          idNovedad: `nov_${r.ID_SolicitudesConfiabilidad}_${fecha}_${Math.random().toString(36).substr(2, 5)}`,
+          idNovedad: `nov_${r.ID_SolicitudesConfiabilidad}_${cleanFecha}`,
           idSolicitud: r.ID_SolicitudesConfiabilidad,
           nSolicitud: req.NSolicitud || r.ID_SolicitudesConfiabilidad,
           identificacion: req.Identificacion || '',
@@ -391,7 +395,83 @@ function getNovedades(email) {
     return dB - dA;
   });
 
-  return { novedades: allNovedades, total: allNovedades.length };
+  // 3. Obtener lecturas del usuario en BigQuery
+  let readIds = [];
+  try {
+    const sqlRead = `SELECT ID_Novedad FROM \`${projectId}.${ds}.${TABLES.READ_NOVEDADES}\` WHERE Correo = @email`;
+    const readRows = bq.query(sqlRead, { email });
+    readIds = readRows.map(r => r.ID_Novedad);
+  } catch (e) {
+    console.warn("Tabla conNovedadesLeidas aun no creada o consulta vacia:", e.message);
+  }
+
+  return { novedades: allNovedades, total: allNovedades.length, readIds: readIds };
+}
+
+function ensureNovedadesLeidasTable(bq) {
+  const projectId = BQ_CREDENTIALS.project_id;
+  const ds = DATASET_ID;
+  const sql = `
+    CREATE TABLE IF NOT EXISTS \`${projectId}.${ds}.${TABLES.READ_NOVEDADES}\` (
+      Correo STRING,
+      ID_Novedad STRING,
+      FechaLectura STRING
+    )
+  `;
+  try { bq.query(sql); } catch (e) { console.warn("Error creando tabla conNovedadesLeidas:", e.message); }
+}
+
+function marcarNovedadLeida(email, { idNovedad, read }) {
+  const context = getUserContext(email);
+  if (!context.isValidUser) throw new Error("Acceso Denegado.");
+  if (!idNovedad) throw new Error("ID de novedad requerido.");
+
+  const bq = new BigQueryClient();
+  const projectId = BQ_CREDENTIALS.project_id;
+  const ds = DATASET_ID;
+
+  ensureNovedadesLeidasTable(bq);
+
+  try {
+    const deleteSql = `DELETE FROM \`${projectId}.${ds}.${TABLES.READ_NOVEDADES}\` WHERE Correo = @email AND ID_Novedad = @idNovedad`;
+    bq.query(deleteSql, { email, idNovedad });
+  } catch (e) { console.warn("Error borrando lectura previa:", e.message); }
+
+  if (read) {
+    const insertSql = `
+      INSERT INTO \`${projectId}.${ds}.${TABLES.READ_NOVEDADES}\` (Correo, ID_Novedad, FechaLectura)
+      VALUES (@email, @idNovedad, CAST(CURRENT_TIMESTAMP() AS STRING))
+    `;
+    bq.query(insertSql, { email, idNovedad });
+  }
+
+  return { success: true, idNovedad, read };
+}
+
+function marcarTodasNovedadesLeidas(email, { idNovedades }) {
+  const context = getUserContext(email);
+  if (!context.isValidUser) throw new Error("Acceso Denegado.");
+  if (!Array.isArray(idNovedades) || idNovedades.length === 0) return { success: true, count: 0 };
+
+  const bq = new BigQueryClient();
+  const projectId = BQ_CREDENTIALS.project_id;
+  const ds = DATASET_ID;
+
+  ensureNovedadesLeidasTable(bq);
+
+  for (const idNovedad of idNovedades) {
+    try {
+      const deleteSql = `DELETE FROM \`${projectId}.${ds}.${TABLES.READ_NOVEDADES}\` WHERE Correo = @email AND ID_Novedad = @idNovedad`;
+      bq.query(deleteSql, { email, idNovedad });
+      const insertSql = `
+        INSERT INTO \`${projectId}.${ds}.${TABLES.READ_NOVEDADES}\` (Correo, ID_Novedad, FechaLectura)
+        VALUES (@email, @idNovedad, CAST(CURRENT_TIMESTAMP() AS STRING))
+      `;
+      bq.query(insertSql, { email, idNovedad });
+    } catch (e) { console.warn("Error marcando leida:", idNovedad, e.message); }
+  }
+
+  return { success: true, count: idNovedades.length };
 }
 
 // ─── DATOS MAESTROS (solo tablas de referencia para formularios) ─────────

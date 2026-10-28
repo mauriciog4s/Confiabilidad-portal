@@ -33,7 +33,8 @@ const TABLES = {
   DOCS_TEMP:   "conDocumentosSolicitudTemporal",
   USERS:       "conUsuarios",
   REL_CLIENTS: "conUsuariosCliente",
-  CLIENT_CONF: "conClienteConfiabilidad"
+  CLIENT_CONF: "conClienteConfiabilidad",
+  READ_NOVEDADES: "conNovedadesLeidas"
 };
 
 // ⚠️ LLAVES PRIVADAS - Solo aquí, nunca en code.gs ni en index.html

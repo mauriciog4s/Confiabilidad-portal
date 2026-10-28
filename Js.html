@@ -175,8 +175,11 @@ const runServer = (endpoint, payload = {}) => {
                 tipo: 'Novedad'
               }
             ],
-            total: 1
+            total: 1,
+            readIds: []
           });
+        } else if (endpoint === 'marcarNovedadLeida' || endpoint === 'marcarTodasNovedadesLeidas') {
+          resolve({ success: true });
         } else {
           resolve({ success: true, message: 'Mock', data: [], total: 0 });
         }
@@ -2143,25 +2146,29 @@ const NovedadesView = ({ userContext, setSelectedRequest, setView, novedadesList
   }, [readIds]);
 
   const toggleRead = (idNovedad) => {
+    const isCurrentlyRead = isRead(idNovedad);
+    const newReadState = !isCurrentlyRead;
     let updated;
-    if (readIds.includes(idNovedad)) {
+    if (isCurrentlyRead) {
       updated = readIds.filter(id => id !== idNovedad);
     } else {
       updated = [...readIds, idNovedad];
     }
     setReadIds(updated);
-    try {
-      localStorage.setItem(localStorageKey, JSON.stringify(updated));
-    } catch (e) { console.warn("Error guardando localStorage", e); }
+
+    runServer('marcarNovedadLeida', { idNovedad, read: newReadState })
+      .catch(err => console.warn("Error guardando estado de lectura en BQ:", err));
   };
 
   const markAllAsRead = () => {
-    const allIds = novedadesList.map(n => n.idNovedad);
-    const updated = [...new Set([...readIds, ...allIds])];
+    const unreadItems = novedadesList.filter(n => !isRead(n.idNovedad));
+    if (unreadItems.length === 0) return;
+    const unreadIds = unreadItems.map(n => n.idNovedad);
+    const updated = [...new Set([...readIds, ...unreadIds])];
     setReadIds(updated);
-    try {
-      localStorage.setItem(localStorageKey, JSON.stringify(updated));
-    } catch (e) { console.warn("Error guardando localStorage", e); }
+
+    runServer('marcarTodasNovedadesLeidas', { idNovedades: unreadIds })
+      .catch(err => console.warn("Error guardando lecturas masivas en BQ:", err));
   };
 
   const stats = useMemo(() => {
@@ -2689,6 +2696,7 @@ const App = () => {
     try {
       const res = await runServer('getNovedades', {});
       setNovedadesList(res.novedades || []);
+      if (Array.isArray(res.readIds)) setReadIds(res.readIds);
     } catch (e) {
       console.warn("Error cargando novedades:", e.message);
     } finally {
@@ -2775,7 +2783,10 @@ const App = () => {
         Promise.all([
           runServer('getRequests', { period: defaultPeriod }).then(r => { setInitialData(r); }),
           runServer('getMasterData', {}).then(m => { setMasterData(m); }),
-          runServer('getNovedades', {}).then(n => { setNovedadesList(n.novedades || []); })
+          runServer('getNovedades', {}).then(n => {
+            setNovedadesList(n.novedades || []);
+            if (Array.isArray(n.readIds)) setReadIds(n.readIds);
+          })
         ]).then(() => setLastSync(Date.now())).catch(console.warn);
       } else {
         setView('unauthorized');
