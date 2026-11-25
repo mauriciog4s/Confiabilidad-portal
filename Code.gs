@@ -1,12 +1,12 @@
 /**
  * ============================================================================
  * ARCHIVO: Code.gs
- * PROPÓSITO: Lógica del servidor. Las variables (BQ_CREDENTIALS, TABLES, etc.)
- * se leen de Config.gs — NO se deben redeclarar aquí.
+ * PROPÓSITO: Servidor principal. Integra BigQuery (vía OAuth2) y subida/descarga
+ * de archivos delegada al Proxy con soporte de autorización Bearer y URL limpia.
  * ============================================================================
  */
 
-// ─── INCLUDE HELPER (para HtmlService templates) ──────────────────────────
+// ─── INCLUDE HELPER ──────────────────────────────────────────────────────
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
@@ -23,47 +23,65 @@ function doGet(e) {
 
 // ─── ROUTER DE API ───────────────────────────────────────────────────────
 function apiHandler(request) {
-  const userEmail = Session.getActiveUser().getEmail();
-  const { endpoint, payload } = request;
-  console.log(`🔒 [API] Endpoint: ${endpoint} | Usuario: ${userEmail}`);
   try {
+    if (!request || typeof request !== 'object') {
+      throw new Error("La solicitud enviada al servidor es nula o inválida.");
+    }
+
+    const { endpoint, payload } = request;
+    const userEmail = Session.getActiveUser().getEmail() || 'usuario_sin_sesion';
+    console.log(`🔒 [API] Endpoint: ${endpoint} | Usuario: ${userEmail}`);
+
     switch (endpoint) {
-      case 'getUserContext':    return getUserContext(userEmail);
-      case 'refreshUserContext':return getUserContext(userEmail);
-      case 'getRequests':       return getRequests(userEmail, payload || {});
-      case 'getMasterData':     return getMasterData(userEmail);
-      case 'createRequest':     return createRequest(userEmail, payload);
-      case 'getRequestDetail':  return getRequestDetail(userEmail, payload);
-      case 'getTemplateName':   return getTemplateName(userEmail, payload);
-      case 'processBulkUpload': return processBulkUpload(userEmail, payload);
+      case 'getUserContext':       return getUserContext(userEmail);
+      case 'refreshUserContext':   return getUserContext(userEmail);
+      case 'getRequests':          return getRequests(userEmail, payload || {});
+      case 'getMasterData':        return getMasterData(userEmail);
+      case 'createRequest':        return createRequest(userEmail, payload);
+      case 'getRequestDetail':     return getRequestDetail(userEmail, payload);
+      case 'getTemplateName':      return getTemplateName(userEmail, payload);
+      case 'processBulkUpload':    return processBulkUpload(userEmail, payload);
       case 'registerTempDocument': return registerTempDocument(userEmail, payload);
       case 'uploadDocument':       return uploadDocument(userEmail, payload);
-      case 'updateClientConfig': return updateClientConfig(userEmail, payload);
-      case 'getClientUsers':    return getClientUsers(userEmail, payload);
-      case 'updateUserConfig':  return updateUserConfig(userEmail, payload);
-      case 'getFileBase64': return getFileBase64(payload);
-      
-      // 👉 AQUÍ AGREGAMOS LA NUEVA RUTA PARA LA VISTA PREVIA:
-      case 'getFileIdByName':   return getFileIdByName(payload);
+      case 'updateClientConfig':   return updateClientConfig(userEmail, payload);
+      case 'getClientUsers':       return getClientUsers(userEmail, payload);
+      case 'updateUserConfig':     return updateUserConfig(userEmail, payload);
+      case 'getFileBase64':        return getFileBase64(payload);
+      case 'getFileIdByName':      return getFileIdByName(payload);
       
       default: throw new Error(`Endpoint desconocido: ${endpoint}`);
     }
   } catch (err) {
-    console.error(`❌ ERROR en ${endpoint}: ${err.message}\nStack: ${err.stack}`);
+    console.error(`❌ ERROR en apiHandler: ${err.message}\nStack: ${err.stack}`);
     return { error: true, message: err.message };
   }
 }
 
 // ─── CONTEXTO DE USUARIO ────────────────────────────────────────────────
 function getUserContext(email) {
+  if (!email || email === 'usuario_sin_sesion') {
+    return {
+      email: 'Sin sesión detectada',
+      role: 'Cliente',
+      allowedClientIds: [],
+      creationClientIds: [],
+      adminClientIds: [],
+      clientNames: {},
+      clientTypes: {},
+      clientData: {},
+      isValidUser: false,
+      isAdmin: false
+    };
+  }
+
   const bq = new BigQueryClient();
-  const projectId = BQ_CREDENTIALS.project_id;
+  const projectId = bq.getProjectId();
 
   let context = {
     email: email,
     role: 'Cliente',
     allowedClientIds: [],
-    creationClientIds: [], // Clientes para los que puede CREAR solicitudes
+    creationClientIds: [],
     adminClientIds: [],
     clientNames: {},
     clientTypes: {},
@@ -82,10 +100,8 @@ function getUserContext(email) {
   const roleLower = context.role.toLowerCase();
 
   context.isAdmin = (roleLower === 'administrador');
-
   context.userClientConfig = {};
 
-  // Siempre obtener clientes asignados
   let relResult = [];
   try {
     const sqlRel = `SELECT ID_ClientesConfiabilidad, ForcedMyRequests FROM \`${projectId}.${DATASET_ID}.${TABLES.REL_CLIENTS}\` WHERE Correo = @email`;
@@ -104,7 +120,6 @@ function getUserContext(email) {
   const privilegedForCreation = ['administrador', 'coordinador general', 'coordinador ep', 'coordinador ecp'];
   const privilegedForView     = ['administrador', 'coordinador general'];
 
-  // Normalización de seguridad para flags en el context
   context.isCoordinatorGeneral = (roleLower === 'coordinador general');
   context.isCoordinatorEP      = (roleLower === 'coordinador ep');
   context.isCoordinatorECP     = (roleLower === 'coordinador ecp');
@@ -114,10 +129,8 @@ function getUserContext(email) {
     const allRes = bq.query(sqlAllClients);
     const allIds = allRes.map(r => r.ID_ClientesConfiabilidad);
 
-    // Todos los privilegiados de creación ven todos los clientes para crear
     context.creationClientIds = allIds;
 
-    // Solo los privilegiados de vista ven todos los clientes en el histórico
     if (privilegedForView.includes(roleLower)) {
       context.allowedClientIds = allIds;
     }
@@ -126,7 +139,6 @@ function getUserContext(email) {
       context.adminClientIds = allIds;
     }
   } else {
-    // Para roles normales, creación = permitidos
     context.creationClientIds = context.allowedClientIds;
   }
 
@@ -134,8 +146,6 @@ function getUserContext(email) {
 
   if (fetchIds.length > 0) {
     const idsFormatted = fetchIds.map(id => `'${id}'`).join(',');
-    // ⚠️ Solo columnas que existen con certeza en conClienteConfiabilidad
-    // ForcedMyRequests va en conUsuariosCliente, NO aquí — agregar columnas extras rompe el query
     const sqlDetails = `
       SELECT ID_ClientesConfiabilidad, RazonSocial, TipodeCliente, NIT
       FROM \`${projectId}.${DATASET_ID}.${TABLES.CLIENT_CONF}\`
@@ -153,30 +163,27 @@ function getUserContext(email) {
           nit: row.NIT,
           razonSocial: descriptiveName,
           tipo: row.TipodeCliente,
-          forcedMyRequests: false  // Se maneja a nivel de usuario en conUsuariosCliente
+          forcedMyRequests: false
         };
       });
     } catch (e) {
       console.warn("Error cargando detalles de clientes:", e.message);
     }
-    // Garantizar nombre fallback para TODOS los IDs (incluidos adminClientIds)
     fetchIds.forEach(id => { if (!context.clientNames[id]) context.clientNames[id] = id; });
   }
   return context;
 }
 
-// ─── OBTENER SOLICITUDES (con filtro de período) ─────────────────────────
-// period: 'today' | 'week' | 'month' | 'year' | 'all'
+// ─── OBTENER SOLICITUDES ─────────────────────────────────────────────────
 function getRequests(email, { period = 'today', clientId = null } = {}) {
   const context = getUserContext(email);
   if (!context.isValidUser) throw new Error("Acceso Denegado.");
 
   const bq = new BigQueryClient();
-  const projectId = BQ_CREDENTIALS.project_id;
+  const projectId = bq.getProjectId();
   const tableView  = `${projectId}.${DATASET_ID}.${TABLES.READ_VIEW}`;
   const tableTemp  = `${projectId}.${DATASET_ID}.${TABLES.WRITE_TABLE}`;
 
-  // Filtro de fecha
   const dateFilters = {
     'today': `DATE(SAFE_CAST(FechaSolicitud AS TIMESTAMP), 'America/Bogota') = CURRENT_DATE('America/Bogota')`,
     'week':  `SAFE_CAST(FechaSolicitud AS TIMESTAMP) >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)`,
@@ -200,7 +207,6 @@ function getRequests(email, { period = 'today', clientId = null } = {}) {
     context.allowedClientIds.forEach((val, i) => { clientParams[`id${i}`] = val; });
   }
 
-  // Tarea 8: Forzar "Mis Solicitudes" (Seguridad robusta)
   let securityClause = '';
   const roleLower = String(context.role || '').toLowerCase();
   if (!context.isAdmin && roleLower !== 'coordinador general') {
@@ -219,7 +225,6 @@ function getRequests(email, { period = 'today', clientId = null } = {}) {
             clientParams.userEmail = email;
           }
         } else {
-          // Si no hay clientId, filtramos: (Si el cliente es de los forzados, debe ser mi solicitud; si no, ver todo lo permitido)
           securityClause = `(ID_Cliente NOT IN (${forcedIdsStr}) OR \`UsuarioCreación\` = @userEmail)`;
           clientParams.userEmail = email;
         }
@@ -227,7 +232,6 @@ function getRequests(email, { period = 'today', clientId = null } = {}) {
     }
   }
 
-  // Construir WHERE
   const buildWhere = (extra = '') => {
     const parts = [];
     if (clientClause)   parts.push(clientClause);
@@ -238,7 +242,6 @@ function getRequests(email, { period = 'today', clientId = null } = {}) {
     return parts.length > 0 ? `WHERE ${parts.join(' AND ')}` : '';
   };
 
-  // 1. Vista principal (Optimization & Mapping fix)
   const sqlColumns = `
     ID_SolicitudesConfiabilidad, NSolicitud, FechaSolicitud, Identificacion, 
     NombreCompleto, Cargo, EstadoActual, EstadoActualEP, 
@@ -257,7 +260,6 @@ function getRequests(email, { period = 'today', clientId = null } = {}) {
     throw new Error("Error cargando solicitudes: " + e.message);
   }
 
-  // 2. Temporales (recién creadas)
   const sqlTemp = `SELECT ${sqlColumns} FROM \`${tableTemp}\` ${buildWhere("EstadoActual = 'Creada'")} ORDER BY FechaSolicitud DESC LIMIT 100`;
   let rowsTemp = [];
   try {
@@ -274,7 +276,6 @@ function getRequests(email, { period = 'today', clientId = null } = {}) {
     console.warn("Error leyendo temporales:", e.message);
   }
 
-  // 3. Deduplicar (vista tiene prioridad)
   const allRows = [...rowsView, ...rowsTemp];
   const uniqueRows = [];
   const seenIds = new Set();
@@ -291,13 +292,13 @@ function getRequests(email, { period = 'today', clientId = null } = {}) {
   return { data: uniqueRows, total: uniqueRows.length, period };
 }
 
-// ─── DATOS MAESTROS (solo tablas de referencia para formularios) ─────────
+// ─── DATOS MAESTROS ──────────────────────────────────────────────────────
 function getMasterData(email) {
   const context = getUserContext(email);
   if (!context.isValidUser) throw new Error("Acceso Denegado.");
 
   const bq = new BigQueryClient();
-  const projectId = BQ_CREDENTIALS.project_id;
+  const projectId = bq.getProjectId();
   const ds = DATASET_ID;
   const result = {};
 
@@ -318,15 +319,14 @@ function getMasterData(email) {
   return result;
 }
 
-// ─── DETALLE COMPLETO DE UNA SOLICITUD (carga bajo demanda) ─────────────
+// ─── DETALLE COMPLETO DE UNA SOLICITUD ───────────────────────────────────
 function getRequestDetail(email, { id }) {
   const context = getUserContext(email);
   if (!context.isValidUser) throw new Error("Acceso Denegado");
 
   const bq = new BigQueryClient();
-  const projectId = BQ_CREDENTIALS.project_id;
+  const projectId = bq.getProjectId();
 
-  // Buscar en vista principal, luego en temporal
   let headerRes = [];
   try {
     const sql = `SELECT * FROM \`${projectId}.${DATASET_ID}.${TABLES.READ_VIEW}\` WHERE ID_SolicitudesConfiabilidad = @id LIMIT 1`;
@@ -417,7 +417,7 @@ function createRequest(email, payload) {
   }
 
   const bq = new BigQueryClient();
-  const projectId = BQ_CREDENTIALS.project_id;
+  const projectId = bq.getProjectId();
   const tableWrite = `${projectId}.${DATASET_ID}.${TABLES.WRITE_TABLE}`;
   const newId = generateUniqueId();
 
@@ -480,7 +480,7 @@ function getTemplateName(email, { clientId }) {
     throw new Error("No tiene permisos para descargar plantillas de este cliente.");
   }
   const bq = new BigQueryClient();
-  const projectId = BQ_CREDENTIALS.project_id;
+  const projectId = bq.getProjectId();
   const sql = `SELECT PlantillaMasivo FROM \`${projectId}.${DATASET_ID}.${TABLES.CLIENT_CONF}\` WHERE ID_ClientesConfiabilidad = @id LIMIT 1`;
   const rows = bq.query(sql, { id: clientId });
   if (rows.length === 0 || !rows[0].PlantillaMasivo) throw new Error("No hay plantilla configurada para este cliente.");
@@ -497,7 +497,7 @@ function processBulkUpload(email, { csvContent, clientId }) {
   }
 
   const bq = new BigQueryClient();
-  const projectId = BQ_CREDENTIALS.project_id;
+  const projectId = bq.getProjectId();
   const tableWrite = `${projectId}.${DATASET_ID}.${TABLES.WRITE_TABLE}`;
 
   const normalizeStr = (str) => {
@@ -505,7 +505,6 @@ function processBulkUpload(email, { csvContent, clientId }) {
     return String(str).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
   };
 
-  // Verificar tipo de cliente
   let clientTypeRaw = context.clientTypes[clientId];
   if (!clientTypeRaw) {
     try {
@@ -516,7 +515,6 @@ function processBulkUpload(email, { csvContent, clientId }) {
   }
   const isInternal = String(clientTypeRaw || 'Externo').toLowerCase().includes('interno');
 
-  // Datos maestros para validación
   const sqlMasters = `
     SELECT 'LineaCC' as Tipo, Linea, LN_Nombre, CC_Nombre, NULL as Descripcion FROM \`${projectId}.${DATASET_ID}.conLineaCC\`
     UNION ALL SELECT 'Ciudad', Ciudades, NULL, NULL, NULL FROM \`${projectId}.${DATASET_ID}.conCiudades\`
@@ -539,7 +537,6 @@ function processBulkUpload(email, { csvContent, clientId }) {
   const validTiposID = new Set(['CEDULA DE CIUDADANIA','TARJETA DE IDENTIDAD','CEDULA DE EXTRANJERIA','CEDULA EXTRANJERIA','PASAPORTE','PERMISO ESPECIAL','PERMISO PERMANENTE DE TRABAJO','PEP','OTRO']);
   const validTiposPoligrafia = new Set(['PREEMPLEO', 'RUTINA', 'ESPECIFICA', 'VERIFEYE PREEMPLEO', 'VERIFEYE RUTINA', 'VERIFEYE ESPECIFICA', 'VSA PREEMPLEO', 'VSA RUTINA', 'VSA ESPECIFICA']);
 
-  // Procesar CSV
   let csvString = Utilities.newBlob(Utilities.base64Decode(csvContent)).getDataAsString('UTF-8');
   if (csvString.charCodeAt(0) === 0xFEFF) csvString = csvString.slice(1);
   const lines = csvString.split(/\r\n|\n|\r/);
@@ -585,10 +582,9 @@ function processBulkUpload(email, { csvContent, clientId }) {
         if (val) hasData = true;
       }
     });
-if (!hasData) continue;
+    if (!hasData) continue;
     const rowNum = i + 1;
 
-    // 1. Información General Obligatoria
     if (!rowData.NombreCompleto) {
       validationErrors.push(`Fila ${rowNum}: NombreCompleto es obligatorio`);
     }
@@ -617,22 +613,17 @@ if (!hasData) continue;
     if (!rowData.Direccion) validationErrors.push(`Fila ${rowNum}: Direccion es obligatoria`);
     if (!rowData.TipoTrabajador) validationErrors.push(`Fila ${rowNum}: TipoTrabajador es obligatorio`);
 
-    // 2. Lógica para Cliente Interno
     if (isInternal) {
       if (!rowData.Linea) validationErrors.push(`Fila ${rowNum}: Linea obligatoria para Cliente Interno`);
       if (!rowData.LineaNegocio) validationErrors.push(`Fila ${rowNum}: LineaNegocio obligatoria para Cliente Interno`);
       if (!rowData.CentroCostos) validationErrors.push(`Fila ${rowNum}: CentroCostos obligatorio para Cliente Interno`);
     }
 
-    // 3. Lógica de Servicios a Aplicar (Debe existir al menos 1 servicio)
     const hasService = ['VisitaDomiciliaria', 'ConsultaAntecedentes', 'Referenciacion', 'EstudiosPoligrafia', 'ConsultaDatacredito', 'ComparativoOEA'].some(s => rowData[s] === 'SI');
     if (!hasService) {
       validationErrors.push(`Fila ${rowNum}: Debe seleccionar al menos un servicio a aplicar (escribir "SI" en alguna de las columnas de servicios)`);
     }
 
-    // 4. Dependencias obligatorias internas por Servicio
-    // Si el servicio padre es NO, forzar limpieza de campos hijos
-    // (por si el CSV los trae rellenos por error)
     if (rowData.VisitaDomiciliaria !== 'SI') rowData.ModalidadVisita = '';
     if (rowData.Referenciacion !== 'SI') {
       rowData.ReferenciaAcademica = 'NO';
@@ -644,26 +635,24 @@ if (!hasData) continue;
       rowData.CiudadP        = '';
     }
 
-    // Validar campos hijos SOLO si el servicio padre está activo
     if (rowData.VisitaDomiciliaria === 'SI' && !rowData.ModalidadVisita) {
       validationErrors.push(`Fila ${rowNum}: ModalidadVisita es obligatoria cuando aplica VisitaDomiciliaria`);
     }
     if (rowData.Referenciacion === 'SI') {
-  if (!rowData.ReferenciaAcademica) validationErrors.push(`Fila ${rowNum}: ReferenciaAcademica (SI/NO) es obligatoria al aplicar Referenciacion`);
-  if (!rowData.ReferenciaLaboral)   validationErrors.push(`Fila ${rowNum}: ReferenciaLaboral (SI/NO) es obligatoria al aplicar Referenciacion`);
-  if (!rowData.ReferenciaPersonal)  validationErrors.push(`Fila ${rowNum}: ReferenciaPersonal (SI/NO) es obligatoria al aplicar Referenciacion`);
+      if (!rowData.ReferenciaAcademica) validationErrors.push(`Fila ${rowNum}: ReferenciaAcademica (SI/NO) es obligatoria al aplicar Referenciacion`);
+      if (!rowData.ReferenciaLaboral)   validationErrors.push(`Fila ${rowNum}: ReferenciaLaboral (SI/NO) es obligatoria al aplicar Referenciacion`);
+      if (!rowData.ReferenciaPersonal)  validationErrors.push(`Fila ${rowNum}: ReferenciaPersonal (SI/NO) es obligatoria al aplicar Referenciacion`);
 
-  // Al menos una referencia debe ser SI
-  const alMenosUnaRef = rowData.ReferenciaAcademica === 'SI' || rowData.ReferenciaLaboral === 'SI' || rowData.ReferenciaPersonal === 'SI';
-  if (!alMenosUnaRef) validationErrors.push(`Fila ${rowNum}: Referenciacion activa pero todas las referencias están en NO — debe tener al menos una en SI`);
-}
+      const alMenosUnaRef = rowData.ReferenciaAcademica === 'SI' || rowData.ReferenciaLaboral === 'SI' || rowData.ReferenciaPersonal === 'SI';
+      if (!alMenosUnaRef) validationErrors.push(`Fila ${rowNum}: Referenciacion activa pero todas las referencias están en NO — debe tener al menos una en SI`);
+    }
     if (rowData.EstudiosPoligrafia === 'SI') {
       if (!rowData.TipoPoligrafia) {
         validationErrors.push(`Fila ${rowNum}: TipoPoligrafia es obligatorio cuando aplica EstudiosPoligrafia`);
       } else if (!validTiposPoligrafia.has(normalizeStr(rowData.TipoPoligrafia))) {
         validationErrors.push(`Fila ${rowNum}: TipoPoligrafia "${rowData.TipoPoligrafia}" no es válido`);
       }
-      if (!rowData.CiudadP)        validationErrors.push(`Fila ${rowNum}: CiudadP es obligatoria cuando aplica EstudiosPoligrafia`);
+      if (!rowData.CiudadP) validationErrors.push(`Fila ${rowNum}: CiudadP es obligatoria cuando aplica EstudiosPoligrafia`);
     }
 
     parsedRows.push(rowData);
@@ -747,15 +736,12 @@ if (!hasData) continue;
   };
 }
 
-// El campo Documento debe llevar SOLO el nombre del archivo, sin prefijo de
-// carpeta: AppSheet arma su Url (gettablefileurl) con este valor tal cual,
-// y un prefijo como "Documentos/" hace que AppSheet responda "File not found"
-// (confirmado con pruebas reales, ver Notes.txt).
+// ─── REGISTRAR METADATOS DE DOCUMENTO (BigQuery) ─────────────────────────
 function registerTempDocument(email, { requestId, docName, fileName }) {
   const context = getUserContext(email);
   if (!context.isValidUser) throw new Error("Usuario no autorizado.");
   const bq = new BigQueryClient();
-  const projectId = BQ_CREDENTIALS.project_id;
+  const projectId = bq.getProjectId();
   const tableId = `${projectId}.${DATASET_ID}.${TABLES.DOCS_TEMP}`;
   const docId = generateUniqueId();
 
@@ -770,11 +756,7 @@ function registerTempDocument(email, { requestId, docName, fileName }) {
   return { success: true, message: "Metadatos registrados." };
 }
 
-// Guarda el archivo directamente en la misma carpeta de Drive donde AppSheet
-// deja sus propios adjuntos (confirmado con pruebas: un archivo subido desde
-// AppSheet en esta carpeta se ve sin problema desde el portal).
-// La validación de tipo y tamaño se repite aquí porque la del navegador se
-// puede evitar llamando el endpoint directamente.
+// ─── GUARDAR DOCUMENTO DIRECTO VÍA PROXY (URL LIMPIA + BEARER TOKEN) ─────
 function uploadDocument(email, payload) {
   const context = getUserContext(email);
   if (!context.isValidUser) throw new Error("Usuario no autorizado.");
@@ -782,30 +764,127 @@ function uploadDocument(email, payload) {
   const { filename, base64, mimetype } = payload;
   if (!filename || !base64) throw new Error("Faltan datos de archivo para guardar en Drive.");
 
-  const cleanFileName = String(filename).split(/[/\\]/).pop();
-
+  const cleanFileName = String(filename).split(/[/\\]/).pop().trim();
   const esPdf = String(mimetype || '').toLowerCase() === 'application/pdf' || /\.pdf$/i.test(cleanFileName);
   if (!esPdf) throw new Error("Solo se permiten archivos en formato PDF.");
 
-  const decoded = Utilities.base64Decode(base64);
+  const cleanBase64 = String(base64).replace(/^data:.*?;base64,/, '');
+  const decoded = Utilities.base64Decode(cleanBase64);
   if (decoded.length === 0) throw new Error("El archivo está vacío.");
   if (decoded.length > MAX_DOC_BYTES) {
     throw new Error(`El archivo supera el máximo permitido de ${Math.round(MAX_DOC_BYTES / 1024 / 1024)} MB.`);
   }
 
-  const blob = Utilities.newBlob(decoded, 'application/pdf', cleanFileName);
-  const targetFolder = DriveApp.getFolderById(APPSHEET_DOCS_PDF_FOLDER_ID);
-  const file = targetFolder.createFile(blob);
+  try {
+    // 1. Limpieza de URL: elimina /a/macros/co.g4s.com/ para evitar redirección de inicio de sesión de Google
+    const cleanUrl = PROXY_URL.replace(/\/a\/macros\/[^\/]+\/s\//, '/macros/s/');
 
-  return { success: true, fileId: file.getId(), fileName: file.getName() };
+    const proxyPayload = {
+      token: PROXY_TOKEN,
+      filename: cleanFileName,
+      mimetype: 'application/pdf',
+      base64: cleanBase64
+    };
+
+    // 2. Encabezados: si el Proxy pide autenticación de dominio, inyecta el token Bearer
+    const headers = {};
+    try {
+      const token = ScriptApp.getOAuthToken();
+      if (token) headers['Authorization'] = 'Bearer ' + token;
+    } catch (e) {
+      console.warn("No se pudo obtener ScriptApp.getOAuthToken():", e.message);
+    }
+
+    const options = {
+      method: 'post',
+      contentType: 'application/json',
+      headers: headers,
+      payload: JSON.stringify(proxyPayload),
+      muteHttpExceptions: true
+    };
+
+    const resp = UrlFetchApp.fetch(cleanUrl, options);
+    const respCode = resp.getResponseCode();
+    const respText = resp.getContentText();
+
+    let result = {};
+    try {
+      result = JSON.parse(respText);
+    } catch (e) {
+      if (respText.includes("SUCCESS_UPLOAD") || respCode === 200) {
+        return { success: true, fileName: cleanFileName };
+      }
+      throw new Error("Respuesta inválida del servidor Proxy: " + respText);
+    }
+
+    if (result.success || result.fileId) {
+      console.log(`✅ Archivo guardado vía Proxy exitosamente: ${cleanFileName}`);
+      return { success: true, fileId: result.fileId, fileName: result.fileName || cleanFileName };
+    } else {
+      throw new Error(result.message || "Error reportado por el Proxy al subir archivo.");
+    }
+  } catch (proxyErr) {
+    console.error("Fallo guardando archivo en Proxy:", proxyErr.message);
+    throw new Error("No fue posible almacenar el archivo en Drive: " + proxyErr.message);
+  }
 }
 
+// ─── OBTENER ARCHIVO EN BASE64 DIRECTO VÍA PROXY ─────────────────────────
+function getFileBase64(payload) {
+  try {
+    let rawInput = String(payload.filename || payload.path || payload.id || '').trim();
+    if (!rawInput) return { success: false, message: "No se proporcionó un nombre o ID de archivo." };
+
+    let cleanName = rawInput;
+    try { cleanName = decodeURIComponent(cleanName); } catch (e) {}
+    cleanName = cleanName.split(/[/\\]/).pop().trim();
+
+    // 1. Limpieza de URL
+    const cleanUrl = PROXY_URL.replace(/\/a\/macros\/[^\/]+\/s\//, '/macros/s/');
+    const proxyFetchUrl = `${cleanUrl}?token=${encodeURIComponent(PROXY_TOKEN)}&action=base64&filename=${encodeURIComponent(cleanName)}`;
+
+    // 2. Encabezado de autenticación de dominio
+    const headers = {};
+    try {
+      const token = ScriptApp.getOAuthToken();
+      if (token) headers['Authorization'] = 'Bearer ' + token;
+    } catch (e) {}
+
+    const proxyRes = UrlFetchApp.fetch(proxyFetchUrl, {
+      method: 'get',
+      headers: headers,
+      muteHttpExceptions: true
+    });
+
+    if (proxyRes.getResponseCode() === 200) {
+      const jsonRes = JSON.parse(proxyRes.getContentText());
+      if (jsonRes.success && jsonRes.base64) {
+        return {
+          success: true,
+          base64: jsonRes.base64,
+          mimeType: jsonRes.mimeType || 'application/pdf',
+          fileName: jsonRes.fileName || cleanName
+        };
+      } else {
+        return { success: false, message: jsonRes.message || `Archivo no encontrado: "${cleanName}"` };
+      }
+    } else {
+      return { success: false, message: `Error del Proxy (${proxyRes.getResponseCode()}): ${proxyRes.getContentText()}` };
+    }
+
+  } catch (error) {
+    console.error("Error en getFileBase64 vía Proxy:", error.message);
+    return { success: false, message: error.message };
+  }
+}
+
+// ─── CONFIGURACIÓN DE CLIENTES Y USUARIOS ────────────────────────────────
 function updateClientConfig(email, { clientId, forcedMyRequests }) {
   const context = getUserContext(email);
   if (!context.isAdmin) throw new Error("Solo administradores pueden realizar esta acción.");
   
   const bq = new BigQueryClient();
-  const projectId = BQ_CREDENTIALS.project_id;
+  const projectId = bq.getProjectId();
   const sql = `UPDATE \`${projectId}.${DATASET_ID}.${TABLES.CLIENT_CONF}\` SET ForcedMyRequests = @val WHERE ID_ClientesConfiabilidad = @id`;
   bq.query(sql, { val: forcedMyRequests ? 'SI' : 'NO', id: clientId });
   return { success: true, message: "Configuración actualizada." };
@@ -815,10 +894,8 @@ function getClientUsers(email, { clientId }) {
   const context = getUserContext(email);
   if (!context.isAdmin) throw new Error("Acceso Denegado");
   const bq = new BigQueryClient();
-  const projectId = BQ_CREDENTIALS.project_id;
+  const projectId = bq.getProjectId();
 
-  // Join para obtener usuarios y sus roles, filtrados por cliente
-  // Se intenta leer ForcedMyRequests de la tabla de relación (conUsuariosCliente)
   const sql = `
     SELECT u.Email, u.Rol_Asignado, rc.ForcedMyRequests as userForced
     FROM \`${projectId}.${DATASET_ID}.${TABLES.REL_CLIENTS}\` rc
@@ -842,26 +919,22 @@ function updateUserConfig(email, { targetEmail, clientId, role, userForced }) {
   const context = getUserContext(email);
   if (!context.isAdmin) throw new Error("Acceso Denegado");
   const bq = new BigQueryClient();
-  const projectId = BQ_CREDENTIALS.project_id;
+  const projectId = bq.getProjectId();
 
   const VALID_ROLES = ['Cliente Completo', 'Cliente Creación', 'Cliente Consulta', 'Cliente Perfilado', 'Administrador', 'Coordinador General', 'Coordinador EP', 'Coordinador ECP'];
 
-  // 1. Actualizar Rol_Asignado en conUsuarios
   if (role) {
     if (!VALID_ROLES.includes(role)) throw new Error(`Rol inválido: ${role}`);
 
-    // Verificar que el usuario exista antes de actualizar
     const checkSql = `SELECT Email FROM \`${projectId}.${DATASET_ID}.${TABLES.USERS}\` WHERE Email = @targetEmail LIMIT 1`;
     const exists = bq.query(checkSql, { targetEmail });
     if (exists.length === 0) throw new Error(`Usuario no encontrado en el sistema: ${targetEmail}`);
 
-    // Ejecutar el UPDATE
     bq.query(
       `UPDATE \`${projectId}.${DATASET_ID}.${TABLES.USERS}\` SET Rol_Asignado = @role WHERE Email = @targetEmail`,
       { role, targetEmail }
     );
 
-    // Sincronizar ForcedMyRequests si es Perfilado
     try {
       bq.query(
         `UPDATE \`${projectId}.${DATASET_ID}.${TABLES.REL_CLIENTS}\` SET ForcedMyRequests = @val WHERE Correo = @targetEmail AND ID_ClientesConfiabilidad = @clientId`,
@@ -869,7 +942,6 @@ function updateUserConfig(email, { targetEmail, clientId, role, userForced }) {
       );
     } catch (e) { console.warn("Error sincronizando ForcedMyRequests:", e.message); }
 
-    // Verificar que el cambio se aplicó
     const verify = bq.query(
       `SELECT Rol_Asignado FROM \`${projectId}.${DATASET_ID}.${TABLES.USERS}\` WHERE Email = @targetEmail LIMIT 1`,
       { targetEmail }
@@ -882,7 +954,6 @@ function updateUserConfig(email, { targetEmail, clientId, role, userForced }) {
     console.log(`✅ [updateUserConfig] Rol de ${targetEmail} cambiado a: ${role}`);
   }
 
-  // 2. Actualizar ForcedMyRequests manualmente (si aplica fuera de cambio de rol)
   if (userForced !== undefined) {
     try {
       bq.query(
@@ -906,62 +977,116 @@ function generateUniqueId() {
   return result;
 }
 
-// ─── CLIENTE BIGQUERY ─────────────────────────────────────────────────
+// ─── CLIENTE BIGQUERY CON BIBLIOTECA OFICIAL OAuth2 ───────────────────────
 class BigQueryClient {
-  constructor() { this.token = this.getServiceAccountToken(); }
+  constructor() {
+    this.creds = this.cargarCredenciales();
+    this.token = this.getServiceAccountToken();
+  }
+
+  cargarCredenciales() {
+    const scriptProps = PropertiesService.getScriptProperties();
+    const jsonStr = scriptProps.getProperty('GOOGLE_CLOUD_CREDS');
+    if (jsonStr) {
+      try {
+        const parsed = JSON.parse(jsonStr);
+        if (parsed.private_key && parsed.client_email) {
+          return parsed;
+        }
+      } catch (e) {
+        console.warn("No se pudo parsear GOOGLE_CLOUD_CREDS como JSON:", e.message);
+      }
+    }
+
+    if (typeof BQ_CREDENTIALS !== 'undefined' && BQ_CREDENTIALS.private_key) {
+      return BQ_CREDENTIALS;
+    }
+
+    throw new Error("No se encontraron credenciales válidas en GOOGLE_CLOUD_CREDS ni en BQ_CREDENTIALS.");
+  }
+
+  getProjectId() {
+    return this.creds.project_id || (typeof CONFIG !== 'undefined' ? CONFIG.PROJECT_ID : 'g4s-shared-tz1');
+  }
 
   getServiceAccountToken() {
-    const header = { alg: 'RS256', typ: 'JWT' };
-    const now = Math.floor(Date.now() / 1000);
-    const claim = {
-      iss: BQ_CREDENTIALS.client_email,
-      scope: 'https://www.googleapis.com/auth/bigquery',
-      aud: 'https://oauth2.googleapis.com/token',
-      exp: now + 3600, iat: now
-    };
-    const signatureInput = Utilities.base64EncodeWebSafe(JSON.stringify(header)) + '.' + Utilities.base64EncodeWebSafe(JSON.stringify(claim));
-    const signature = Utilities.computeRsaSha256Signature(signatureInput, BQ_CREDENTIALS.private_key);
-    const jwt = signatureInput + '.' + Utilities.base64EncodeWebSafe(signature);
-    const response = UrlFetchApp.fetch('https://oauth2.googleapis.com/token', {
-      method: 'post',
-      payload: { grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: jwt }
-    });
-    return JSON.parse(response.getContentText()).access_token;
+    try {
+      const rawKey = String(this.creds.private_key || '');
+      const pemKey = rawKey.replace(/\\n/g, '\n').trim();
+
+      const service = OAuth2.createService('BigQueryAPI')
+        .setTokenUrl('https://oauth2.googleapis.com/token')
+        .setPrivateKey(pemKey)
+        .setIssuer(this.creds.client_email)
+        .setPropertyStore(PropertiesService.getScriptProperties())
+        .setScope('https://www.googleapis.com/auth/bigquery');
+
+      if (!service.hasAccess()) {
+        const err = service.getLastError();
+        console.error("❌ Error de acceso en OAuth2:", err);
+        throw new Error("Fallo de acceso OAuth2 con BigQuery: " + (err ? JSON.stringify(err) : "Token expirado o inválido"));
+      }
+
+      return service.getAccessToken();
+
+    } catch (err) {
+      console.error("❌ Error en BigQueryClient.getServiceAccountToken:", err.message);
+      throw new Error(`Error de autenticación con BigQuery: ${err.message}`);
+    }
   }
 
   query(sql, params = {}) {
-    const projectId = BQ_CREDENTIALS.project_id;
+    const projectId = this.getProjectId();
     const url = `https://bigquery.googleapis.com/bigquery/v2/projects/${projectId}/queries`;
+    
     const queryParameters = Object.keys(params).map(key => ({
-      name: key, parameterType: { type: 'STRING' }, parameterValue: { value: String(params[key]) }
+      name: key,
+      parameterType: { type: 'STRING' },
+      parameterValue: { value: String(params[key]) }
     }));
+
     const payload = {
-      query: sql, useLegacySql: false,
+      query: sql,
+      useLegacySql: false,
       parameterMode: queryParameters.length > 0 ? 'NAMED' : undefined,
       queryParameters: queryParameters.length > 0 ? queryParameters : undefined,
       maxResults: 10000
     };
+
     const options = {
-      method: 'post', contentType: 'application/json',
+      method: 'post',
+      contentType: 'application/json',
       headers: { Authorization: `Bearer ${this.token}` },
-      payload: JSON.stringify(payload), muteHttpExceptions: true
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
     };
+
     const response = UrlFetchApp.fetch(url, options);
-    if (response.getResponseCode() !== 200) throw new Error(`BigQuery Error: ${response.getContentText()}`);
+    if (response.getResponseCode() !== 200) {
+      throw new Error(`BigQuery Error: ${response.getContentText()}`);
+    }
+
     let json = JSON.parse(response.getContentText());
     if (!json.schema) return [];
+    
     const fields = json.schema.fields.map(f => f.name);
     let allRows = json.rows || [];
     let jobId = json.jobReference.jobId;
     let pageToken = json.pageToken;
+
     while (pageToken) {
       const nextUrl = `https://bigquery.googleapis.com/bigquery/v2/projects/${projectId}/queries/${jobId}?pageToken=${pageToken}&maxResults=10000`;
-      const nextRes = UrlFetchApp.fetch(nextUrl, { method: 'get', headers: { Authorization: `Bearer ${this.token}` }, muteHttpExceptions: true });
-      if (nextRes.getResponseCode() !== 200) { console.warn("Error paginando BigQuery"); break; }
+      const nextRes = UrlFetchApp.fetch(nextUrl, {
+        method: 'get',
+        headers: { Authorization: `Bearer ${this.token}` },
+        muteHttpExceptions: true
+      });
+      if (nextRes.getResponseCode() !== 200) break;
       const nextJson = JSON.parse(nextRes.getContentText());
       if (nextJson.rows) allRows = allRows.concat(nextJson.rows);
       pageToken = nextJson.pageToken;
     }
+
     return allRows.map(row => {
       let obj = {};
       row.f.forEach((cell, i) => { obj[fields[i]] = cell.v; });
@@ -970,269 +1095,9 @@ class BigQueryClient {
   }
 }
 
-function diagnosticarTablaTemporal() {
-  const bq = new BigQueryClient();
-  const sql = `SELECT column_name FROM \`g4s-shared-tz1.Confiabilidad.INFORMATION_SCHEMA.COLUMNS\` WHERE table_name = 'conSolicitudesTemporal' ORDER BY ordinal_position`;
-  const result = bq.query(sql);
-  console.log(result.map(r => r.column_name).join('\n'));
-}
-
-
-
-function buscarInformesEnVistaPrincipal() {
-  const bq = new BigQueryClient();
-  const projectId = BQ_CREDENTIALS.project_id;
-  
-  // Usamos las variables dinámicas de tu Config.gs para ir a la vista correcta
-  const vistaPrincipal = `${projectId}.${DATASET_ID}.${TABLES.READ_VIEW}`;
-  
-  const sql = `
-    SELECT 
-      Identificacion,
-      NombreCompleto, 
-      EstadoActual,
-      ArchivoInforme 
-    FROM \`${vistaPrincipal}\`
-    WHERE ArchivoInforme IS NOT NULL 
-      AND ArchivoInforme != '' 
-      AND ArchivoInforme != 'None'
-      AND ArchivoInforme != 'null'
-    LIMIT 5
-  `;
-  
-  try {
-    console.log(`Buscando en la vista histórica: ${vistaPrincipal}...`);
-    const result = bq.query(sql);
-    
-    if (result.length === 0) {
-      console.log("No se encontraron PDFs válidos tampoco en la vista principal.");
-    } else {
-      console.log("✅ Registros con Informe Final en el histórico:");
-      console.log(JSON.stringify(result, null, 2));
-    }
-  } catch (err) {
-    console.error("Error consultando la vista principal:", err.message);
-  }
-}
-
-function validarCedulaEnVistaPrincipal() {
-  const bq = new BigQueryClient();
-  const projectId = BQ_CREDENTIALS.project_id;
-  
-  // Apuntamos directo a la vista que ya sabemos que tiene los datos finales
-  const vistaPrincipal = `${projectId}.${DATASET_ID}.${TABLES.READ_VIEW}`;
-  const numeroCedula = '1062311344';
-  
-  const sql = `
-    SELECT 
-      Identificacion,
-      NombreCompleto, 
-      EstadoActual,
-      ArchivoInforme 
-    FROM \`${vistaPrincipal}\`
-    WHERE Identificacion = @cedula
-  `;
-  
-  try {
-    console.log(`Buscando la cédula ${numeroCedula} en el histórico final...`);
-    const result = bq.query(sql, { cedula: numeroCedula });
-    
-    if (result.length === 0) {
-      console.log(`❌ La cédula no existe en el histórico. Sigue en temporal o fue borrada.`);
-    } else {
-      console.log(`✅ Resultado de la cédula:`);
-      console.log(JSON.stringify(result, null, 2));
-    }
-  } catch (err) {
-    console.error("Error consultando la base de datos:", err.message);
-  }
-}
-
-function verIDsDeLaCedula() {
-  const bq = new BigQueryClient();
-  const projectId = BQ_CREDENTIALS.project_id;
-  const vistaPrincipal = `${projectId}.${DATASET_ID}.${TABLES.READ_VIEW}`;
-  
-  const sql = `
-    SELECT 
-      ID_SolicitudesConfiabilidad,
-      NSolicitud,
-      Identificacion,
-      EstadoActual,
-      ArchivoInforme,
-      FechaSolicitud
-    FROM \`${vistaPrincipal}\`
-    WHERE Identificacion = '1123414899'
-  `;
-  
-  try {
-    const result = bq.query(sql);
-    console.log(JSON.stringify(result, null, 2));
-  } catch (err) {
-    console.error("Error:", err.message);
-  }
-}
-
-
-function searchFileInFolderRecursive(folder, fileName, currentDepth, maxDepth) {
-  if (currentDepth > maxDepth) return null;
-
-  const subfolders = folder.getFolders();
-  while (subfolders.hasNext()) {
-    const sub = subfolders.next();
-    const filesInSub = sub.getFilesByName(fileName);
-    if (filesInSub.hasNext()) return filesInSub.next();
-
-    if (currentDepth < maxDepth) {
-      const foundInNested = searchFileInFolderRecursive(sub, fileName, currentDepth + 1, maxDepth);
-      if (foundInNested) return foundInNested;
-    }
-  }
-  return null;
-}
-
-function findFileInFolder(rootFolder, pathOrFilename) {
-  if (!rootFolder) return null;
-
-  let rawInput = String(pathOrFilename || '').trim();
-  if (!rawInput) return null;
-
-  let cleanPath = rawInput;
-  try { cleanPath = decodeURIComponent(cleanPath); } catch (e) {}
-  cleanPath = cleanPath.replace(/\\/g, '/');
-
-  const parts = cleanPath.split('/').map(p => p.trim()).filter(p => p.length > 0);
-  if (parts.length === 0) return null;
-
-  const fileName = parts[parts.length - 1];
-
-  // 1. Búsqueda directa por index en la carpeta y sus subcarpetas (Rápido)
-  try {
-    const escapedName = fileName.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-    const searchRes = rootFolder.searchFiles(`title = '${escapedName}' and trashed = false`);
-    if (searchRes.hasNext()) return searchRes.next();
-  } catch (e) {
-    console.warn("searchFiles error:", e.message);
-  }
-
-  // 2. Si hay partes de ruta (e.g. Files/9053869/Informe Final.pdf o Documentos/xxx.pdf)
-  if (parts.length > 1) {
-    const folderParts = parts.slice(0, -1);
-    let currentFolder = rootFolder;
-    let pathFound = true;
-
-    for (const folderName of folderParts) {
-      const subfolders = currentFolder.getFoldersByName(folderName);
-      if (subfolders.hasNext()) {
-        currentFolder = subfolders.next();
-      } else {
-        pathFound = false;
-        break;
-      }
-    }
-
-    if (pathFound) {
-      const files = currentFolder.getFilesByName(fileName);
-      if (files.hasNext()) return files.next();
-    }
-  }
-
-  // 3. Buscar por nombre exacto en la carpeta raíz
-  const directFiles = rootFolder.getFilesByName(fileName);
-  if (directFiles.hasNext()) return directFiles.next();
-
-  // 4. Búsqueda recursiva suave como último recurso
-  return searchFileInFolderRecursive(rootFolder, fileName, 1, 3);
-}
-
-function getFileBase64(payload) {
-  try {
-    let rawInput = String(payload.filename || payload.path || payload.id || '').trim();
-    if (!rawInput) return { success: false, message: "No se proporcionó un nombre o ID de archivo." };
-
-    let file = null;
-
-    let cleanName = rawInput;
-    try { cleanName = decodeURIComponent(cleanName); } catch (e) {}
-    cleanName = cleanName.split(/[/\\]/).pop().trim();
-
-    // 1. Búsqueda rápida por nombre global mediante índice de Drive (Mili-segundos)
-    if (cleanName) {
-      try {
-        const files = DriveApp.getFilesByName(cleanName);
-        while (files.hasNext()) {
-          const candidate = files.next();
-          if (!candidate.isTrashed()) {
-            file = candidate;
-            break;
-          }
-        }
-      } catch (e) {
-        console.warn("DriveApp.getFilesByName error:", e.message);
-      }
-    }
-
-    // 2. Si es un ID directo o URL de Drive
-    if (!file && /^[a-zA-Z0-9_-]{25,}$/.test(rawInput)) {
-      try { file = DriveApp.getFileById(rawInput); }
-      catch (e) { console.warn("No se pudo obtener archivo por ID directo:", e.message); }
-    }
-
-    if (!file) {
-      const driveIdMatch = rawInput.match(/\/d\/([a-zA-Z0-9_-]{20,})/i) || rawInput.match(/[?&]id=([a-zA-Z0-9_-]{20,})/i);
-      if (driveIdMatch && driveIdMatch[1]) {
-        try { file = DriveApp.getFileById(driveIdMatch[1]); }
-        catch (e) { console.warn("No se pudo obtener archivo por ID extraído:", e.message); }
-      }
-    }
-
-    // 3. Si no se encontró globalmente, buscar dentro de las carpetas configuradas
-    // Orden según Notes.txt (confirmado por el cliente):
-    //   1) ROOT_DRIVE_FOLDER_ID    -> Documentos de una solicitud
-    //   2) REPORTS_DRIVE_FOLDER_ID -> Informes finales (con subcarpetas por solicitud)
-    //   3) APPSHEET_DOCS_IMAGE_FOLDER_ID -> Imágenes
-    // Las demás quedan como respaldo adicional por si el archivo no está en las anteriores.
-    if (!file) {
-      const targetFolderIds = [
-        typeof ROOT_DRIVE_FOLDER_ID !== 'undefined' ? ROOT_DRIVE_FOLDER_ID : null,
-        typeof REPORTS_DRIVE_FOLDER_ID !== 'undefined' ? REPORTS_DRIVE_FOLDER_ID : null,
-        typeof APPSHEET_DOCS_IMAGE_FOLDER_ID !== 'undefined' ? APPSHEET_DOCS_IMAGE_FOLDER_ID : null,
-        typeof APPSHEET_DOCS_PDF_FOLDER_ID !== 'undefined' ? APPSHEET_DOCS_PDF_FOLDER_ID : null,
-        typeof DOCS_DRIVE_FOLDER_ID !== 'undefined' ? DOCS_DRIVE_FOLDER_ID : null
-      ].filter(Boolean);
-
-      for (const folderId of targetFolderIds) {
-        if (file) break;
-        try {
-          const folder = DriveApp.getFolderById(folderId);
-          file = findFileInFolder(folder, rawInput);
-        } catch (e) {
-          console.warn(`Error accediendo a carpeta Drive (${folderId}):`, e.message);
-        }
-      }
-    }
-
-    if (file) {
-      const base64 = Utilities.base64Encode(file.getBlob().getBytes());
-      const mimeType = file.getMimeType();
-      const fileName = file.getName();
-      return { success: true, base64: base64, mimeType: mimeType, fileName: fileName };
-    } else {
-      return { success: false, message: `Archivo no encontrado en Drive ("${cleanName}")` };
-    }
-  } catch (error) {
-    console.error("Error en getFileBase64:", error.message);
-    return { success: false, message: error.message };
-  }
-}
-
-
-
-// Añade esto en tu backend (Code.gs)
 function getFileIdByName(payload) {
   try {
     const filename = payload.filename;
-    // Busca el archivo en Drive por su nombre exacto
     const files = DriveApp.getFilesByName(filename);
     
     if (files.hasNext()) {
