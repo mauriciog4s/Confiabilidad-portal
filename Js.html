@@ -1,8 +1,8 @@
 <script type="text/babel">
 const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
-// ─── CONFIG PROXY (solo URL pública del proxy de archivos) ───────────────
-const PROXY_URL   = "https://script.google.com/a/macros/co.g4s.com/s/AKfycbxQB6XNAaKr8gXmzUNBsu4lLwjc9NwK_XjHSJmw37HVRNvBHDM5sQOIg6NLcXXs0Im4/exec";
+// ─── CONFIG PROXY ────────────────────────────────────────────────────────
+const PROXY_URL   = "https://script.google.com/macros/s/AKfycbyefffkTgcl4jJwIPBIEYJV0ZoJQnCYjivMyQKGsNbF1kgkg4vDT8HQUe7ObME07HxAHQ/exec";
 const PROXY_TOKEN = "G4S-ACCESS-KEY-2025";
 
 // Tamaño máximo por documento de soporte (en MB)
@@ -78,89 +78,7 @@ const runServer = (endpoint, payload = {}) => {
   return new Promise((resolve, reject) => {
     if (typeof google === 'undefined' || !google.script) {
       setTimeout(() => {
-        if (endpoint === 'getUserContext') {
-          resolve({
-            isValidUser: true,
-            role: 'Administrador',
-            isAdmin: true,
-            email: 'mock.admin@g4s.com',
-            allowedClientIds: ['client-1'],
-            creationClientIds: ['client-1'],
-            clientNames: {'client-1': 'CLIENTE DE PRUEBA G4S'},
-            clientTypes: {'client-1': 'Externo'},
-            userClientConfig: {'client-1': {forcedMyRequests: false}}
-          });
-        } else if (endpoint === 'getMasterData') {
-          resolve({
-            conCiudades: [{ Ciudad: 'BOGOTA D.C.-BOGOTA D.C.' }, { Ciudad: 'MEDELLIN' }],
-            conPoligrafias: [{ Ciudad: 'Bogotá' }, { Ciudad: 'Medellín' }, { Ciudad: 'Cali' }]
-          });
-        } else if (endpoint === 'getRequests') {
-          resolve({
-            data: [
-              {
-                ID_Solicitud: 'SOL-001',
-                ID_SolicitudesConfiabilidad: 'SOL-001',
-                ID_Cliente: 'client-1',
-                UsuarioCreación: 'mock.admin@g4s.com',
-                NombreCompleto: 'JUAN PEREZ',
-                Identificacion: '12345678',
-                TipoIdentificacion: 'Cédula de Ciudadanía',
-                EstadoActual: 'Ingresada',
-                FechaSolicitud: new Date().toISOString().replace('T', ' ').slice(0, 19),
-                RazonSocial: 'CLIENTE DE PRUEBA G4S',
-                EstudiosPoligrafia: 'SI',
-                TipoPoligrafia: 'Preempleo',
-                CiudadP: 'Bogotá'
-              }
-            ],
-            total: 1,
-            period: payload.period || 'today'
-          });
-        } else if (endpoint === 'getRequestDetail') {
-          resolve({
-            success: true,
-            header: {
-              ID_Solicitud: 'SOL-001',
-              ID_SolicitudesConfiabilidad: 'SOL-001',
-              ID_Cliente: 'client-1',
-              UsuarioCreación: 'mock.admin@g4s.com',
-              NombreCompleto: 'JUAN PEREZ',
-              Identificacion: '12345678',
-              TipoIdentificacion: 'Cédula de Ciudadanía',
-              EstadoActual: 'Ingresada',
-              FechaSolicitud: new Date().toISOString().replace('T', ' ').slice(0, 19),
-              RazonSocial: 'CLIENTE DE PRUEBA G4S',
-              EstudiosPoligrafia: 'SI',
-              TipoPoligrafia: 'Preempleo',
-              CiudadP: 'Bogotá'
-            },
-            documents: [
-              {
-                Documento: 'https://example.com/documento1.pdf',
-                NombreDocumento: 'Cédula de Ciudadanía PDF',
-                FechaActualizacion: '2026-05-15'
-              }
-            ],
-            autFirmada: [
-              {
-                Archivo: 'https://example.com/autorizacion.pdf',
-                NombreArchivo: 'Autorización Firmada PDF',
-                FechaActualizacion: '2026-05-15'
-              }
-            ],
-            services: []
-          });
-        } else if (endpoint === 'getFileBase64') {
-          resolve({
-            success: true,
-            base64: 'JVBERi0xLjANCjEgMCBvYmo8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4gZW5kb2JqDQoyIDAgb2JqPDwgL1R5cGUgL1BhZ2VzIC9Db3VudCAwIC9LaWRzIFtdID4+IGVuZG9iag0KdHJhaWxlcjw8IC9Sb290IDEgMCBSID4+DQolRU9G',
-            mimeType: 'application/pdf',
-            fileName: payload.filename || 'documento.pdf'
-          });
-        } else {
-          resolve({ success: true, message: 'Mock', data: [], total: 0 });
-        }
+        resolve({ success: true, message: 'Mock' });
       }, 400);
       return;
     }
@@ -174,40 +92,6 @@ const runServer = (endpoint, payload = {}) => {
   });
 };
 
-// ─── UPLOAD VÍA PROXY ─────────────────────────────────────────────────────
-const uploadFileViaProxy = (file, aliasName) => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => {
-      const base64 = reader.result.toString().replace(/^data:(.*,)?/, '');
-      const iframeName = 'upload_' + Date.now() + Math.random();
-      const iframe = document.createElement('iframe');
-      iframe.name = iframeName; iframe.style.display = 'none';
-      document.body.appendChild(iframe);
-      const form = document.createElement('form');
-      form.target = iframeName; form.action = PROXY_URL;
-      form.method = 'POST'; form.style.display = 'none';
-      const datos = { token: PROXY_TOKEN, filename: aliasName, mimetype: file.type, base64 };
-      for (const key in datos) {
-        const input = document.createElement('input');
-        input.type = 'hidden'; input.name = key; input.value = datos[key];
-        form.appendChild(input);
-      }
-      document.body.appendChild(form);
-      iframe.onload = function() {
-        setTimeout(() => {
-          if (document.body.contains(form)) document.body.removeChild(form);
-          if (document.body.contains(iframe)) document.body.removeChild(iframe);
-        }, 2000);
-        resolve(true);
-      };
-      form.submit();
-    };
-    reader.onerror = reject;
-  });
-};
-
 // ─── ICONOS ───────────────────────────────────────────────────────────────
 const Icon = ({ name, size = 20, className = "" }) => {
   const icons = {
@@ -215,7 +99,6 @@ const Icon = ({ name, size = 20, className = "" }) => {
     ClipboardList: <><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M15 2H9a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1Z"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></>,
     History: <><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 12"/><path d="M3 3v9h9"/><path d="M12 7v5l4 2"/></>,
     FileText: <><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></>,
-    FileSignature: <><path d="M20 19.5v.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8.5L20 7.5V11"/><path d="M18 5.675V9H14.675L18 5.675Z"/><path d="M18 11l-2.293 2.293a1 1 0 0 0 0 1.414l1.586 1.586a1 1 0 0 0 1.414 0L21 14"/><path d="M12 15l-3 3 .707 2.293 2.293-2.293 3-3"/></>,
     ChevronRight: <path d="m9 18 6-6-6-6"/>,
     User: <><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>,
     Settings: <><path d="M12.22 2h-.44a2 2 0 0 1-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.09a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.09a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.09a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></>,
@@ -296,7 +179,6 @@ const getStatusBadgeColor = (status) => {
   return 'bg-yellow-100 text-yellow-700 border border-yellow-200';
 };
 
-// ─── TOGGLE SWITCH ────────────────────────────────────────────────────────
 const ToggleSwitch = ({ value, onChange, label, subLabel }) => (
   <div className="flex items-center justify-between py-1">
     <div className="flex flex-col">
@@ -310,7 +192,6 @@ const ToggleSwitch = ({ value, onChange, label, subLabel }) => (
   </div>
 );
 
-// ─── SEARCHABLE SELECT ───────────────────────────────────────────────────
 const SearchableSelect = ({ options, value, onChange, placeholder = "Seleccionar...", label, required }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch]   = useState('');
@@ -327,7 +208,7 @@ const SearchableSelect = ({ options, value, onChange, placeholder = "Seleccionar
 
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (containerRef.current && !containerRef.ref?.current?.contains?.(e.target) && !containerRef.current.contains(e.target)) setIsOpen(false);
+      if (containerRef.current && !containerRef.current.contains(e.target)) setIsOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -369,22 +250,17 @@ const SearchableSelect = ({ options, value, onChange, placeholder = "Seleccionar
   );
 };
 
-// ─── SECCIÓN DIVISORA DEL FORMULARIO ─────────────────────────────────────
-// Sección minimalista: línea divisora + ícono + título, sin tarjeta propia
 const FormSection = ({ icon, title, children }) => (
   <div>
-    {/* Divisor con título */}
     <div className="flex items-center gap-2 mb-4">
       <Icon name={icon} size={14} style={{ color: '#10253F' }} />
       <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#10253F' }}>{title}</span>
       <div className="flex-1 h-px bg-gray-200 ml-1"></div>
     </div>
-    {/* Contenido */}
     <div>{children}</div>
   </div>
 );
 
-// ─── MODAL DE ALERTA ──────────────────────────────────────────────────────
 const AlertModal = ({ show, title, message, items, onClose, type = 'error' }) => {
   if (!show) return null;
   const colors = {
@@ -413,7 +289,1200 @@ const AlertModal = ({ show, title, message, items, onClose, type = 'error' }) =>
   );
 };
 
-// ─── VISTA DE LOGIN ───────────────────────────────────────────────────────
+// ─── VISTA PREVIA DE ARCHIVOS (MENSAJES NEUTROS Y SEGUROS) ─────────────────
+const FilePreviewModal = ({ file, onClose }) => {
+  const [fileUrl, setFileUrl] = React.useState(null);
+  const [fileType, setFileType] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState(null);
+
+  React.useEffect(() => {
+    if (!file || !file.name) return;
+    
+    let urlToRevoke = null;
+    setLoading(true);
+    setError(null);
+    setFileUrl(null);
+    setFileType(null);
+
+    runServer('getFileBase64', { filename: file.name })
+      .then(response => {
+        if (response.success && response.base64) {
+          const mime = response.mimeType || 'application/pdf';
+          setFileType(mime);
+          
+          const byteCharacters = atob(response.base64);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: mime });
+          
+          urlToRevoke = URL.createObjectURL(blob);
+          setFileUrl(urlToRevoke);
+        } else {
+          throw new Error(response.message || "No se obtuvieron datos del archivo.");
+        }
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setError("Error al procesar el archivo o documento no encontrado.");
+        setLoading(false);
+      });
+
+    return () => {
+      if (urlToRevoke) URL.revokeObjectURL(urlToRevoke);
+    };
+  }, [file]);
+
+  if (!file || !file.name) return null;
+  const isImage = fileType && fileType.startsWith('image/');
+
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 md:p-6 bg-black/70 backdrop-blur-sm animate-fade-in">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl h-full max-h-[90vh] flex flex-col overflow-hidden animate-scale-in">
+        <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-100 text-blue-600 rounded-lg shadow-sm">
+              <Icon name="FileText" size={18}/>
+            </div>
+            <h3 className="font-bold text-gray-800 truncate max-w-md">{file.label || file.name}</h3>
+          </div>
+          <button onClick={onClose} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors">
+            <Icon name="X" size={24}/>
+          </button>
+        </div>
+        
+        <div className="flex-1 bg-gray-200 relative flex items-center justify-center overflow-hidden">
+          {loading && (
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+              {/* Tarea 1: Mensaje neutro sin indicios de arquitectura */}
+              <span className="text-gray-500 font-bold text-sm">Cargando documento...</span>
+            </div>
+          )}
+          
+          {error && (
+            <div className="flex flex-col items-center gap-2 text-red-500 bg-white p-6 rounded-2xl shadow-sm">
+              <Icon name="AlertTriangle" size={32} />
+              <span className="font-bold text-center">{error}</span>
+            </div>
+          )}
+          
+          {(!loading && !error && fileUrl) && (
+            isImage ? (
+              <div className="p-4 w-full h-full flex justify-center items-center">
+                <img src={fileUrl} alt="Vista Previa" className="max-w-full max-h-full object-contain shadow-lg rounded-lg" />
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center p-8 text-center h-full w-full bg-white">
+                <Icon name="FileText" size={64} className="text-gray-300 mb-4" />
+                <h4 className="text-xl font-bold text-gray-700 mb-2">Documento Listo</h4>
+                {/* Tarea 1: Mensaje neutro sin mención a servidores ni proxies */}
+                <p className="text-sm text-gray-500 max-w-md mb-8">
+                  El documento está listo. Selecciona una opción para continuar:
+                </p>
+                <div className="flex flex-col md:flex-row gap-4">
+                  <a href={fileUrl} target="_blank" rel="noreferrer" 
+                     className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black uppercase text-[11px] flex items-center gap-2 shadow-lg transition-all">
+                    <Icon name="Search" size={16} /> Abrir en nueva pestaña
+                  </a>
+                  <a href={fileUrl} download={file.name} 
+                     className="px-6 py-3 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl font-black uppercase text-[11px] flex items-center gap-2 shadow-sm transition-all">
+                    <Icon name="Download" size={16} /> Descargar Archivo
+                  </a>
+                </div>
+              </div>
+            )
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── DETALLE DE SOLICITUD ─────────────────────────────────────────────────
+const RequestDetail = ({ requestId, onBack, preloadedData }) => {
+  const [detailData, setDetailData] = useState(null);
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState(null);
+  const [fileStates, setFileStates] = useState({});
+  const [previewFile, setPreviewFile] = useState(null);
+
+  useEffect(() => {
+    setLoading(true); setError(null);
+    runServer('getRequestDetail', { id: requestId })
+      .then(data => { setDetailData(data); setLoading(false); })
+      .catch(err => { setError(err.message); setLoading(false); });
+  }, [requestId]);
+
+  const updateFileStatus = (fileName, status, message = "") =>
+    setFileStates(prev => ({ ...prev, [fileName]: { status, message } }));
+
+  const handleDownload = async (input) => {
+    let path = null;
+    if (typeof input === 'string') path = input;
+    else if (typeof input === 'object' && input !== null) path = input.InformeEstudioPoligrafia || input.Documento || input.URL || input.Archivo || input.NombreArchivo;
+    
+    if (!path) return alert("Datos de documento inválidos o sin ruta.");
+    const filename = path.split(/[/\\]/).pop();
+    if (!filename) return alert("No se pudo obtener el nombre del archivo.");
+    
+    // Tarea 1: Mensaje neutro de descarga
+    updateFileStatus(filename, 'loading', 'Descargando documento...');
+
+    try {
+      const response = await runServer('getFileBase64', { filename: path });
+      if (response && response.success && response.base64) {
+        const mime = response.mimeType || 'application/octet-stream';
+        const downloadName = response.fileName || filename;
+        const byteCharacters = atob(response.base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: mime });
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = downloadName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+        updateFileStatus(filename, 'success', 'Descargado ✓');
+      } else {
+        throw new Error(response.message || "Fallo al obtener bytes del archivo.");
+      }
+    } catch (error) {
+      updateFileStatus(filename, 'error', 'Error descargando');
+      alert("Error en la descarga: " + error.message);
+    }
+  };
+
+  if (loading) return (
+    <div className="flex items-center justify-center h-full p-10 flex-col gap-4">
+      <div className="w-12 h-12 border-4 border-appBlue border-t-transparent rounded-full animate-spin"></div>
+      <p className="text-sm text-gray-500">Cargando detalles de la solicitud...</p>
+    </div>
+  );
+  if (error) return (
+    <div className="p-10 text-center">
+      <Icon name="AlertTriangle" size={40} className="text-red-500 mx-auto mb-3"/>
+      <p className="text-red-600 font-bold mb-2">Error al cargar detalle</p>
+      <p className="text-sm text-gray-500 mb-4">{error}</p>
+      <button onClick={onBack} className="text-blue-600 underline text-sm">Volver al listado</button>
+    </div>
+  );
+
+  const header = detailData?.header || preloadedData;
+
+  const Card = ({ title, children, count }) => (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-4 overflow-hidden">
+      <div className="px-4 py-3 border-b border-gray-100 font-bold text-gray-700 text-sm uppercase flex justify-between">
+        <span>{title}</span>
+        {count !== undefined && <span className="bg-gray-100 text-gray-600 px-2 rounded-full text-xs flex items-center">{count}</span>}
+      </div>
+      <div>{children}</div>
+    </div>
+  );
+
+  const DetailField = ({ label, value }) => (
+    <div className="border-b border-gray-50 pb-2 last:border-0">
+      <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">{label}</div>
+      <div className="text-sm text-gray-700 font-medium break-words">{value || 'N/A'}</div>
+    </div>
+  );
+
+  const GenericList = ({ items, labelKey, dateKey }) => (
+    items?.length > 0
+      ? <ul className="divide-y divide-gray-100">{items.map((item, i) => (
+          <li key={i} className="p-3 text-sm hover:bg-gray-50">
+            <div className="font-medium text-gray-700">{item[labelKey] || JSON.stringify(item)}</div>
+            {dateKey && item[dateKey] && <div className="text-xs text-gray-400">{item[dateKey]}</div>}
+          </li>
+        ))}</ul>
+      : <div className="p-4 text-center text-xs text-gray-400 italic">No hay registros.</div>
+  );
+
+  const DownloadRow = ({ path, label, date, hidePreview }) => {
+    if (!path) return null;
+    const filename = path.split(/[/\\]/).pop();
+    const fs = fileStates[filename] || {};
+    
+    const handlePreview = () => {
+      setPreviewFile({ name: path, label: label || filename });
+    };
+
+    return (
+      <div className="flex items-center justify-between bg-blue-50 p-2.5 rounded border border-blue-100 mb-2">
+        <div className="flex items-center gap-3 overflow-hidden flex-1">
+          <div className="bg-white p-1.5 rounded-full text-blue-600 shadow-sm min-w-[28px]"><Icon name="FileText" size={14}/></div>
+          <div className="flex-1 overflow-hidden">
+            <div className="text-xs font-bold text-blue-900 truncate">{label || filename}</div>
+            {date && <div className="text-[9px] text-blue-400">{date}</div>}
+            {fs.message && <div className={`text-[9px] font-bold ${fs.status==='success'?'text-green-600':'text-blue-500'}`}>{fs.message}</div>}
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2 ml-2">
+          {!hidePreview && (
+            <button onClick={handlePreview} title="Previsualizar archivo"
+              className="p-2 rounded-lg bg-white text-blue-600 hover:bg-blue-100 shadow-sm transition">
+              <Icon name="Search" size={15} />
+            </button>
+          )}
+          
+          <button onClick={() => handleDownload(path)} disabled={fs.status==='loading'} title="Descargar archivo"
+            className={`p-2 rounded-lg transition ${fs.status==='loading' ? 'opacity-50 cursor-not-allowed' : 'bg-white text-blue-600 hover:bg-blue-600 hover:text-white shadow-sm'}`}>
+            <Icon name={fs.status==='loading'?'RefreshCw':'Download'} size={15} className={fs.status==='loading'?'animate-spin':''}/>
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="p-4 md:p-6 max-w-7xl mx-auto animate-fade-in">
+      <button onClick={onBack} className="mb-4 text-gray-500 hover:text-gray-800 flex items-center gap-1 text-sm btn-action">
+        <Icon name="ChevronRight" className="rotate-180" size={16}/> Volver
+      </button>
+      <div className="grid grid-cols-12 gap-6">
+        <div className="col-span-12 md:col-span-8 space-y-4">
+          <Card title="Información Detallada">
+            <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <DetailField label="Cliente"  value={header.Cliente || header.RazonSocial}/>
+              <DetailField label="NIT"      value={header.NIT}/>
+              <div className="col-span-2 mt-1 border-b border-gray-200 pb-1"><h4 className="text-xs font-bold text-blue-600 uppercase">Fechas Clave</h4></div>
+              <DetailField label="Programación Visita"     value={formatDateCO(header.ProgramacionVisita)}/>
+              <DetailField label="Programación Poligrafía" value={formatDateCO(header.ProgramacionPoligrafia)}/>
+              <DetailField label="Fecha Entrega ECP"       value={formatDateCO(header.FechaEntregaECP)}/>
+              <DetailField label="Fecha Entrega EP"        value={formatDateCO(header.FechaEntregaEP)}/>
+              {header.ArchivoInforme && header.ArchivoInforme !== 'None' && header.ArchivoInforme !== 'null' && (
+                <>
+                  <div className="col-span-2 mt-1 border-b border-gray-200 pb-1"><h4 className="text-xs font-bold text-green-600 uppercase">Informe Final</h4></div>
+                  <div className="col-span-2"><DownloadRow path={header.ArchivoInforme} label="Informe Final"/></div>
+                </>
+              )}
+              <div className="col-span-2 mt-1 border-b border-gray-200 pb-1"><h4 className="text-xs font-bold text-appRed uppercase">Información Del Evaluado</h4></div>
+              <DetailField label="Nombre Completo"       value={header.NombreCompleto}/>
+              <DetailField label="Tipo Identificación"   value={header.TipoIdentificacion}/>
+              <DetailField label="Identificación"        value={header.Identificacion}/>
+              <DetailField label="Fecha Expedición"      value={formatDateCO(header.FechaExpedicion, false)}/>
+              <DetailField label="Cargo"                 value={header.Cargo}/>
+              <DetailField label="Ciudad"                value={header.Ciudad}/>
+              <DetailField label="Dirección"             value={header.Direccion}/>
+              <DetailField label="Barrio"                value={header.Barrio}/>
+              <div className="col-span-2"><DetailField label="Notas Adicionales" value={header.Notas}/></div>
+            </div>
+          </Card>
+          <Card title="Novedades" count={detailData?.notas?.length}>
+            <GenericList items={detailData?.notas} labelKey="Nota" dateKey="FechaActualizacion"/>
+          </Card>
+          <Card title="Histórico de Estados" count={detailData?.historicoEstSolicitud?.length}>
+            <GenericList items={detailData?.historicoEstSolicitud} labelKey="EstadoSol" dateKey="FechaActualziacion"/>
+          </Card>
+          {(detailData?.poligrafia?.length > 0) && (
+            <Card title="Informe Poligrafía" count={detailData.poligrafia.length}>
+              {detailData.poligrafia.map((item, i) => (
+                <div key={i} className="p-4 border-b hover:bg-gray-50">
+                  <div className="flex justify-between mb-3">
+                    <div><div className="text-[10px] font-bold text-gray-400 uppercase">Analista</div><div className="font-bold text-gray-700">{item.AnalistaPoligrafo || 'N/A'}</div></div>
+                    <div className="text-right"><div className="text-[10px] text-gray-400 uppercase">Actualización</div><div className="text-xs text-gray-500">{item.FechaActualización || item.FechaActualizacion || ''}</div></div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-xs mb-3 bg-white p-3 rounded border border-gray-100">
+                    <div><span className="font-bold text-gray-800">Concepto:</span> {item.ConceptoEP}</div>
+                    <div><span className="font-bold text-gray-800">Nivel Riesgo:</span> <span className="bg-gray-100 px-1.5 rounded">{item.NivelRiesgo}</span></div>
+                    <div><span className="font-bold text-gray-800">Admisiones:</span> {item.Admisiones}</div>
+                    <div><span className="font-bold text-gray-800">Elaborado Por:</span> {item.ElaboradoPor}</div>
+                  </div>
+                  {item.InformeEstudioPoligrafia && <DownloadRow path={item.InformeEstudioPoligrafia} label="Informe Estudio Poligrafía"/>}
+                </div>
+              ))}
+            </Card>
+          )}
+          {(detailData?.datacredito?.length > 0) && (
+            <Card title="Consulta Datacrédito" count={detailData.datacredito.length}>
+              {detailData.datacredito.map((item, i) => (
+                <div key={i} className="px-4 py-2">
+                  <DownloadRow path={item.Archivo} label={`Consulta - ${item.FechaActualizacion || item.FechaConsulta || ''}`}/>
+                </div>
+              ))}
+            </Card>
+          )}
+        </div>
+        <div className="col-span-12 md:col-span-4 space-y-4">
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 text-center">
+            <div className="text-gray-400 text-xs font-bold mb-1">ESTADO ACTUAL</div>
+            <div className={`text-2xl font-black mb-2 uppercase ${getStatusBadgeColor(header.EstadoActual).split(' ')[1]}`}>{header.EstadoActual}</div>
+            <div className="text-gray-500 text-xs bg-gray-100 inline-block px-2 py-1 rounded">ID: {header.NSolicitud || header.ID_SolicitudesConfiabilidad}</div>
+            {header.EstadoActualEP && (
+              <div className="mt-2 pt-2 border-t border-gray-100">
+                <div className="text-xs text-gray-400 font-bold mb-1">ESTADO EP</div>
+                <span className="inline-flex items-center justify-center px-2 h-[22px] rounded text-[9px] font-bold uppercase bg-purple-100 text-purple-700 border border-purple-200">{header.EstadoActualEP}</span>
+              </div>
+            )}
+          </div>
+          <Card title="Servicios Aplicados" count={detailData?.services?.length}>
+            {detailData?.services?.length > 0
+              ? <ul className="divide-y">{detailData.services.map((s,i) => (
+                  <li key={i} className="px-4 py-3 hover:bg-gray-50">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="font-bold text-sm text-gray-700">{s.TipoServicio || s.Servicio || s.ServicioAplicar}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${s.EstadoActual === 'Finalizado' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{s.EstadoActual || s.Estado}</span>
+                    </div>
+                    <div className="text-[10px] text-gray-400 flex items-center gap-1"><Icon name="Clock" size={10}/> {s.FechaActualizacion || s.Fecha || 'Pendiente'}</div>
+                  </li>
+                ))}</ul>
+              : <div className="p-4 text-center text-xs text-gray-400 italic">No hay servicios registrados.</div>
+            }
+          </Card>
+          {detailData?.autFirmada?.length > 0 && (
+            <Card title="Autorizaciones Firmadas" count={detailData.autFirmada.length}>
+              {detailData.autFirmada.map((doc, i) => (
+                <div key={i} className="px-4 py-2">
+                  <DownloadRow path={doc.Archivo || doc.NombreArchivo} label={doc.NombreArchivo || 'Autorización Firmada'} date={doc.FechaActualizacion}/>
+                </div>
+              ))}
+            </Card>
+          )}
+          {detailData?.documents?.length > 0 && (
+            <Card title="Documentos" count={detailData.documents.length}>
+              {detailData.documents.map((doc, i) => (
+                <div key={i} className="px-4 py-2">
+                  <DownloadRow path={doc.Documento || doc.URL || doc.Archivo} label={doc.NombreDocumento || doc.Nombre || 'Documento'} date={doc.FechaActualizacion}/>
+                </div>
+              ))}
+            </Card>
+          )}
+        </div>
+      </div>
+
+      <FilePreviewModal file={previewFile} onClose={() => setPreviewFile(null)} />
+    </div>
+  );
+};
+
+// ─── CREAR SOLICITUD ──────────────────────────────────────────────────────
+const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
+  const [step, setStep]                         = useState(1);
+  const [uploading, setUploading]               = useState(false);
+  const [uploadProgress, setUploadProgress]     = useState({ current: 0, total: 0 });
+  const [showSuccess, setShowSuccess]           = useState(false);
+  const [showValidationAlert, setShowValidationAlert] = useState(false);
+  const [missingFields, setMissingFields]       = useState([]);
+  const [createdId, setCreatedId]               = useState('');
+  const [showPersonalRefWarning, setShowPersonalRefWarning] = useState(false);
+  const [attachments, setAttachments]           = useState([]);
+  const [currentFile, setCurrentFile]           = useState(null);
+  const [currentDocName, setCurrentDocName]     = useState('');
+
+  useEffect(() => {
+    if (showPersonalRefWarning) { const t = setTimeout(() => setShowPersonalRefWarning(false), 3000); return () => clearTimeout(t); }
+  }, [showPersonalRefWarning]);
+
+  const [formData, setFormData] = useState({
+    fechaSolicitud: new Date().toLocaleString(), clientId: '', nombre: '', nit: '', razonSocial: '',
+    tipoIdentificacion: '', identificacion: '', fechaExpedicion: '', cargo: '', correo: '',
+    celular: '', ciudad: '', barrio: '', direccion: '', tipoTrabajador: 'Nuevo', centroCostos: '',
+    visitaDomiciliaria: false, modalidadVisita: '', consultaAntecedentes: false,
+    referenciacion: false, referenciaAcademica: null, referenciaLaboral: null, referenciaPersonal: null,
+    estudiosPoligrafia: false, tipoPoligrafia: '', ciudadPoligrafia: '', consultaDatacredito: false,
+    comparativoOEA: false, notas: '', clienteProyectoInterno: '', linea: '', lineaNegocio: '',
+    clienteClientesSecundarios: '', nitClienteSecundario: '', convenioClienteSecundario: '',
+    tipoCostoClienteSecundario: '', centroCostosExterno: ''
+  });
+
+  const ciudadesList           = useMemo(() => masterData?.conCiudades || [], [masterData]);
+  const searchableCiudadesList = useMemo(() => {
+    return ciudadesList.length > 0
+      ? ciudadesList.map(c => ({ value: c.Ciudades, label: c.Ciudades }))
+      : ['Bogotá','Medellín','Cali','Barranquilla','Otra'].map(c => ({ value: c, label: c }));
+  }, [ciudadesList]);
+  const ciudadesPoligrafiaList = useMemo(() => masterData?.conPoligrafias || [], [masterData]);
+  const clienteProyectoList    = useMemo(() => masterData?.ClienteProyecto || [], [masterData]);
+  const lineaCCList            = useMemo(() => masterData?.LineaCC || [], [masterData]);
+  const secondaryClientsRaw    = useMemo(() => masterData?.conClientesSecundarios || [], [masterData]);
+
+  const availableSecondaryClients = useMemo(() => {
+    if (!formData.clientId) return [];
+    return secondaryClientsRaw.filter(i => String(i.ClientePrincipal) === String(formData.clientId)).map(i => i.ClienteSecundarioNombre);
+  }, [formData.clientId, secondaryClientsRaw]);
+
+  const clientType = useMemo(() => (formData.clientId && userContext?.clientTypes) ? userContext.clientTypes[formData.clientId] : '', [formData.clientId, userContext]);
+  const isInternal = useMemo(() => clientType === 'Interno', [clientType]);
+
+  const uniqueLineas = useMemo(() => [...new Set(lineaCCList.map(i => i.Linea))].sort(), [lineaCCList]);
+  const availableLNs = useMemo(() => !formData.linea ? [] : [...new Set(lineaCCList.filter(i => i.Linea === formData.linea).map(i => i.LN_Nombre))].sort(), [formData.linea, lineaCCList]);
+  const availableCCs = useMemo(() => (!formData.linea || !formData.lineaNegocio) ? [] : [...new Set(lineaCCList.filter(i => i.Linea === formData.linea && i.LN_Nombre === formData.lineaNegocio).map(i => i.CC_Nombre))].sort(), [formData.linea, formData.lineaNegocio, lineaCCList]);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    if (name === 'clientId') {
+      const cd = userContext?.clientData?.[value];
+      setFormData(p => ({ ...p, [name]: value, nit: cd?.nit || '', razonSocial: cd?.razonSocial || '' }));
+    } else if (name === 'linea') {
+      setFormData(p => ({ ...p, [name]: value, lineaNegocio: '', centroCostos: '' }));
+    } else if (name === 'lineaNegocio') {
+      setFormData(p => ({ ...p, [name]: value, centroCostos: '' }));
+    } else {
+      setFormData(p => ({ ...p, [name]: value }));
+    }
+  };
+
+  const handleCelularChange = (e) => {
+    const val = e.target.value.replace(/\D/g, '');
+    if (val.length <= 13) setFormData(p => ({ ...p, celular: val }));
+  };
+
+  const handleIdentificacionChange = (e) => {
+    const val = e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    if (val.length <= 15) setFormData(p => ({ ...p, identificacion: val }));
+  };
+
+  const handleToggle = (name, val) => {
+    if (name === 'referenciaPersonal' && val === true && formData.visitaDomiciliaria) { setShowPersonalRefWarning(true); return; }
+    setFormData(p => {
+      const next = { ...p, [name]: val };
+      if (name === 'visitaDomiciliaria') {
+        if (val === true)  next.referenciaPersonal = false;
+        if (val === false) next.modalidadVisita = '';
+      }
+      if (name === 'referenciacion' && val === false) {
+        next.referenciaAcademica = null;
+        next.referenciaLaboral   = null;
+        next.referenciaPersonal  = null;
+      }
+      if (name === 'estudiosPoligrafia' && val === false) {
+        next.tipoPoligrafia   = '';
+        next.ciudadPoligrafia = '';
+      }
+      return next;
+    });
+  };
+
+  const validarArchivoSoporte = (file) => {
+    if (!file) return "Seleccione un archivo.";
+    const esPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+    if (!esPdf) return "Solo se permiten archivos en formato PDF.";
+    if (file.size === 0) return "El archivo está vacío.";
+    if (file.size > MAX_DOC_MB * 1024 * 1024) {
+      return `El archivo pesa ${(file.size / 1024 / 1024).toFixed(1)} MB y el máximo permitido es ${MAX_DOC_MB} MB.`;
+    }
+    return null;
+  };
+
+  const seleccionarArchivo = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const error = validarArchivoSoporte(file);
+    if (error) { alert(error); e.target.value = ""; setCurrentFile(null); return; }
+    setCurrentFile(file);
+  };
+
+  const addAttachment = () => {
+    if (!currentFile) return alert("Seleccione un archivo.");
+    const error = validarArchivoSoporte(currentFile);
+    if (error) {
+      alert(error);
+      setCurrentFile(null);
+      document.getElementById('fileInput').value = "";
+      return;
+    }
+    if (!currentDocName.trim()) return alert("Ingrese un nombre para el documento.");
+    setAttachments(a => [...a, { id: Date.now(), file: currentFile, name: currentDocName.trim() }]);
+    setCurrentFile(null); setCurrentDocName('');
+    document.getElementById('fileInput').value = "";
+  };
+
+  const resetForm = () => {
+    setFormData({ fechaSolicitud: new Date().toLocaleString(), clientId: '', nombre: '', nit: '', razonSocial: '',
+      tipoIdentificacion: '', identificacion: '', fechaExpedicion: '', cargo: '', correo: '', celular: '',
+      ciudad: '', barrio: '', direccion: '', tipoTrabajador: 'Nuevo', centroCostos: '',
+      visitaDomiciliaria: false, modalidadVisita: '', consultaAntecedentes: false,
+      referenciacion: false, referenciaAcademica: null, referenciaLaboral: null, referenciaPersonal: null,
+      estudiosPoligrafia: false, tipoPoligrafia: '', ciudadPoligrafia: '', consultaDatacredito: false,
+      comparativoOEA: false, notas: '', clienteProyectoInterno: '', linea: '', lineaNegocio: '',
+      clienteClientesSecundarios: '', nitClienteSecundario: '', convenioClienteSecundario: '',
+      tipoCostoClienteSecundario: '', centroCostosExterno: '' });
+    setAttachments([]); setStep(1); setShowSuccess(false);
+  };
+
+  const handleSubmit = async () => {
+    const missing = [];
+    if (!formData.clientId) missing.push("ID Cliente");
+    if (!formData.nombre) missing.push("Nombre Completo");
+    if (!formData.tipoIdentificacion) missing.push("Tipo de Identificación");
+    if (!formData.identificacion) missing.push("Número de Identificación");
+    else if (formData.identificacion.length < 5 || formData.identificacion.length > 15) missing.push("Identificación: entre 5 y 15 caracteres");
+    if (!formData.cargo) missing.push("Cargo");
+    if (!formData.celular) missing.push("Celular");
+    else if (!isValidPhone(formData.celular)) missing.push("Celular inválido (solo dígitos, 7 a 13)");
+    if (!formData.ciudad) missing.push("Ciudad");
+    if (!formData.direccion) missing.push("Dirección");
+    if (!formData.tipoTrabajador) missing.push("Tipo Trabajador");
+    if (formData.correo && !isValidEmail(formData.correo)) missing.push("Formato de Correo inválido");
+    if (isInternal) {
+      if (!formData.linea) missing.push("Línea");
+      if (!formData.lineaNegocio) missing.push("Línea de Negocio");
+      if (!formData.centroCostos) missing.push("Centro de Costos");
+      if (formData.consultaAntecedentes && attachments.length === 0) missing.push("Documento de Soporte (obligatorio para Antecedentes)");
+    }
+    if (formData.visitaDomiciliaria && !formData.modalidadVisita) missing.push("Modalidad Visita");
+    if (formData.referenciacion) {
+      if (formData.referenciaAcademica === null) missing.push("Referencia Académica (seleccione SÍ o NO)");
+      if (formData.referenciaLaboral === null) missing.push("Referencia Laboral (seleccione SÍ o NO)");
+      if (formData.referenciaPersonal === null) missing.push("Referencia Personal (seleccione SÍ o NO)");
+
+      const alMenosUnaRef = formData.referenciaAcademica === true || formData.referenciaLaboral === true || formData.referenciaPersonal === true;
+      if (!alMenosUnaRef) missing.push("Referenciación: debe seleccionar SÍ en al menos una referencia (Académica, Laboral o Personal)");
+    }
+    if (formData.estudiosPoligrafia) {
+      if (!formData.tipoPoligrafia) missing.push("Tipo de Poligrafía");
+      if (!formData.ciudadPoligrafia) missing.push("Ciudad Poligrafía");
+    }
+    const hasService = formData.visitaDomiciliaria || formData.consultaAntecedentes || formData.referenciacion || formData.estudiosPoligrafia || formData.consultaDatacredito || formData.comparativoOEA;
+    if (!hasService) missing.push("Debe seleccionar al menos un servicio a aplicar");
+
+    if (currentFile || currentDocName.trim()) {
+      missing.push("Documento de Soporte sin agregar: presione el botón AGREGAR para adjuntarlo, o borre el nombre y el archivo seleccionado");
+    }
+
+    if (missing.length > 0) { setMissingFields(missing); setShowValidationAlert(true); return; }
+
+    setUploading(true);
+    setUploadProgress({ current: 0, total: attachments.length });
+
+    const payload = {
+      ...formData,
+      visitaDomiciliaria:  formData.visitaDomiciliaria  ? 'SI' : 'NO',
+      consultaAntecedentes:formData.consultaAntecedentes? 'SI' : 'NO',
+      referenciacion:      formData.referenciacion      ? 'SI' : 'NO',
+      referenciaAcademica: formData.referenciaAcademica === true ? 'SI' : 'NO',
+      referenciaLaboral:   formData.referenciaLaboral   === true ? 'SI' : 'NO',
+      referenciaPersonal:  formData.referenciaPersonal  === true ? 'SI' : 'NO',
+      estudiosPoligrafia:  formData.estudiosPoligrafia  ? 'SI' : 'NO',
+      consultaDatacredito: formData.consultaDatacredito ? 'SI' : 'NO',
+      comparativoOEA:      formData.comparativoOEA      ? 'SI' : 'NO',
+    };
+
+    try {
+      const response = await runServer('createRequest', payload);
+      if (!response.success) throw new Error(response.message || "Error al crear solicitud.");
+      const newId = response.requestId;
+      let processed = 0;
+
+      const readFileAsBase64 = (file) => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.toString().replace(/^data:(.*,)?/, ''));
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      for (const att of attachments) {
+        const aliasName = `${newId}_${att.file.name}`;
+        const base64Str = await readFileAsBase64(att.file);
+
+        const uploadRes = await runServer('uploadDocument', {
+          filename: aliasName,
+          base64: base64Str,
+          mimetype: att.file.type
+        });
+
+        if (!uploadRes || uploadRes.error) {
+          throw new Error(`Error subiendo el archivo "${att.name}": ` + (uploadRes?.message || "Fallo en el servidor"));
+        }
+
+        await runServer('registerTempDocument', { requestId: newId, docName: att.name, fileName: aliasName });
+        processed++;
+        setUploadProgress(p => ({ ...p, current: processed }));
+      }
+
+      setUploading(false);
+      setCreatedId(newId);
+      if (onReload) onReload();
+      setShowSuccess(true);
+    } catch (error) {
+      console.error(error);
+      alert("Error procesando solicitud: " + error.message);
+      setUploading(false);
+    }
+  };
+
+  if (showSuccess) return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/30 backdrop-blur-sm animate-fade-in">
+      <div className="bg-white p-10 rounded-3xl shadow-2xl text-center max-w-md w-full border border-gray-100 animate-scale-in">
+        <div className="w-24 h-24 bg-vividGreen/10 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-inner transform rotate-12">
+          <Icon name="CheckCircle" size={48} className="text-vividGreen -rotate-12"/>
+        </div>
+        <h2 className="text-3xl font-black text-gray-800 mb-2 tracking-tight">¡Éxito Total!</h2>
+        <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-8 text-center">La solicitud ha sido procesada</p>
+        <div className="bg-gray-50/50 p-6 rounded-3xl border border-gray-100 text-left mb-8 space-y-4">
+          <div className="flex justify-between items-center">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">ID Solicitud</span>
+            <span className="font-mono font-black text-vividBlue bg-white px-3 py-1 rounded-xl shadow-sm border border-gray-100">{createdId}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Evaluado</span>
+            <span className="font-black text-gray-700 truncate ml-4 uppercase text-[11px]">{formData.nombre}</span>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-4">
+          <button onClick={resetForm} className="btn-3d-blue py-4 rounded-2xl flex items-center justify-center gap-3">
+            <Icon name="ClipboardList" size={18}/> <span className="text-xs font-black uppercase tracking-widest">Crear Nueva</span>
+          </button>
+          <button onClick={() => setView('history')} className="btn-3d-gray py-4 rounded-2xl flex items-center justify-center gap-3">
+            <Icon name="History" size={18}/> <span className="text-xs font-black uppercase tracking-widest text-gray-600">Ver Historial</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const inputClass = "w-full border border-gray-200 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-vividBlue/20 focus:border-vividBlue outline-none transition-all bg-white hover:border-gray-300";
+  const labelClass = "text-[10px] font-black text-gray-500 uppercase tracking-wider mb-1.5 block";
+  const fieldClass = "flex flex-col";
+
+  return (
+    <div className="p-4 md:p-8 max-w-5xl mx-auto animate-fade-in pb-24">
+      <div className="flex items-center justify-center mb-10">
+        <div className="flex items-center group cursor-pointer" onClick={() => setStep(1)}>
+          <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-sm transition-all shadow-lg ${step===1?'bg-vividRed text-white shadow-red-500/40 scale-110':'bg-white text-gray-400 border border-gray-100'}`}>1</div>
+          <div className="ml-4">
+            <span className={`block text-[10px] font-black uppercase tracking-widest ${step===1?'text-vividRed':'text-gray-400'}`}>Paso 1</span>
+            <span className={`text-xs font-bold ${step===1?'text-gray-800':'text-gray-400'}`}>Información Evaluado</span>
+          </div>
+        </div>
+        <div className="w-16 h-1 bg-gray-100 mx-6 rounded-full overflow-hidden">
+          <div className={`h-full bg-vividRed transition-all duration-500 ${step===2?'w-full':'w-0'}`}></div>
+        </div>
+        <div className="flex items-center group cursor-pointer" onClick={() => step === 2 && setStep(2)}>
+          <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-sm transition-all shadow-lg ${step===2?'bg-vividRed text-white shadow-red-500/40 scale-110':'bg-white text-gray-400 border border-gray-100'}`}>2</div>
+          <div className="ml-4">
+            <span className={`block text-[10px] font-black uppercase tracking-widest ${step===2?'text-vividRed':'text-gray-400'}`}>Paso 2</span>
+            <span className={`text-xs font-bold ${step===2?'text-gray-800':'text-gray-400'}`}>Servicios A Aplicar</span>
+          </div>
+        </div>
+      </div>
+
+      {step === 1 && (
+        <div className="animate-fade-in">
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="text-2xl font-black text-gray-800 tracking-tight">Datos del Candidato</h3>
+            <div className="px-4 py-1.5 bg-vividBlue/10 text-vividBlue rounded-full text-[10px] font-black uppercase tracking-tighter shadow-inner">
+              Fecha: {formData.fechaSolicitud.split(',')[0]}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm divide-y divide-gray-100">
+            <div className="p-6">
+              <FormSection icon="Building" title="1. Información del Cliente">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  <SearchableSelect
+                    label="Cliente"
+                    required
+                    value={formData.clientId}
+                    onChange={val => handleChange({ target: { name: 'clientId', value: val } })}
+                    options={userContext?.creationClientIds?.map(id => ({ value: id, label: userContext.clientNames?.[id] || id })) || []}
+                  />
+                  <div className={fieldClass}>
+                    <label className={labelClass}>NIT</label>
+                    <input type="text" readOnly value={formData.nit} className={`${inputClass} bg-gray-50 font-mono font-bold cursor-not-allowed`}/>
+                  </div>
+                  <div className={fieldClass}>
+                    <label className={labelClass}>Razón Social</label>
+                    <input type="text" readOnly value={formData.razonSocial} className={`${inputClass} bg-gray-50 font-bold cursor-not-allowed`}/>
+                  </div>
+                </div>
+
+                {isInternal && (
+                  <div className="mt-5 pt-5 border-t-2 border-dashed border-blue-100">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-1 h-4 bg-vividBlue rounded-full"></div>
+                      <span className="text-[10px] font-black text-vividBlue uppercase tracking-widest">Configuración Proyecto Interno</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div className={fieldClass}><label className={labelClass}>Proyecto</label>
+                        <select name="clienteProyectoInterno" value={formData.clienteProyectoInterno} onChange={handleChange} className={inputClass}>
+                          <option value="">Seleccione...</option>{clienteProyectoList.map((cp,i) => <option key={i} value={cp.Descripcion}>{cp.Descripcion}</option>)}
+                        </select></div>
+                      <div className={fieldClass}><label className={labelClass}>Línea <span className="text-vividRed">*</span></label>
+                        <select name="linea" value={formData.linea} onChange={handleChange} className={inputClass}>
+                          <option value="">Seleccione...</option>{uniqueLineas.map((l,i) => <option key={i} value={l}>{l}</option>)}
+                        </select></div>
+                      <div className={fieldClass}><label className={labelClass}>Línea Negocio <span className="text-vividRed">*</span></label>
+                        <select name="lineaNegocio" value={formData.lineaNegocio} onChange={handleChange} disabled={!formData.linea} className={`${inputClass} disabled:opacity-50 disabled:cursor-not-allowed`}>
+                          <option value="">Seleccione...</option>{availableLNs.map((l,i) => <option key={i} value={l}>{l}</option>)}
+                        </select></div>
+                      <div className={fieldClass}><label className={labelClass}>Centro de Costos <span className="text-vividRed">*</span></label>
+                        <select name="centroCostos" value={formData.centroCostos} onChange={handleChange} disabled={!formData.lineaNegocio} className={`${inputClass} disabled:opacity-50 disabled:cursor-not-allowed`}>
+                          <option value="">Seleccione...</option>{availableCCs.map((c,i) => <option key={i} value={c}>{c}</option>)}
+                        </select></div>
+                    </div>
+                  </div>
+                )}
+
+                {(!isInternal && formData.clientId) && (
+                  <div className="mt-5 pt-5 border-t-2 border-dashed border-blue-100">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-1 h-4 bg-vividBlue rounded-full"></div>
+                      <span className="text-[10px] font-black text-vividBlue uppercase tracking-widest">Configuración Cliente Externo</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      {availableSecondaryClients.length > 0 && (<>
+                        <div className={fieldClass}><label className={labelClass}>Cliente Secundario</label>
+                          <select name="clienteClientesSecundarios" value={formData.clienteClientesSecundarios} onChange={handleChange} className={inputClass}>
+                            <option value="">Seleccione...</option>{availableSecondaryClients.map((c,i) => <option key={i} value={c}>{c}</option>)}
+                          </select></div>
+                        <div className={fieldClass}><label className={labelClass}>NIT Secundario</label><input type="text" name="nitClienteSecundario" value={formData.nitClienteSecundario} onChange={handleChange} className={inputClass}/></div>
+                        <div className={fieldClass}><label className={labelClass}>Convenio</label><input type="text" name="convenioClienteSecundario" value={formData.convenioClienteSecundario} onChange={handleChange} className={inputClass}/></div>
+                        <div className={fieldClass}><label className={labelClass}>Tipo Costo</label><input type="text" name="tipoCostoClienteSecundario" value={formData.tipoCostoClienteSecundario} onChange={handleChange} className={inputClass}/></div>
+                      </>)}
+                      <div className={fieldClass}><label className={labelClass}>C. Costos Externo</label><input type="text" name="centroCostosExterno" value={formData.centroCostosExterno} onChange={handleChange} className={inputClass}/></div>
+                    </div>
+                  </div>
+                )}
+              </FormSection>
+            </div>
+
+            <div className="p-6">
+              <FormSection icon="IdCard" title="2. Identificación del Evaluado">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+                  <div className="md:col-span-2 flex flex-col">
+                    <label className={labelClass}>Nombre Completo <span className="text-vividRed">*</span></label>
+                    <input type="text" name="nombre" value={formData.nombre} onChange={handleChange} className={inputClass} placeholder="Nombre completo del evaluado"/>
+                  </div>
+                  <div className={fieldClass}>
+                    <label className={labelClass}>Tipo ID <span className="text-vividRed">*</span></label>
+                    <select name="tipoIdentificacion" value={formData.tipoIdentificacion} onChange={handleChange} className={inputClass}>
+                      <option value="">Seleccione...</option>
+                      <option value="Cédula de Ciudadanía">Cédula de Ciudadanía</option>
+                      <option value="Tarjeta de Identidad">Tarjeta de Identidad</option>
+                      <option value="Cédula Extranjeria">Cédula Extranjeria</option>
+                      <option value="Pasaporte">Pasaporte</option>
+                      <option value="Permiso Especial">Permiso Especial</option>
+                      <option value="Permiso Permanente de Trabajo">Permiso Permanente de Trabajo</option>
+                      <option value="PEP">PEP</option>
+                      <option value="Otro">Otro</option>
+                    </select>
+                  </div>
+                  <div className={fieldClass}>
+                    <label className={labelClass}>N° Identificación <span className="text-vividRed">*</span></label>
+                    <input type="text" name="identificacion" value={formData.identificacion} onChange={handleIdentificacionChange} className={inputClass} placeholder="Número"/>
+                  </div>
+                  <div className={fieldClass}>
+                    <label className={labelClass}>Fecha Expedición</label>
+                    <input type="date" name="fechaExpedicion" value={formData.fechaExpedicion} onChange={handleChange} className={inputClass}/>
+                  </div>
+                  <div className={fieldClass}>
+                    <label className={labelClass}>Cargo <span className="text-vividRed">*</span></label>
+                    <input type="text" name="cargo" value={formData.cargo} onChange={handleChange} className={inputClass} placeholder="Puesto"/>
+                  </div>
+                  <div className={fieldClass}>
+                    <label className={labelClass}>Correo</label>
+                    <input type="email" name="correo" value={formData.correo} onChange={handleChange} className={inputClass} placeholder="email@ejemplo.com"/>
+                  </div>
+                  <div className={fieldClass}>
+                    <label className={labelClass}>Celular <span className="text-vividRed">*</span></label>
+                    <input type="tel" name="celular" value={formData.celular} onChange={handleCelularChange} inputMode="numeric" pattern="[0-9]*" maxLength={13} className={inputClass} placeholder="3001234567"/>
+                  </div>
+                </div>
+              </FormSection>
+            </div>
+
+            <div className="p-6">
+              <FormSection icon="MapPin" title="3. Ubicación">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+                  <SearchableSelect
+                    label="Ciudad"
+                    required
+                    value={formData.ciudad}
+                    onChange={val => handleChange({ target: { name: 'ciudad', value: val } })}
+                    options={searchableCiudadesList}
+                  />
+                  <div className={fieldClass}>
+                    <label className={labelClass}>Barrio</label>
+                    <input type="text" name="barrio" value={formData.barrio} onChange={handleChange} className={inputClass}/>
+                  </div>
+                  <div className="md:col-span-2 flex flex-col">
+                    <label className={labelClass}>Dirección <span className="text-vividRed">*</span></label>
+                    <input type="text" name="direccion" value={formData.direccion} onChange={handleChange} className={inputClass}/>
+                  </div>
+                </div>
+              </FormSection>
+            </div>
+
+            <div className="p-6">
+              <FormSection icon="Briefcase" title="4. Tipo de Trabajador">
+                <div className="flex rounded-2xl bg-gray-100 p-1 overflow-hidden h-11 max-w-sm">
+                  {['Nuevo','Actual','Reinversión'].map(t => (
+                    <button key={t} type="button" onClick={() => setFormData(p => ({...p, tipoTrabajador: t}))}
+                      className={`flex-1 text-[11px] font-black uppercase tracking-tighter rounded-xl transition-all ${formData.tipoTrabajador===t?'bg-white text-gray-800 shadow-sm scale-[1.02]':'text-gray-400 hover:text-gray-600'}`}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </FormSection>
+            </div>
+          </div>
+
+          <div className="flex flex-col md:flex-row items-center justify-end gap-4 pt-4">
+            <button type="button" onClick={() => setView('history')} className="w-full md:w-auto px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest text-gray-400 hover:bg-gray-100 transition-all">Cancelar</button>
+            <button type="button" onClick={() => setStep(2)} className="w-full md:w-auto px-12 py-3 rounded-2xl text-xs font-black uppercase tracking-widest bg-vividBlue text-white shadow-lg shadow-blue-500/30 hover:scale-105 active:scale-95 transition-all btn-3d">Siguiente →</button>
+          </div>
+        </div>
+      )}
+
+      {step === 2 && (
+        <div className="animate-fade-in">
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="text-2xl font-black text-gray-800 tracking-tight">Servicios a Aplicar</h3>
+            <div className="flex items-center gap-2 text-vividOrange bg-vividOrange/10 px-3 py-1 rounded-full text-[10px] font-black uppercase shadow-inner">
+              <Icon name="Info" size={12}/> Seleccione al menos uno
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm divide-y divide-gray-100">
+            <div className="p-6">
+              <FormSection icon="Home" title="Visita Domiciliaria">
+                <ToggleSwitch label="¿Aplicar Visita Domiciliaria?" value={formData.visitaDomiciliaria} onChange={v => handleToggle('visitaDomiciliaria', v)}/>
+                {formData.visitaDomiciliaria && (
+                  <div className="mt-4 pt-4 border-t-2 border-dashed border-blue-100 animate-scale-in">
+                    <label className={`${labelClass} mb-3`}>Modalidad de Visita <span className="text-vividRed">*</span></label>
+                    <div className="flex flex-wrap gap-2">
+                      {['Presencial','Virtual','Autogestionada'].map(m => (
+                        <button key={m} type="button" onClick={() => setFormData(p => ({...p, modalidadVisita: m}))}
+                          className={`px-5 py-2 text-[11px] font-black uppercase tracking-tight rounded-xl transition-all border-2 ${formData.modalidadVisita===m?'bg-blue-700 text-white border-blue-700 shadow-md':'bg-white text-gray-500 border-gray-200 hover:border-blue-300 hover:text-blue-600'}`}>{m}</button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </FormSection>
+            </div>
+
+            <div className="p-6">
+              <FormSection icon="Search" title="Consulta de Antecedentes">
+                <ToggleSwitch label="¿Aplicar Consulta de Antecedentes?" value={formData.consultaAntecedentes} onChange={v => handleToggle('consultaAntecedentes', v)}/>
+              </FormSection>
+            </div>
+
+            <div className="p-6">
+              <FormSection icon="Phone" title="Referenciación">
+                <ToggleSwitch label="¿Aplicar Referenciación?" value={formData.referenciacion} onChange={v => handleToggle('referenciacion', v)}/>
+                {formData.referenciacion && (
+                  <div className="mt-4 pt-4 border-t-2 border-dashed border-purple-100 animate-scale-in space-y-3">
+                    <p className="text-[10px] font-black text-purple-600 uppercase tracking-widest mb-3">Tipos de referencia a aplicar:</p>
+                    <div className="bg-gray-50 rounded-xl px-4 py-3 border border-gray-200">
+                      <ToggleSwitch label="Referencia Académica" value={formData.referenciaAcademica} onChange={v => handleToggle('referenciaAcademica', v)}/>
+                    </div>
+                    <div className="bg-gray-50 rounded-xl px-4 py-3 border border-gray-200">
+                      <ToggleSwitch label="Referencia Laboral" value={formData.referenciaLaboral} onChange={v => handleToggle('referenciaLaboral', v)}/>
+                    </div>
+                    <div className="bg-gray-50 rounded-xl px-4 py-3 border border-gray-200 relative">
+                      <ToggleSwitch label="Referencia Personal" value={formData.referenciaPersonal} onChange={v => handleToggle('referenciaPersonal', v)}/>
+                      {showPersonalRefWarning && (
+                        <div className="absolute -top-10 left-0 bg-vividOrange text-white text-[9px] font-black uppercase px-3 py-1.5 rounded-xl shadow-xl shadow-vividOrange/30 animate-fade-in z-10">
+                          Incompatible con Visita Domiciliaria
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </FormSection>
+            </div>
+
+            <div className="p-6">
+              <FormSection icon="Wrench" title="Estudios de Poligrafía">
+                <ToggleSwitch label="¿Aplicar Estudios de Poligrafía?" value={formData.estudiosPoligrafia} onChange={v => handleToggle('estudiosPoligrafia', v)}/>
+                {formData.estudiosPoligrafia && (
+                  <div className="mt-4 pt-4 border-t-2 border-dashed border-amber-100 animate-scale-in grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div className={fieldClass}>
+                      <label className={labelClass}>Tipo de Poligrafía <span className="text-vividRed">*</span></label>
+                      <select name="tipoPoligrafia" value={formData.tipoPoligrafia} onChange={handleChange} className={inputClass}>
+                        <option value="">Seleccione...</option>
+                        {['Preempleo','Rutina','Especifica','Verifeye Preempleo','Verifeye Rutina','Verifeye Especifica','VSA Preempleo','VSA Rutina','VSA Especifica'].map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+                    <div className={fieldClass}>
+                      <label className={labelClass}>Ciudad de Poligrafía <span className="text-vividRed">*</span></label>
+                      <select name="ciudadPoligrafia" value={formData.ciudadPoligrafia} onChange={handleChange} className={inputClass}>
+                        <option value="">Seleccione...</option>
+                        {ciudadesPoligrafiaList.length > 0
+                          ? ciudadesPoligrafiaList.map((c,i) => <option key={i} value={c.Ciudad}>{c.Ciudad}</option>)
+                          : ['Bogotá','Medellín','Cali'].map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </FormSection>
+            </div>
+
+            <div className="p-6">
+              <FormSection icon="FileText" title="Datacrédito y Comparativo OEA">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                    <ToggleSwitch label="Consulta Datacrédito" value={formData.consultaDatacredito} onChange={v => handleToggle('consultaDatacredito', v)}/>
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                    <ToggleSwitch label="Comparativo OEA" value={formData.comparativoOEA} onChange={v => handleToggle('comparativoOEA', v)}/>
+                  </div>
+                </div>
+              </FormSection>
+            </div>
+
+            <div className="p-6">
+              <FormSection icon="Upload" title="Documentos de Soporte">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-5 items-end">
+                  <div className="md:col-span-5">
+                    <label className={labelClass}>Nombre del Documento</label>
+                    <input type="text" value={currentDocName} onChange={e => setCurrentDocName(e.target.value)} className={inputClass} placeholder="Ej: Cédula, Diploma..."/>
+                  </div>
+                  <div className="md:col-span-5">
+                    <label className={labelClass}>Archivo <span className="text-gray-400 normal-case font-normal">(solo PDF, máx. {MAX_DOC_MB} MB)</span></label>
+                    <div className="relative">
+                      <input id="fileInput" type="file" accept=".pdf,application/pdf" onChange={seleccionarArchivo}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"/>
+                      <div className="w-full border border-gray-200 rounded-xl p-2.5 text-xs bg-white flex items-center justify-between text-gray-500 hover:border-gray-300 transition-all">
+                        <span className="truncate">{currentFile ? currentFile.name : "Seleccionar archivo PDF..."}</span>
+                        <Icon name="FileText" size={14} className="text-gray-400 flex-shrink-0 ml-2"/>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="md:col-span-2">
+                    <button onClick={addAttachment} type="button" className="w-full bg-gray-800 hover:bg-black text-white rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all">Agregar</button>
+                  </div>
+                </div>
+
+                {attachments.length > 0 && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-4 border-t border-gray-100">
+                    {attachments.map(att => (
+                      <div key={att.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-2xl border border-gray-200 shadow-sm animate-scale-in">
+                        <div className="flex items-center gap-3 overflow-hidden">
+                          <div className="bg-white p-2 rounded-xl text-vividBlue shadow-inner border border-gray-100"><Icon name="FileText" size={16}/></div>
+                          <div className="truncate">
+                            <div className="text-[11px] font-black text-gray-700 uppercase tracking-tight truncate">{att.name}</div>
+                            <div className="text-[9px] text-gray-400 truncate">{att.file.name}</div>
+                          </div>
+                        </div>
+                        <button onClick={() => setAttachments(a => a.filter(x => x.id !== att.id))} className="text-vividRed hover:bg-red-50 p-2 rounded-xl transition-all flex-shrink-0 ml-2">
+                          <Icon name="Trash" size={16}/>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </FormSection>
+            </div>
+
+            <div className="p-6">
+              <FormSection icon="FileText" title="Notas Adicionales">
+                <textarea name="notas" maxLength={3000} value={formData.notas} onChange={handleChange}
+                  className="w-full border border-gray-200 rounded-xl p-4 text-xs h-28 outline-none focus:ring-2 focus:ring-gray-300 bg-white transition-all resize-none hover:border-gray-300"
+                  placeholder="Observaciones relevantes del caso..."/>
+                <div className="text-right text-[9px] font-black text-gray-300 uppercase tracking-widest mt-1">{formData.notas.length} / 3000 CARACTERES</div>
+              </FormSection>
+            </div>
+          </div>
+
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-4">
+            <button type="button" onClick={() => setStep(1)} className="w-full md:w-auto px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest text-gray-400 hover:bg-gray-100 transition-all">← Anterior</button>
+            <div className="flex gap-4 w-full md:w-auto">
+              <button type="button" onClick={() => setView('history')} className="flex-1 md:flex-none px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest text-gray-400 hover:bg-gray-100 transition-all">Cancelar</button>
+              <button type="button" onClick={handleSubmit} disabled={uploading}
+                className="flex-1 md:flex-none px-12 py-3 rounded-2xl text-xs font-black uppercase tracking-widest bg-vividRed text-white shadow-xl shadow-red-500/30 hover:scale-105 active:scale-95 transition-all btn-3d disabled:opacity-50 flex items-center justify-center gap-3">
+                {uploading ? <><Icon name="RefreshCw" size={16} className="animate-spin"/> Guardando...</> : <><Icon name="Check" size={16}/> Enviar Solicitud</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <AlertModal show={showValidationAlert} title="Faltan Datos" items={missingFields} onClose={() => setShowValidationAlert(false)}/>
+    </div>
+  );
+};
+
+// ─── CARGA MASIVA ─────────────────────────────────────────────────────────
+const BulkUpload = ({ userContext, setView, onReload }) => {
+  const [selectedClient, setSelectedClient] = useState('');
+  const [downloading, setDownloading]       = useState(false);
+  const [uploading, setUploading]           = useState(false);
+  const [file, setFile]                     = useState(null);
+  const [uploadResult, setUploadResult]     = useState(null);
+  const [showValidationAlert, setShowValidationAlert] = useState(false);
+  const [validationErrors, setValidationErrors]       = useState([]);
+
+  const clients = useMemo(() => userContext?.creationClientIds || [], [userContext]);
+  useEffect(() => { if (clients.length > 0 && !selectedClient) setSelectedClient(clients[0]); }, [clients]);
+
+  const handleDownloadTemplate = async () => {
+    if (!selectedClient) { alert("Por favor seleccione un cliente primero."); return; }
+    setDownloading(true);
+    try {
+      const response = await runServer('getTemplateName', { clientId: selectedClient });
+      if (!response.success) throw new Error(response.message || "Error al obtener plantilla.");
+      const filename = response.filename;
+      
+      const fileRes = await runServer('getFileBase64', { filename });
+      if (fileRes && fileRes.success && fileRes.base64) {
+        const mime = fileRes.mimeType || 'text/csv';
+        const byteCharacters = atob(fileRes.base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: mime });
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+        setDownloading(false);
+        return;
+      } else {
+        throw new Error(fileRes.message || "No se pudo recuperar la plantilla.");
+      }
+    } catch (e) {
+      alert("Error descargando plantilla: " + e.message);
+      setDownloading(false);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!selectedClient) return alert("Seleccione un cliente.");
+    if (!file) return alert("Seleccione un archivo CSV para cargar.");
+    setUploading(true);
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const csvContent = e.target.result;
+        const base64Content = csvContent.split(',')[1];
+        const decodedText = atob(base64Content);
+        const rows = decodedText.split(/\r\n|\n|\r/);
+        if (rows.length < 2) throw new Error("El archivo está vacío o sin datos.");
+        const delimiter = rows[0].includes(';') ? ';' : ',';
+        const headers = rows[0].split(delimiter).map(h => h.trim().replace(/^"|"$/g, '').toUpperCase());
+        const correoIdx  = headers.findIndex(h => h.includes("CORREO") || h.includes("EMAIL"));
+        const celularIdx = headers.findIndex(h => h.includes("CELULAR") || h.includes("MOVIL") || h.includes("TELEFONO"));
+        const frontErrors = [];
+        for (let i = 1; i < rows.length; i++) {
+          const line = rows[i].trim(); if (!line) continue;
+          const cols = line.split(delimiter); const rowNum = i + 1;
+          if (correoIdx !== -1 && cols[correoIdx]) {
+            const val = cols[correoIdx].trim().replace(/^"|"$/g, '');
+            if (val && !isValidEmail(val)) frontErrors.push(`Fila ${rowNum}: Correo inválido (${val})`);
+          }
+          if (celularIdx !== -1 && cols[celularIdx]) {
+            const val = cols[celularIdx].trim().replace(/^"|"$/g, '');
+            if (val && !isValidPhone(val)) frontErrors.push(`Fila ${rowNum}: Celular inválido (${val})`);
+          }
+        }
+        if (frontErrors.length > 0) { setValidationErrors(frontErrors); setShowValidationAlert(true); setUploading(false); return; }
+        const response = await runServer('processBulkUpload', { csvContent: base64Content, clientId: selectedClient });
+        if (response.success) { setUploadResult(response); if (onReload) onReload(); }
+        else {
+          setValidationErrors(response.errorList || [response.message]);
+          setShowValidationAlert(true);
+        }
+      } catch (err) { alert("Error en carga masiva: " + err.message); }
+      finally { setUploading(false); }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  if (uploadResult) return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/30 backdrop-blur-sm animate-fade-in">
+      <div className="bg-white p-10 rounded-3xl shadow-2xl text-center max-w-md w-full border border-gray-100 animate-scale-in">
+        <div className="w-24 h-24 bg-vividGreen/10 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-inner transform rotate-12">
+          <Icon name="CheckCircle" size={48} className="text-vividGreen -rotate-12"/>
+        </div>
+        <h2 className="text-3xl font-black text-gray-800 mb-2 tracking-tight">¡Carga Finalizada!</h2>
+        <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-8 text-center">Resultados del procesamiento masivo</p>
+        <div className="bg-gray-50/50 p-6 rounded-3xl border border-gray-100 text-left mb-6 space-y-4">
+          <div className="flex justify-between items-center">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Exitosos</span>
+            <span className="font-mono font-black text-vividGreen bg-white px-3 py-1 rounded-xl shadow-sm border border-gray-100">{uploadResult.loaded}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Fallidos</span>
+            <span className={`font-mono font-black px-3 py-1 rounded-xl shadow-sm border border-gray-100 ${uploadResult.failed > 0 ? 'text-vividRed bg-vividRed/5' : 'text-gray-400 bg-white'}`}>{uploadResult.failed}</span>
+          </div>
+        </div>
+        {uploadResult.technicalErrors?.length > 0 && (
+          <div className="bg-vividRed/[0.03] border border-vividRed/10 rounded-2xl p-4 mb-8 text-left max-h-36 overflow-y-auto">
+            <p className="text-[9px] font-black text-vividRed uppercase tracking-widest mb-2">Errores Técnicos Detectados:</p>
+            <ul className="text-[10px] text-gray-600 space-y-1.5 list-disc list-inside font-medium">
+              {uploadResult.technicalErrors.map((e,i) => <li key={i} className="leading-tight">{e}</li>)}
+            </ul>
+          </div>
+        )}
+        <div className="grid grid-cols-1 gap-4">
+          <button onClick={() => { setFile(null); setUploadResult(null); }} className="btn-3d-blue py-4 rounded-2xl flex items-center justify-center gap-3">
+            <Icon name="Upload" size={18}/> <span className="text-xs font-black uppercase tracking-widest">Subir Otro</span>
+          </button>
+          <button onClick={() => setView('history')} className="btn-3d-gray py-4 rounded-2xl flex items-center justify-center gap-3">
+            <Icon name="History" size={18}/> <span className="text-xs font-black uppercase tracking-widest text-gray-600">Ver Historial</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="p-6 md:p-8 max-w-4xl mx-auto animate-fade-in">
+      <h2 className="text-2xl font-bold text-gray-800 mb-6">Carga Masiva</h2>
+      <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200">
+        <div className="mb-8 max-w-sm">
+          <SearchableSelect
+            label="Cliente"
+            required
+            value={selectedClient}
+            onChange={val => setSelectedClient(val)}
+            options={clients.map(id => ({ value: id, label: userContext?.clientNames?.[id] || id }))}
+          />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="border-r border-gray-100 pr-6">
+            <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4"><Icon name="Download" size={32}/></div>
+            <h3 className="text-lg font-bold text-gray-700 text-center mb-2">Paso 1: Descargar Plantilla</h3>
+            <p className="text-sm text-gray-500 text-center mb-5">Obtenga el formato CSV para este cliente.</p>
+            <button onClick={handleDownloadTemplate} disabled={downloading || !selectedClient}
+              className="flex items-center justify-center gap-2 mx-auto text-blue-600 font-bold hover:underline text-sm btn-action disabled:opacity-50">
+              {downloading ? <><Icon name="RefreshCw" size={15} className="animate-spin"/> Buscando...</> : <><Icon name="Download" size={15}/> Descargar Plantilla</>}
+            </button>
+          </div>
+          <div className="pl-0 md:pl-4">
+            <div className="w-16 h-16 bg-green-50 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4"><Icon name="Upload" size={32}/></div>
+            <h3 className="text-lg font-bold text-gray-700 text-center mb-2">Paso 2: Subir Datos</h3>
+            <p className="text-sm text-gray-500 text-center mb-4">Suba el CSV diligenciado.</p>
+            <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 hover:bg-gray-50 cursor-pointer transition relative mb-4">
+              <input type="file" accept=".csv" onChange={e => e.target.files?.[0] && setFile(e.target.files[0])} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"/>
+              <div className="text-center text-xs text-gray-400">
+                {file ? <span className="text-green-600 font-bold">{file.name}</span> : "Arrastre o haga clic aquí"}
+              </div>
+            </div>
+            <button onClick={handleUpload} disabled={uploading || !file}
+              className="w-full btn-3d-red px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 flex items-center justify-center gap-3">
+              {uploading ? <><Icon name="RefreshCw" size={16} className="animate-spin"/> Procesando...</> : <><Icon name="Upload" size={16}/> Procesar Archivo</>}
+            </button>
+          </div>
+        </div>
+      </div>
+      <AlertModal show={showValidationAlert} title="Errores en Plantilla"
+        message="Se encontraron errores en el archivo. La carga fue rechazada."
+        items={validationErrors} onClose={() => { setShowValidationAlert(false); setValidationErrors([]); }}/>
+    </div>
+  );
+};
+
+// ─── PANELES GENERALES ────────────────────────────────────────────────────
 const LoginView = ({ onSuccess, isLoading }) => (
   <div className="flex flex-col h-screen bg-gray-100">
     <div className="bg-appRed h-2 w-full"></div>
@@ -440,7 +1509,6 @@ const LoginView = ({ onSuccess, isLoading }) => (
   </div>
 );
 
-// ─── SIDEBAR ──────────────────────────────────────────────────────────────
 const Sidebar = ({ currentView, setView, onLogout, userContext, syncStatus, lastSync, isOpen, toggleSidebar, isCollapsed, toggleCollapse }) => {
   const menuItems = useMemo(() => {
     const all = [
@@ -525,7 +1593,6 @@ const Sidebar = ({ currentView, setView, onLogout, userContext, syncStatus, last
   );
 };
 
-// ─── HOME DASHBOARD ───────────────────────────────────────────────────────
 const HomeDashboard = ({ userContext, requests, setView, syncStatus }) => {
   const stats = useMemo(() => {
     const total     = requests.length;
@@ -593,7 +1660,6 @@ const HomeDashboard = ({ userContext, requests, setView, syncStatus }) => {
   );
 };
 
-// ─── LISTA DE SOLICITUDES ────────────────────────────────────────────────
 const PERIODS = [
   { key: 'today', label: 'Hoy'       },
   { key: 'week',  label: 'Semana'    },
@@ -819,1399 +1885,7 @@ const RequestList = ({ setView, setSelectedRequest, initialData, onRefresh, onCh
   );
 };
 
-
-
-// ─── MODAL DE VISTA PREVIA DE ARCHIVOS (VERSIÓN HÍBRIDA) ──────────────
-const FilePreviewModal = ({ file, onClose }) => {
-  const [fileUrl, setFileUrl] = React.useState(null);
-  const [fileType, setFileType] = React.useState(null);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState(null);
-
-  React.useEffect(() => {
-    if (!file || !file.name) return;
-    
-    let urlToRevoke = null;
-    setLoading(true);
-    setError(null);
-    setFileUrl(null);
-    setFileType(null);
-
-    // Pedimos el archivo en Base64 al backend
-    runServer('getFileBase64', { filename: file.name })
-      .then(response => {
-        if (response.success && response.base64) {
-          const mime = response.mimeType || 'application/pdf';
-          setFileType(mime);
-          
-          // 1. Convertimos el texto Base64 a un Array Binario
-          const byteCharacters = atob(response.base64);
-          const byteNumbers = new Array(byteCharacters.length);
-          for (let i = 0; i < byteCharacters.length; i++) {
-            byteNumbers[i] = byteCharacters.charCodeAt(i);
-          }
-          const byteArray = new Uint8Array(byteNumbers);
-          
-          // 2. Creamos un "Blob"
-          const blob = new Blob([byteArray], { type: mime });
-          
-          // 3. Generamos la URL local
-          urlToRevoke = URL.createObjectURL(blob);
-          setFileUrl(urlToRevoke);
-        } else {
-          throw new Error(response.message || "No se obtuvieron datos del archivo.");
-        }
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error(err);
-        setError("Error al procesar el archivo. Es posible que el formato no sea compatible.");
-        setLoading(false);
-      });
-
-    return () => {
-      if (urlToRevoke) URL.revokeObjectURL(urlToRevoke);
-    };
-  }, [file]);
-
-  if (!file || !file.name) return null;
-
-  // Verificamos si es una imagen
-  const isImage = fileType && fileType.startsWith('image/');
-
-  return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 md:p-6 bg-black/70 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl h-full max-h-[90vh] flex flex-col overflow-hidden animate-scale-in">
-        
-        <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 text-blue-600 rounded-lg shadow-sm">
-              <Icon name="FileText" size={18}/>
-            </div>
-            <h3 className="font-bold text-gray-800 truncate max-w-md">
-              {file.label || file.name}
-            </h3>
-          </div>
-          <button onClick={onClose} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors">
-            <Icon name="X" size={24}/>
-          </button>
-        </div>
-        
-        <div className="flex-1 bg-gray-200 relative flex items-center justify-center overflow-hidden">
-          {loading && (
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-              <span className="text-gray-500 font-bold text-sm">Preparando documento...</span>
-            </div>
-          )}
-          
-          {error && (
-            <div className="flex flex-col items-center gap-2 text-red-500 bg-white p-6 rounded-2xl shadow-sm">
-              <Icon name="AlertTriangle" size={32} />
-              <span className="font-bold text-center">{error}</span>
-            </div>
-          )}
-          
-          {(!loading && !error && fileUrl) && (
-            isImage ? (
-              // Si es imagen, la pintamos (Chrome no bloquea esto)
-              <div className="p-4 w-full h-full flex justify-center items-center">
-                <img src={fileUrl} alt="Vista Previa" className="max-w-full max-h-full object-contain shadow-lg rounded-lg" />
-              </div>
-            ) : (
-              // Si es PDF o documento, mostramos interfaz amigable en vez del iframe bloqueado
-              <div className="flex flex-col items-center justify-center p-8 text-center h-full w-full bg-white">
-                <Icon name="FileText" size={64} className="text-gray-300 mb-4" />
-                <h4 className="text-xl font-bold text-gray-700 mb-2">Documento Listo</h4>
-                <p className="text-sm text-gray-500 max-w-md mb-8">
-                  Por políticas de seguridad del navegador, este tipo de documento no se puede incrustar aquí. Elige una opción:
-                </p>
-                <div className="flex flex-col md:flex-row gap-4">
-                  <a href={fileUrl} target="_blank" rel="noreferrer" 
-                     className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black uppercase text-[11px] flex items-center gap-2 shadow-lg transition-all">
-                    <Icon name="Search" size={16} /> Abrir en nueva pestaña
-                  </a>
-                  <a href={fileUrl} download={file.name} 
-                     className="px-6 py-3 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl font-black uppercase text-[11px] flex items-center gap-2 shadow-sm transition-all">
-                    <Icon name="Download" size={16} /> Descargar Archivo
-                  </a>
-                </div>
-              </div>
-            )
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-
-
-// ─── DETALLE DE SOLICITUD ─────────────────────────────────────────────────
-const RequestDetail = ({ requestId, onBack, preloadedData }) => {
-  const [detailData, setDetailData] = useState(null);
-  const [loading, setLoading]       = useState(true);
-  const [error, setError]           = useState(null);
-  const [fileStates, setFileStates] = useState({});
-  const [previewFile, setPreviewFile] = useState(null); // Estado para el modal
-
-  useEffect(() => {
-    setLoading(true); setError(null);
-    runServer('getRequestDetail', { id: requestId })
-      .then(data => { setDetailData(data); setLoading(false); })
-      .catch(err => { setError(err.message); setLoading(false); });
-  }, [requestId]);
-
-  const updateFileStatus = (fileName, status, message = "") =>
-    setFileStates(prev => ({ ...prev, [fileName]: { status, message } }));
-
-  const handleDownload = async (input) => {
-    let path = null;
-    if (typeof input === 'string') path = input;
-    else if (typeof input === 'object' && input !== null) path = input.InformeEstudioPoligrafia || input.Documento || input.URL || input.Archivo || input.NombreArchivo;
-    
-    if (!path) return alert("Datos de documento inválidos o sin ruta.");
-    const filename = path.split(/[/\\]/).pop();
-    if (!filename) return alert("No se pudo obtener el nombre del archivo.");
-    
-    updateFileStatus(filename, 'loading', 'Iniciando descarga...');
-    
-    const downloadViaProxy = () => {
-      updateFileStatus(filename, 'loading', 'Descargando vía proxy...');
-      const iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      iframe.src = `${PROXY_URL}?filename=${encodeURIComponent(filename)}&token=${PROXY_TOKEN}`;
-      document.body.appendChild(iframe);
-      setTimeout(() => {
-        updateFileStatus(filename, 'success', 'Descarga realizada');
-        setTimeout(() => { if (document.body.contains(iframe)) document.body.removeChild(iframe); }, 60000);
-      }, 4000);
-    };
-
-    try {
-      const response = await runServer('getFileBase64', { filename: path });
-      if (response && response.success && response.base64) {
-        const mime = response.mimeType || 'application/octet-stream';
-        const downloadName = response.fileName || filename;
-        const byteCharacters = atob(response.base64);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], { type: mime });
-        const blobUrl = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = downloadName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
-        updateFileStatus(filename, 'success', 'Descargado ✓');
-      } else {
-        console.warn("getFileBase64 no encontró el archivo, probando proxy...", response?.message);
-        downloadViaProxy();
-      }
-    } catch (error) {
-      console.warn("Error en getFileBase64, probando proxy...", error?.message);
-      downloadViaProxy();
-    }
-  };
-
-  if (loading) return (
-    <div className="flex items-center justify-center h-full p-10 flex-col gap-4">
-      <div className="w-12 h-12 border-4 border-appBlue border-t-transparent rounded-full animate-spin"></div>
-      <p className="text-sm text-gray-500">Cargando detalles de la solicitud...</p>
-    </div>
-  );
-  if (error) return (
-    <div className="p-10 text-center">
-      <Icon name="AlertTriangle" size={40} className="text-red-500 mx-auto mb-3"/>
-      <p className="text-red-600 font-bold mb-2">Error al cargar detalle</p>
-      <p className="text-sm text-gray-500 mb-4">{error}</p>
-      <button onClick={onBack} className="text-blue-600 underline text-sm">Volver al listado</button>
-    </div>
-  );
-
-  const header = detailData?.header || preloadedData;
-
-  const Card = ({ title, children, count }) => (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-4 overflow-hidden">
-      <div className="px-4 py-3 border-b border-gray-100 font-bold text-gray-700 text-sm uppercase flex justify-between">
-        <span>{title}</span>
-        {count !== undefined && <span className="bg-gray-100 text-gray-600 px-2 rounded-full text-xs flex items-center">{count}</span>}
-      </div>
-      <div>{children}</div>
-    </div>
-  );
-
-  const DetailField = ({ label, value }) => (
-    <div className="border-b border-gray-50 pb-2 last:border-0">
-      <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">{label}</div>
-      <div className="text-sm text-gray-700 font-medium break-words">{value || 'N/A'}</div>
-    </div>
-  );
-
-  const GenericList = ({ items, labelKey, dateKey }) => (
-    items?.length > 0
-      ? <ul className="divide-y divide-gray-100">{items.map((item, i) => (
-          <li key={i} className="p-3 text-sm hover:bg-gray-50">
-            <div className="font-medium text-gray-700">{item[labelKey] || JSON.stringify(item)}</div>
-            {dateKey && item[dateKey] && <div className="text-xs text-gray-400">{item[dateKey]}</div>}
-          </li>
-        ))}</ul>
-      : <div className="p-4 text-center text-xs text-gray-400 italic">No hay registros.</div>
-  );
-
-  const DownloadRow = ({ path, label, date, hidePreview }) => {
-    if (!path) return null;
-    const filename = path.split(/[/\\]/).pop();
-    const fs = fileStates[filename] || {};
-    
-    // Dispara el modal con el nombre del archivo para pedir el Base64
-    const handlePreview = () => {
-      setPreviewFile({ name: path, label: label || filename });
-    };
-
-    return (
-      <div className="flex items-center justify-between bg-blue-50 p-2.5 rounded border border-blue-100 mb-2">
-        <div className="flex items-center gap-3 overflow-hidden flex-1">
-          <div className="bg-white p-1.5 rounded-full text-blue-600 shadow-sm min-w-[28px]"><Icon name="FileText" size={14}/></div>
-          <div className="flex-1 overflow-hidden">
-            <div className="text-xs font-bold text-blue-900 truncate">{label || filename}</div>
-            {date && <div className="text-[9px] text-blue-400">{date}</div>}
-            {fs.message && <div className={`text-[9px] font-bold ${fs.status==='success'?'text-green-600':'text-blue-500'}`}>{fs.message}</div>}
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-2 ml-2">
-          {!hidePreview && (
-            <button onClick={handlePreview} title="Previsualizar archivo"
-              className="p-2 rounded-lg bg-white text-blue-600 hover:bg-blue-100 shadow-sm transition">
-              <Icon name="Search" size={15} />
-            </button>
-          )}
-          
-          <button onClick={() => handleDownload(path)} disabled={fs.status==='loading'} title="Descargar archivo"
-            className={`p-2 rounded-lg transition ${fs.status==='loading' ? 'opacity-50 cursor-not-allowed' : 'bg-white text-blue-600 hover:bg-blue-600 hover:text-white shadow-sm'}`}>
-            <Icon name={fs.status==='loading'?'RefreshCw':'Download'} size={15} className={fs.status==='loading'?'animate-spin':''}/>
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto animate-fade-in">
-      <button onClick={onBack} className="mb-4 text-gray-500 hover:text-gray-800 flex items-center gap-1 text-sm btn-action">
-        <Icon name="ChevronRight" className="rotate-180" size={16}/> Volver
-      </button>
-      <div className="grid grid-cols-12 gap-6">
-        <div className="col-span-12 md:col-span-8 space-y-4">
-          <Card title="Información Detallada">
-            <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <DetailField label="Cliente"  value={header.Cliente || header.RazonSocial}/>
-              <DetailField label="NIT"      value={header.NIT}/>
-              <div className="col-span-2 mt-1 border-b border-gray-200 pb-1"><h4 className="text-xs font-bold text-blue-600 uppercase">Fechas Clave</h4></div>
-              <DetailField label="Programación Visita"     value={formatDateCO(header.ProgramacionVisita)}/>
-              <DetailField label="Programación Poligrafía" value={formatDateCO(header.ProgramacionPoligrafia)}/>
-              <DetailField label="Fecha Entrega ECP"       value={formatDateCO(header.FechaEntregaECP)}/>
-              <DetailField label="Fecha Entrega EP"        value={formatDateCO(header.FechaEntregaEP)}/>
-              {header.ArchivoInforme && header.ArchivoInforme !== 'None' && header.ArchivoInforme !== 'null' && (
-                <>
-                  <div className="col-span-2 mt-1 border-b border-gray-200 pb-1"><h4 className="text-xs font-bold text-green-600 uppercase">Informe Final</h4></div>
-                  <div className="col-span-2"><DownloadRow path={header.ArchivoInforme} label="Informe Final"/></div>
-                </>
-              )}
-              <div className="col-span-2 mt-1 border-b border-gray-200 pb-1"><h4 className="text-xs font-bold text-appRed uppercase">Información Del Evaluado</h4></div>
-              <DetailField label="Nombre Completo"       value={header.NombreCompleto}/>
-              <DetailField label="Tipo Identificación"   value={header.TipoIdentificacion}/>
-              <DetailField label="Identificación"        value={header.Identificacion}/>
-              <DetailField label="Fecha Expedición"      value={formatDateCO(header.FechaExpedicion, false)}/>
-              <DetailField label="Cargo"                 value={header.Cargo}/>
-              <DetailField label="Ciudad"                value={header.Ciudad}/>
-              <DetailField label="Dirección"             value={header.Direccion}/>
-              <DetailField label="Barrio"                value={header.Barrio}/>
-              <div className="col-span-2"><DetailField label="Notas Adicionales" value={header.Notas}/></div>
-            </div>
-          </Card>
-          <Card title="Novedades" count={detailData?.notas?.length}>
-            <GenericList items={detailData?.notas} labelKey="Nota" dateKey="FechaActualizacion"/>
-          </Card>
-          <Card title="Histórico de Estados" count={detailData?.historicoEstSolicitud?.length}>
-            <GenericList items={detailData?.historicoEstSolicitud} labelKey="EstadoSol" dateKey="FechaActualziacion"/>
-          </Card>
-          {(detailData?.poligrafia?.length > 0) && (
-            <Card title="Informe Poligrafía" count={detailData.poligrafia.length}>
-              {detailData.poligrafia.map((item, i) => (
-                <div key={i} className="p-4 border-b hover:bg-gray-50">
-                  <div className="flex justify-between mb-3">
-                    <div><div className="text-[10px] font-bold text-gray-400 uppercase">Analista</div><div className="font-bold text-gray-700">{item.AnalistaPoligrafo || 'N/A'}</div></div>
-                    <div className="text-right"><div className="text-[10px] text-gray-400 uppercase">Actualización</div><div className="text-xs text-gray-500">{item.FechaActualización || item.FechaActualizacion || ''}</div></div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3 text-xs mb-3 bg-white p-3 rounded border border-gray-100">
-                    <div><span className="font-bold text-gray-800">Concepto:</span> {item.ConceptoEP}</div>
-                    <div><span className="font-bold text-gray-800">Nivel Riesgo:</span> <span className="bg-gray-100 px-1.5 rounded">{item.NivelRiesgo}</span></div>
-                    <div><span className="font-bold text-gray-800">Admisiones:</span> {item.Admisiones}</div>
-                    <div><span className="font-bold text-gray-800">Elaborado Por:</span> {item.ElaboradoPor}</div>
-                  </div>
-                  {item.InformeEstudioPoligrafia && <DownloadRow path={item.InformeEstudioPoligrafia} label="Informe Estudio Poligrafía"/>}
-                </div>
-              ))}
-            </Card>
-          )}
-          {(detailData?.datacredito?.length > 0) && (
-            <Card title="Consulta Datacrédito" count={detailData.datacredito.length}>
-              {detailData.datacredito.map((item, i) => (
-                <div key={i} className="px-4 py-2">
-                  <DownloadRow path={item.Archivo} label={`Consulta - ${item.FechaActualizacion || item.FechaConsulta || ''}`}/>
-                </div>
-              ))}
-            </Card>
-          )}
-        </div>
-        <div className="col-span-12 md:col-span-4 space-y-4">
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 text-center">
-            <div className="text-gray-400 text-xs font-bold mb-1">ESTADO ACTUAL</div>
-            <div className={`text-2xl font-black mb-2 uppercase ${getStatusBadgeColor(header.EstadoActual).split(' ')[1]}`}>{header.EstadoActual}</div>
-            <div className="text-gray-500 text-xs bg-gray-100 inline-block px-2 py-1 rounded">ID: {header.NSolicitud || header.ID_SolicitudesConfiabilidad}</div>
-            {header.EstadoActualEP && (
-              <div className="mt-2 pt-2 border-t border-gray-100">
-                <div className="text-xs text-gray-400 font-bold mb-1">ESTADO EP</div>
-                <span className="inline-flex items-center justify-center px-2 h-[22px] rounded text-[9px] font-bold uppercase bg-purple-100 text-purple-700 border border-purple-200">{header.EstadoActualEP}</span>
-              </div>
-            )}
-          </div>
-          <Card title="Servicios Aplicados" count={detailData?.services?.length}>
-            {detailData?.services?.length > 0
-              ? <ul className="divide-y">{detailData.services.map((s,i) => (
-                  <li key={i} className="px-4 py-3 hover:bg-gray-50">
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="font-bold text-sm text-gray-700">{s.TipoServicio || s.Servicio || s.ServicioAplicar}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${s.EstadoActual === 'Finalizado' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{s.EstadoActual || s.Estado}</span>
-                    </div>
-                    <div className="text-[10px] text-gray-400 flex items-center gap-1"><Icon name="Clock" size={10}/> {s.FechaActualizacion || s.Fecha || 'Pendiente'}</div>
-                  </li>
-                ))}</ul>
-              : <div className="p-4 text-center text-xs text-gray-400 italic">No hay servicios registrados.</div>
-            }
-          </Card>
-          {detailData?.autFirmada?.length > 0 && (
-            <Card title="Autorizaciones Firmadas" count={detailData.autFirmada.length}>
-              {detailData.autFirmada.map((doc, i) => (
-                <div key={i} className="px-4 py-2">
-                  <DownloadRow path={doc.Archivo || doc.NombreArchivo} label={doc.NombreArchivo || 'Autorización Firmada'} date={doc.FechaActualizacion}/>
-                </div>
-              ))}
-            </Card>
-          )}
-          {detailData?.documents?.length > 0 && (
-            <Card title="Documentos" count={detailData.documents.length}>
-              {detailData.documents.map((doc, i) => (
-                <div key={i} className="px-4 py-2">
-                  <DownloadRow path={doc.Documento || doc.URL || doc.Archivo} label={doc.NombreDocumento || doc.Nombre || 'Documento'} date={doc.FechaActualizacion}/>
-                </div>
-              ))}
-            </Card>
-          )}
-        </div>
-      </div>
-
-      {/* Renderizamos el modal de vista previa aquí mismo */}
-      <FilePreviewModal 
-        file={previewFile} 
-        onClose={() => setPreviewFile(null)} 
-      />
-
-    </div>
-  );
-};
-
-
-
-// ─── CREAR SOLICITUD ──────────────────────────────────────────────────────
-const CreateRequest = ({ userContext, setView, onReload, masterData }) => {
-  const [step, setStep]                         = useState(1);
-  const [uploading, setUploading]               = useState(false);
-  const [uploadProgress, setUploadProgress]     = useState({ current: 0, total: 0 });
-  const [showSuccess, setShowSuccess]           = useState(false);
-  const [showValidationAlert, setShowValidationAlert] = useState(false);
-  const [missingFields, setMissingFields]       = useState([]);
-  const [createdId, setCreatedId]               = useState('');
-  const [showPersonalRefWarning, setShowPersonalRefWarning] = useState(false);
-  const [attachments, setAttachments]           = useState([]);
-  const [currentFile, setCurrentFile]           = useState(null);
-  const [currentDocName, setCurrentDocName]     = useState('');
-
-  useEffect(() => {
-    if (showPersonalRefWarning) { const t = setTimeout(() => setShowPersonalRefWarning(false), 3000); return () => clearTimeout(t); }
-  }, [showPersonalRefWarning]);
-
-  const [formData, setFormData] = useState({
-    fechaSolicitud: new Date().toLocaleString(), clientId: '', nombre: '', nit: '', razonSocial: '',
-    tipoIdentificacion: '', identificacion: '', fechaExpedicion: '', cargo: '', correo: '',
-    celular: '', ciudad: '', barrio: '', direccion: '', tipoTrabajador: 'Nuevo', centroCostos: '',
-    visitaDomiciliaria: false, modalidadVisita: '', consultaAntecedentes: false,
-    referenciacion: false, referenciaAcademica: null, referenciaLaboral: null, referenciaPersonal: null,
-    estudiosPoligrafia: false, tipoPoligrafia: '', ciudadPoligrafia: '', consultaDatacredito: false,
-    comparativoOEA: false, notas: '', clienteProyectoInterno: '', linea: '', lineaNegocio: '',
-    clienteClientesSecundarios: '', nitClienteSecundario: '', convenioClienteSecundario: '',
-    tipoCostoClienteSecundario: '', centroCostosExterno: ''
-  });
-
-  const ciudadesList           = useMemo(() => masterData?.conCiudades || [], [masterData]);
-  const searchableCiudadesList = useMemo(() => {
-    const list = ciudadesList.length > 0
-      ? ciudadesList.map(c => ({ value: c.Ciudades, label: c.Ciudades }))
-      : ['Bogotá','Medellín','Cali','Barranquilla','Otra'].map(c => ({ value: c, label: c }));
-    return list;
-  }, [ciudadesList]);
-  const ciudadesPoligrafiaList = useMemo(() => masterData?.conPoligrafias || [], [masterData]);
-  const clienteProyectoList    = useMemo(() => masterData?.ClienteProyecto || [], [masterData]);
-  const lineaCCList            = useMemo(() => masterData?.LineaCC || [], [masterData]);
-  const secondaryClientsRaw    = useMemo(() => masterData?.conClientesSecundarios || [], [masterData]);
-
-  const availableSecondaryClients = useMemo(() => {
-    if (!formData.clientId) return [];
-    return secondaryClientsRaw.filter(i => String(i.ClientePrincipal) === String(formData.clientId)).map(i => i.ClienteSecundarioNombre);
-  }, [formData.clientId, secondaryClientsRaw]);
-
-  const clientType = useMemo(() => (formData.clientId && userContext?.clientTypes) ? userContext.clientTypes[formData.clientId] : '', [formData.clientId, userContext]);
-  const isInternal = useMemo(() => clientType === 'Interno', [clientType]);
-
-  const uniqueLineas = useMemo(() => [...new Set(lineaCCList.map(i => i.Linea))].sort(), [lineaCCList]);
-  const availableLNs = useMemo(() => !formData.linea ? [] : [...new Set(lineaCCList.filter(i => i.Linea === formData.linea).map(i => i.LN_Nombre))].sort(), [formData.linea, lineaCCList]);
-  const availableCCs = useMemo(() => (!formData.linea || !formData.lineaNegocio) ? [] : [...new Set(lineaCCList.filter(i => i.Linea === formData.linea && i.LN_Nombre === formData.lineaNegocio).map(i => i.CC_Nombre))].sort(), [formData.linea, formData.lineaNegocio, lineaCCList]);
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    if (name === 'clientId') {
-      const cd = userContext?.clientData?.[value];
-      setFormData(p => ({ ...p, [name]: value, nit: cd?.nit || '', razonSocial: cd?.razonSocial || '' }));
-    } else if (name === 'linea') {
-      setFormData(p => ({ ...p, [name]: value, lineaNegocio: '', centroCostos: '' }));
-    } else if (name === 'lineaNegocio') {
-      setFormData(p => ({ ...p, [name]: value, centroCostos: '' }));
-    } else {
-      setFormData(p => ({ ...p, [name]: value }));
-    }
-  };
-
-  const handleCelularChange = (e) => {
-    const val = e.target.value.replace(/\D/g, '');
-    if (val.length <= 13) setFormData(p => ({ ...p, celular: val }));
-  };
-
-  const handleIdentificacionChange = (e) => {
-    const val = e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-    if (val.length <= 15) setFormData(p => ({ ...p, identificacion: val }));
-  };
-
-  // ── handleToggle con limpieza de campos hijos ──────────────────────────
-  const handleToggle = (name, val) => {
-    if (name === 'referenciaPersonal' && val === true && formData.visitaDomiciliaria) { setShowPersonalRefWarning(true); return; }
-    setFormData(p => {
-      const next = { ...p, [name]: val };
-      if (name === 'visitaDomiciliaria') {
-        if (val === true)  next.referenciaPersonal = false;
-        if (val === false) next.modalidadVisita = '';
-      }
-      if (name === 'referenciacion' && val === false) {
-        next.referenciaAcademica = null;
-        next.referenciaLaboral   = null;
-        next.referenciaPersonal  = null;
-      }
-      if (name === 'estudiosPoligrafia' && val === false) {
-        next.tipoPoligrafia   = '';
-        next.ciudadPoligrafia = '';
-      }
-      return next;
-    });
-  };
-
-  // Solo PDF y máximo 10 MB: evita archivos pesados que hagan fallar la carga.
-  const validarArchivoSoporte = (file) => {
-    if (!file) return "Seleccione un archivo.";
-    const esPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
-    if (!esPdf) return "Solo se permiten archivos en formato PDF.";
-    if (file.size === 0) return "El archivo está vacío.";
-    if (file.size > MAX_DOC_MB * 1024 * 1024) {
-      return `El archivo pesa ${(file.size / 1024 / 1024).toFixed(1)} MB y el máximo permitido es ${MAX_DOC_MB} MB.`;
-    }
-    return null;
-  };
-
-  const seleccionarArchivo = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const error = validarArchivoSoporte(file);
-    if (error) { alert(error); e.target.value = ""; setCurrentFile(null); return; }
-    setCurrentFile(file);
-  };
-
-  const addAttachment = () => {
-    if (!currentFile) return alert("Seleccione un archivo.");
-    const error = validarArchivoSoporte(currentFile);
-    if (error) {
-      alert(error);
-      setCurrentFile(null);
-      document.getElementById('fileInput').value = "";
-      return;
-    }
-    if (!currentDocName.trim()) return alert("Ingrese un nombre para el documento.");
-    setAttachments(a => [...a, { id: Date.now(), file: currentFile, name: currentDocName.trim() }]);
-    setCurrentFile(null); setCurrentDocName('');
-    document.getElementById('fileInput').value = "";
-  };
-
-  const resetForm = () => {
-    setFormData({ fechaSolicitud: new Date().toLocaleString(), clientId: '', nombre: '', nit: '', razonSocial: '',
-      tipoIdentificacion: '', identificacion: '', fechaExpedicion: '', cargo: '', correo: '', celular: '',
-      ciudad: '', barrio: '', direccion: '', tipoTrabajador: 'Nuevo', centroCostos: '',
-      visitaDomiciliaria: false, modalidadVisita: '', consultaAntecedentes: false,
-      referenciacion: false, referenciaAcademica: null, referenciaLaboral: null, referenciaPersonal: null,
-      estudiosPoligrafia: false, tipoPoligrafia: '', ciudadPoligrafia: '', consultaDatacredito: false,
-      comparativoOEA: false, notas: '', clienteProyectoInterno: '', linea: '', lineaNegocio: '',
-      clienteClientesSecundarios: '', nitClienteSecundario: '', convenioClienteSecundario: '',
-      tipoCostoClienteSecundario: '', centroCostosExterno: '' });
-    setAttachments([]); setStep(1); setShowSuccess(false);
-  };
-
-  const handleSubmit = async () => {
-    const missing = [];
-    if (!formData.clientId)        missing.push("ID Cliente");
-    if (!formData.nombre)          missing.push("Nombre Completo");
-    if (!formData.tipoIdentificacion) missing.push("Tipo de Identificación");
-    if (!formData.identificacion)  missing.push("Número de Identificación");
-    else if (formData.identificacion.length < 5 || formData.identificacion.length > 15) missing.push("Identificación: entre 5 y 15 caracteres");
-    if (!formData.cargo)           missing.push("Cargo");
-    if (!formData.celular)         missing.push("Celular");
-    else if (!isValidPhone(formData.celular)) missing.push("Celular inválido (solo dígitos, 7 a 13)");
-    if (!formData.ciudad)          missing.push("Ciudad");
-    if (!formData.direccion)       missing.push("Dirección");
-    if (!formData.tipoTrabajador)  missing.push("Tipo Trabajador");
-    if (formData.correo && !isValidEmail(formData.correo)) missing.push("Formato de Correo inválido");
-    if (isInternal) {
-      if (!formData.linea)        missing.push("Línea");
-      if (!formData.lineaNegocio) missing.push("Línea de Negocio");
-      if (!formData.centroCostos) missing.push("Centro de Costos");
-      if (formData.consultaAntecedentes && attachments.length === 0) missing.push("Documento de Soporte (obligatorio para Antecedentes)");
-    }
-    if (formData.visitaDomiciliaria && !formData.modalidadVisita) missing.push("Modalidad Visita");
-    if (formData.referenciacion) {
-  if (formData.referenciaAcademica === null) missing.push("Referencia Académica (seleccione SÍ o NO)");
-  if (formData.referenciaLaboral   === null) missing.push("Referencia Laboral (seleccione SÍ o NO)");
-  if (formData.referenciaPersonal  === null) missing.push("Referencia Personal (seleccione SÍ o NO)");
-
-  // Al menos una referencia debe ser SÍ
-  const alMenosUnaRef = formData.referenciaAcademica === true || formData.referenciaLaboral === true || formData.referenciaPersonal === true;
-  if (!alMenosUnaRef) missing.push("Referenciación: debe seleccionar SÍ en al menos una referencia (Académica, Laboral o Personal)");
-}
-    if (formData.estudiosPoligrafia) {
-      if (!formData.tipoPoligrafia)   missing.push("Tipo de Poligrafía");
-      if (!formData.ciudadPoligrafia) missing.push("Ciudad Poligrafía");
-    }
-    const hasService = formData.visitaDomiciliaria || formData.consultaAntecedentes || formData.referenciacion || formData.estudiosPoligrafia || formData.consultaDatacredito || formData.comparativoOEA;
-    if (!hasService) missing.push("Debe seleccionar al menos un servicio a aplicar");
-
-    // Evita que un documento diligenciado pero no agregado se pierda al guardar
-    if (currentFile || currentDocName.trim()) {
-      missing.push("Documento de Soporte sin agregar: presione el botón AGREGAR para adjuntarlo, o borre el nombre y el archivo seleccionado");
-    }
-
-    if (missing.length > 0) { setMissingFields(missing); setShowValidationAlert(true); return; }
-
-    setUploading(true);
-    setUploadProgress({ current: 0, total: attachments.length });
-
-    const payload = {
-      ...formData,
-      visitaDomiciliaria:  formData.visitaDomiciliaria  ? 'SI' : 'NO',
-      consultaAntecedentes:formData.consultaAntecedentes? 'SI' : 'NO',
-      referenciacion:      formData.referenciacion      ? 'SI' : 'NO',
-      referenciaAcademica: formData.referenciaAcademica === true ? 'SI' : 'NO',
-      referenciaLaboral:   formData.referenciaLaboral   === true ? 'SI' : 'NO',
-      referenciaPersonal:  formData.referenciaPersonal  === true ? 'SI' : 'NO',
-      estudiosPoligrafia:  formData.estudiosPoligrafia  ? 'SI' : 'NO',
-      consultaDatacredito: formData.consultaDatacredito ? 'SI' : 'NO',
-      comparativoOEA:      formData.comparativoOEA      ? 'SI' : 'NO',
-    };
-
-    try {
-      const response = await runServer('createRequest', payload);
-      if (!response.success) throw new Error(response.message || "Error al crear solicitud.");
-      const newId = response.requestId;
-      let processed = 0;
-
-      const readFileAsBase64 = (file) => new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result.toString().replace(/^data:(.*,)?/, ''));
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-
-      for (const att of attachments) {
-        const aliasName = `${newId}_${att.file.name}`;
-        try {
-          const base64Str = await readFileAsBase64(att.file);
-          await runServer('uploadDocument', { filename: aliasName, base64: base64Str, mimetype: att.file.type });
-        } catch (e) {
-          console.warn("Fallback upload via proxy:", e.message);
-          try { await uploadFileViaProxy(att.file, aliasName); } catch (pe) { console.warn("Proxy upload error:", pe.message); }
-        }
-        await runServer('registerTempDocument', { requestId: newId, docName: att.name, fileName: aliasName });
-        processed++;
-        setUploadProgress(p => ({ ...p, current: processed }));
-      }
-      setUploading(false);
-      setCreatedId(newId);
-      if (onReload) onReload();
-      setShowSuccess(true);
-    } catch (error) {
-      console.error(error);
-      alert("Error procesando solicitud: " + error.message);
-      setUploading(false);
-    }
-  };
-
-  if (showSuccess) return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/30 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white p-10 rounded-3xl shadow-2xl text-center max-w-md w-full border border-gray-100 animate-scale-in">
-        <div className="w-24 h-24 bg-vividGreen/10 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-inner transform rotate-12">
-          <Icon name="CheckCircle" size={48} className="text-vividGreen -rotate-12"/>
-        </div>
-        <h2 className="text-3xl font-black text-gray-800 mb-2 tracking-tight">¡Éxito Total!</h2>
-        <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-8 text-center">La solicitud ha sido procesada</p>
-        <div className="bg-gray-50/50 p-6 rounded-3xl border border-gray-100 text-left mb-8 space-y-4">
-          <div className="flex justify-between items-center">
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">ID Solicitud</span>
-            <span className="font-mono font-black text-vividBlue bg-white px-3 py-1 rounded-xl shadow-sm border border-gray-100">{createdId}</span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Evaluado</span>
-            <span className="font-black text-gray-700 truncate ml-4 uppercase text-[11px]">{formData.nombre}</span>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 gap-4">
-          <button onClick={resetForm} className="btn-3d-blue py-4 rounded-2xl flex items-center justify-center gap-3">
-            <Icon name="ClipboardList" size={18}/> <span className="text-xs font-black uppercase tracking-widest">Crear Nueva</span>
-          </button>
-          <button onClick={() => setView('history')} className="btn-3d-gray py-4 rounded-2xl flex items-center justify-center gap-3">
-            <Icon name="History" size={18}/> <span className="text-xs font-black uppercase tracking-widest text-gray-600">Ver Historial</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
-  const inputClass = "w-full border border-gray-200 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-vividBlue/20 focus:border-vividBlue outline-none transition-all bg-white hover:border-gray-300";
-  const labelClass = "text-[10px] font-black text-gray-500 uppercase tracking-wider mb-1.5 block";
-  const fieldClass = "flex flex-col";
-
-  return (
-    <div className="p-4 md:p-8 max-w-5xl mx-auto animate-fade-in pb-24">
-
-      {/* ── STEPPER ─────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-center mb-10">
-        <div className="flex items-center group cursor-pointer" onClick={() => setStep(1)}>
-          <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-sm transition-all shadow-lg ${step===1?'bg-vividRed text-white shadow-red-500/40 scale-110':'bg-white text-gray-400 border border-gray-100'}`}>1</div>
-          <div className="ml-4">
-            <span className={`block text-[10px] font-black uppercase tracking-widest ${step===1?'text-vividRed':'text-gray-400'}`}>Paso 1</span>
-            <span className={`text-xs font-bold ${step===1?'text-gray-800':'text-gray-400'}`}>Información Evaluado</span>
-          </div>
-        </div>
-        <div className="w-16 h-1 bg-gray-100 mx-6 rounded-full overflow-hidden">
-          <div className={`h-full bg-vividRed transition-all duration-500 ${step===2?'w-full':'w-0'}`}></div>
-        </div>
-        <div className="flex items-center group cursor-pointer" onClick={() => step === 2 && setStep(2)}>
-          <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-sm transition-all shadow-lg ${step===2?'bg-vividRed text-white shadow-red-500/40 scale-110':'bg-white text-gray-400 border border-gray-100'}`}>2</div>
-          <div className="ml-4">
-            <span className={`block text-[10px] font-black uppercase tracking-widest ${step===2?'text-vividRed':'text-gray-400'}`}>Paso 2</span>
-            <span className={`text-xs font-bold ${step===2?'text-gray-800':'text-gray-400'}`}>Servicios A Aplicar</span>
-          </div>
-        </div>
-      </div>
-
-      {/* ════════════════════════════════════════════════════════════════
-          PASO 1 — INFORMACIÓN DEL EVALUADO
-      ════════════════════════════════════════════════════════════════ */}
-      {step === 1 && (
-        <div className="animate-fade-in">
-
-          {/* Cabecera */}
-          <div className="flex items-center justify-between mb-5">
-            <h3 className="text-2xl font-black text-gray-800 tracking-tight">Datos del Candidato</h3>
-            <div className="px-4 py-1.5 bg-vividBlue/10 text-vividBlue rounded-full text-[10px] font-black uppercase tracking-tighter shadow-inner">
-              Fecha: {formData.fechaSolicitud.split(',')[0]}
-            </div>
-          </div>
-
-          {/* ── TARJETA ÚNICA ── */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm divide-y divide-gray-100">
-
-          {/* SECCIÓN 1 */}
-          <div className="p-6">
-          <FormSection icon="Building" title="1. Información del Cliente">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              <SearchableSelect
-                label="Cliente"
-                required
-                value={formData.clientId}
-                onChange={val => handleChange({ target: { name: 'clientId', value: val } })}
-                options={userContext?.creationClientIds?.map(id => ({ value: id, label: userContext.clientNames?.[id] || id })) || []}
-              />
-              <div className={fieldClass}>
-                <label className={labelClass}>NIT</label>
-                <input type="text" readOnly value={formData.nit} className={`${inputClass} bg-gray-50 font-mono font-bold cursor-not-allowed`}/>
-              </div>
-              <div className={fieldClass}>
-                <label className={labelClass}>Razón Social</label>
-                <input type="text" readOnly value={formData.razonSocial} className={`${inputClass} bg-gray-50 font-bold cursor-not-allowed`}/>
-              </div>
-            </div>
-
-            {/* Sub-sección cliente interno */}
-            {isInternal && (
-              <div className="mt-5 pt-5 border-t-2 border-dashed border-blue-100">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-1 h-4 bg-vividBlue rounded-full"></div>
-                  <span className="text-[10px] font-black text-vividBlue uppercase tracking-widest">Configuración Proyecto Interno</span>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className={fieldClass}><label className={labelClass}>Proyecto</label>
-                    <select name="clienteProyectoInterno" value={formData.clienteProyectoInterno} onChange={handleChange} className={inputClass}>
-                      <option value="">Seleccione...</option>{clienteProyectoList.map((cp,i) => <option key={i} value={cp.Descripcion}>{cp.Descripcion}</option>)}
-                    </select></div>
-                  <div className={fieldClass}><label className={labelClass}>Línea <span className="text-vividRed">*</span></label>
-                    <select name="linea" value={formData.linea} onChange={handleChange} className={inputClass}>
-                      <option value="">Seleccione...</option>{uniqueLineas.map((l,i) => <option key={i} value={l}>{l}</option>)}
-                    </select></div>
-                  <div className={fieldClass}><label className={labelClass}>Línea Negocio <span className="text-vividRed">*</span></label>
-                    <select name="lineaNegocio" value={formData.lineaNegocio} onChange={handleChange} disabled={!formData.linea} className={`${inputClass} disabled:opacity-50 disabled:cursor-not-allowed`}>
-                      <option value="">Seleccione...</option>{availableLNs.map((l,i) => <option key={i} value={l}>{l}</option>)}
-                    </select></div>
-                  <div className={fieldClass}><label className={labelClass}>Centro de Costos <span className="text-vividRed">*</span></label>
-                    <select name="centroCostos" value={formData.centroCostos} onChange={handleChange} disabled={!formData.lineaNegocio} className={`${inputClass} disabled:opacity-50 disabled:cursor-not-allowed`}>
-                      <option value="">Seleccione...</option>{availableCCs.map((c,i) => <option key={i} value={c}>{c}</option>)}
-                    </select></div>
-                </div>
-              </div>
-            )}
-
-            {/* Sub-sección cliente externo */}
-            {(!isInternal && formData.clientId) && (
-              <div className="mt-5 pt-5 border-t-2 border-dashed border-blue-100">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-1 h-4 bg-vividBlue rounded-full"></div>
-                  <span className="text-[10px] font-black text-vividBlue uppercase tracking-widest">Configuración Cliente Externo</span>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  {availableSecondaryClients.length > 0 && (<>
-                    <div className={fieldClass}><label className={labelClass}>Cliente Secundario</label>
-                      <select name="clienteClientesSecundarios" value={formData.clienteClientesSecundarios} onChange={handleChange} className={inputClass}>
-                        <option value="">Seleccione...</option>{availableSecondaryClients.map((c,i) => <option key={i} value={c}>{c}</option>)}
-                      </select></div>
-                    <div className={fieldClass}><label className={labelClass}>NIT Secundario</label><input type="text" name="nitClienteSecundario" value={formData.nitClienteSecundario} onChange={handleChange} className={inputClass}/></div>
-                    <div className={fieldClass}><label className={labelClass}>Convenio</label><input type="text" name="convenioClienteSecundario" value={formData.convenioClienteSecundario} onChange={handleChange} className={inputClass}/></div>
-                    <div className={fieldClass}><label className={labelClass}>Tipo Costo</label><input type="text" name="tipoCostoClienteSecundario" value={formData.tipoCostoClienteSecundario} onChange={handleChange} className={inputClass}/></div>
-                  </>)}
-                  <div className={fieldClass}><label className={labelClass}>C. Costos Externo</label><input type="text" name="centroCostosExterno" value={formData.centroCostosExterno} onChange={handleChange} className={inputClass}/></div>
-                </div>
-              </div>
-            )}
-          </FormSection>
-          </div>
-
-          {/* SECCIÓN 2 */}
-          <div className="p-6">
-          <FormSection icon="IdCard" title="2. Identificación del Evaluado">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
-              <div className="md:col-span-2 flex flex-col">
-                <label className={labelClass}>Nombre Completo <span className="text-vividRed">*</span></label>
-                <input type="text" name="nombre" value={formData.nombre} onChange={handleChange} className={inputClass} placeholder="Nombre completo del evaluado"/>
-              </div>
-              <div className={fieldClass}>
-                <label className={labelClass}>Tipo ID <span className="text-vividRed">*</span></label>
-                <select name="tipoIdentificacion" value={formData.tipoIdentificacion} onChange={handleChange} className={inputClass}>
-                  <option value="">Seleccione...</option>
-                  <option value="Cédula de Ciudadanía">Cédula de Ciudadanía</option>
-                  <option value="Tarjeta de Identidad">Tarjeta de Identidad</option>
-                  <option value="Cédula Extranjeria">Cédula Extranjeria</option>
-                  <option value="Pasaporte">Pasaporte</option>
-                  <option value="Permiso Especial">Permiso Especial</option>
-                  <option value="Permiso Permanente de Trabajo">Permiso Permanente de Trabajo</option>
-                  <option value="PEP">PEP</option>
-                  <option value="Otro">Otro</option>
-                </select>
-              </div>
-              <div className={fieldClass}>
-                <label className={labelClass}>N° Identificación <span className="text-vividRed">*</span></label>
-                <input type="text" name="identificacion" value={formData.identificacion} onChange={handleIdentificacionChange} className={inputClass} placeholder="Número"/>
-              </div>
-              <div className={fieldClass}>
-                <label className={labelClass}>Fecha Expedición</label>
-                <input type="date" name="fechaExpedicion" value={formData.fechaExpedicion} onChange={handleChange} className={inputClass}/>
-              </div>
-              <div className={fieldClass}>
-                <label className={labelClass}>Cargo <span className="text-vividRed">*</span></label>
-                <input type="text" name="cargo" value={formData.cargo} onChange={handleChange} className={inputClass} placeholder="Puesto"/>
-              </div>
-              <div className={fieldClass}>
-                <label className={labelClass}>Correo</label>
-                <input type="email" name="correo" value={formData.correo} onChange={handleChange} className={inputClass} placeholder="email@ejemplo.com"/>
-              </div>
-              <div className={fieldClass}>
-                <label className={labelClass}>Celular <span className="text-vividRed">*</span></label>
-                <input type="tel" name="celular" value={formData.celular} onChange={handleCelularChange} inputMode="numeric" pattern="[0-9]*" maxLength={13} className={inputClass} placeholder="3001234567"/>
-              </div>
-            </div>
-          </FormSection>
-          </div>
-
-          {/* SECCIÓN 3 */}
-          <div className="p-6">
-          <FormSection icon="MapPin" title="3. Ubicación">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
-              <SearchableSelect
-                label="Ciudad"
-                required
-                value={formData.ciudad}
-                onChange={val => handleChange({ target: { name: 'ciudad', value: val } })}
-                options={searchableCiudadesList}
-              />
-              <div className={fieldClass}>
-                <label className={labelClass}>Barrio</label>
-                <input type="text" name="barrio" value={formData.barrio} onChange={handleChange} className={inputClass}/>
-              </div>
-              <div className="md:col-span-2 flex flex-col">
-                <label className={labelClass}>Dirección <span className="text-vividRed">*</span></label>
-                <input type="text" name="direccion" value={formData.direccion} onChange={handleChange} className={inputClass}/>
-              </div>
-            </div>
-          </FormSection>
-          </div>
-
-          {/* SECCIÓN 4 */}
-          <div className="p-6">
-          <FormSection icon="Briefcase" title="4. Tipo de Trabajador">
-            <div className="flex rounded-2xl bg-gray-100 p-1 overflow-hidden h-11 max-w-sm">
-              {['Nuevo','Actual','Reinversión'].map(t => (
-                <button key={t} type="button" onClick={() => setFormData(p => ({...p, tipoTrabajador: t}))}
-                  className={`flex-1 text-[11px] font-black uppercase tracking-tighter rounded-xl transition-all ${formData.tipoTrabajador===t?'bg-white text-gray-800 shadow-sm scale-[1.02]':'text-gray-400 hover:text-gray-600'}`}>
-                  {t}
-                </button>
-              ))}
-            </div>
-          </FormSection>
-          </div>
-
-          </div>{/* fin tarjeta */}
-
-          {/* Botones navegación */}
-          <div className="flex flex-col md:flex-row items-center justify-end gap-4 pt-4">
-            <button type="button" onClick={() => setView('history')} className="w-full md:w-auto px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest text-gray-400 hover:bg-gray-100 transition-all">Cancelar</button>
-            <button type="button" onClick={() => setStep(2)} className="w-full md:w-auto px-12 py-3 rounded-2xl text-xs font-black uppercase tracking-widest bg-vividBlue text-white shadow-lg shadow-blue-500/30 hover:scale-105 active:scale-95 transition-all btn-3d">Siguiente →</button>
-          </div>
-        </div>
-      )}
-
-      {/* ════════════════════════════════════════════════════════════════
-          PASO 2 — SERVICIOS A APLICAR
-      ════════════════════════════════════════════════════════════════ */}
-      {step === 2 && (
-        <div className="animate-fade-in">
-
-          {/* Cabecera */}
-          <div className="flex items-center justify-between mb-5">
-            <h3 className="text-2xl font-black text-gray-800 tracking-tight">Servicios a Aplicar</h3>
-            <div className="flex items-center gap-2 text-vividOrange bg-vividOrange/10 px-3 py-1 rounded-full text-[10px] font-black uppercase shadow-inner">
-              <Icon name="Info" size={12}/> Seleccione al menos uno
-            </div>
-          </div>
-
-          {/* ── TARJETA ÚNICA ── */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm divide-y divide-gray-100">
-
-          {/* Visita Domiciliaria */}
-          <div className="p-6">
-          <FormSection icon="Home" title="Visita Domiciliaria">
-            <ToggleSwitch label="¿Aplicar Visita Domiciliaria?" value={formData.visitaDomiciliaria} onChange={v => handleToggle('visitaDomiciliaria', v)}/>
-            {formData.visitaDomiciliaria && (
-              <div className="mt-4 pt-4 border-t-2 border-dashed border-blue-100 animate-scale-in">
-                <label className={`${labelClass} mb-3`}>Modalidad de Visita <span className="text-vividRed">*</span></label>
-                <div className="flex flex-wrap gap-2">
-                  {['Presencial','Virtual','Autogestionada'].map(m => (
-                    <button key={m} type="button" onClick={() => setFormData(p => ({...p, modalidadVisita: m}))}
-                      className={`px-5 py-2 text-[11px] font-black uppercase tracking-tight rounded-xl transition-all border-2 ${formData.modalidadVisita===m?'bg-blue-700 text-white border-blue-700 shadow-md':'bg-white text-gray-500 border-gray-200 hover:border-blue-300 hover:text-blue-600'}`}>{m}</button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </FormSection>
-          </div>
-
-          {/* Antecedentes */}
-          <div className="p-6">
-          <FormSection icon="Search" title="Consulta de Antecedentes">
-            <ToggleSwitch label="¿Aplicar Consulta de Antecedentes?" value={formData.consultaAntecedentes} onChange={v => handleToggle('consultaAntecedentes', v)}/>
-          </FormSection>
-          </div>
-
-          {/* Referenciación */}
-          <div className="p-6">
-          <FormSection icon="Phone" title="Referenciación">
-            <ToggleSwitch label="¿Aplicar Referenciación?" value={formData.referenciacion} onChange={v => handleToggle('referenciacion', v)}/>
-            {formData.referenciacion && (
-              <div className="mt-4 pt-4 border-t-2 border-dashed border-purple-100 animate-scale-in space-y-3">
-                <p className="text-[10px] font-black text-purple-600 uppercase tracking-widest mb-3">Tipos de referencia a aplicar:</p>
-
-                <div className="bg-gray-50 rounded-xl px-4 py-3 border border-gray-200">
-                  <ToggleSwitch label="Referencia Académica" value={formData.referenciaAcademica} onChange={v => handleToggle('referenciaAcademica', v)}/>
-                </div>
-
-                <div className="bg-gray-50 rounded-xl px-4 py-3 border border-gray-200">
-                  <ToggleSwitch label="Referencia Laboral" value={formData.referenciaLaboral} onChange={v => handleToggle('referenciaLaboral', v)}/>
-                </div>
-
-                <div className="bg-gray-50 rounded-xl px-4 py-3 border border-gray-200 relative">
-                  <ToggleSwitch label="Referencia Personal" value={formData.referenciaPersonal} onChange={v => handleToggle('referenciaPersonal', v)}/>
-                  {showPersonalRefWarning && (
-                    <div className="absolute -top-10 left-0 bg-vividOrange text-white text-[9px] font-black uppercase px-3 py-1.5 rounded-xl shadow-xl shadow-vividOrange/30 animate-fade-in z-10">
-                      Incompatible con Visita Domiciliaria
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </FormSection>
-          </div>
-
-          {/* Poligrafía */}
-          <div className="p-6">
-          <FormSection icon="Wrench" title="Estudios de Poligrafía">
-            <ToggleSwitch label="¿Aplicar Estudios de Poligrafía?" value={formData.estudiosPoligrafia} onChange={v => handleToggle('estudiosPoligrafia', v)}/>
-            {formData.estudiosPoligrafia && (
-              <div className="mt-4 pt-4 border-t-2 border-dashed border-amber-100 animate-scale-in grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div className={fieldClass}>
-                  <label className={labelClass}>Tipo de Poligrafía <span className="text-vividRed">*</span></label>
-                  <select name="tipoPoligrafia" value={formData.tipoPoligrafia} onChange={handleChange} className={inputClass}>
-                    <option value="">Seleccione...</option>
-                    {['Preempleo','Rutina','Especifica','Verifeye Preempleo','Verifeye Rutina','Verifeye Especifica','VSA Preempleo','VSA Rutina','VSA Especifica'].map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-                <div className={fieldClass}>
-                  <label className={labelClass}>Ciudad de Poligrafía <span className="text-vividRed">*</span></label>
-                  <select name="ciudadPoligrafia" value={formData.ciudadPoligrafia} onChange={handleChange} className={inputClass}>
-                    <option value="">Seleccione...</option>
-                    {ciudadesPoligrafiaList.length > 0
-                      ? ciudadesPoligrafiaList.map((c,i) => <option key={i} value={c.Ciudad}>{c.Ciudad}</option>)
-                      : ['Bogotá','Medellín','Cali'].map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-              </div>
-            )}
-          </FormSection>
-          </div>
-
-          {/* Datacrédito + OEA */}
-          <div className="p-6">
-          <FormSection icon="FileText" title="Datacrédito y Comparativo OEA">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                <ToggleSwitch label="Consulta Datacrédito" value={formData.consultaDatacredito} onChange={v => handleToggle('consultaDatacredito', v)}/>
-              </div>
-              <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                <ToggleSwitch label="Comparativo OEA" value={formData.comparativoOEA} onChange={v => handleToggle('comparativoOEA', v)}/>
-              </div>
-            </div>
-          </FormSection>
-          </div>
-
-          {/* Documentos */}
-          <div className="p-6">
-          <FormSection icon="Upload" title="Documentos de Soporte">
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-5 items-end">
-              <div className="md:col-span-5">
-                <label className={labelClass}>Nombre del Documento</label>
-                <input type="text" value={currentDocName} onChange={e => setCurrentDocName(e.target.value)} className={inputClass} placeholder="Ej: Cédula, Diploma..."/>
-              </div>
-              <div className="md:col-span-5">
-                <label className={labelClass}>Archivo <span className="text-gray-400 normal-case font-normal">(solo PDF, máx. {MAX_DOC_MB} MB)</span></label>
-                <div className="relative">
-                  <input id="fileInput" type="file" accept=".pdf,application/pdf" onChange={seleccionarArchivo}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"/>
-                  <div className="w-full border border-gray-200 rounded-xl p-2.5 text-xs bg-white flex items-center justify-between text-gray-500 hover:border-gray-300 transition-all">
-                    <span className="truncate">{currentFile ? currentFile.name : "Seleccionar archivo PDF..."}</span>
-                    <Icon name="FileText" size={14} className="text-gray-400 flex-shrink-0 ml-2"/>
-                  </div>
-                </div>
-              </div>
-              <div className="md:col-span-2">
-                <button onClick={addAttachment} type="button" className="w-full bg-gray-800 hover:bg-black text-white rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all">Agregar</button>
-              </div>
-            </div>
-
-            {attachments.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-4 border-t border-gray-100">
-                {attachments.map(att => (
-                  <div key={att.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-2xl border border-gray-200 shadow-sm animate-scale-in">
-                    <div className="flex items-center gap-3 overflow-hidden">
-                      <div className="bg-white p-2 rounded-xl text-vividBlue shadow-inner border border-gray-100"><Icon name="FileText" size={16}/></div>
-                      <div className="truncate">
-                        <div className="text-[11px] font-black text-gray-700 uppercase tracking-tight truncate">{att.name}</div>
-                        <div className="text-[9px] text-gray-400 truncate">{att.file.name}</div>
-                      </div>
-                    </div>
-                    <button onClick={() => setAttachments(a => a.filter(x => x.id !== att.id))} className="text-vividRed hover:bg-red-50 p-2 rounded-xl transition-all flex-shrink-0 ml-2">
-                      <Icon name="Trash" size={16}/>
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </FormSection>
-          </div>
-
-          {/* Notas */}
-          <div className="p-6">
-          <FormSection icon="FileText" title="Notas Adicionales">
-            <textarea name="notas" maxLength={3000} value={formData.notas} onChange={handleChange}
-              className="w-full border border-gray-200 rounded-xl p-4 text-xs h-28 outline-none focus:ring-2 focus:ring-gray-300 bg-white transition-all resize-none hover:border-gray-300"
-              placeholder="Observaciones relevantes del caso..."/>
-            <div className="text-right text-[9px] font-black text-gray-300 uppercase tracking-widest mt-1">{formData.notas.length} / 3000 CARACTERES</div>
-          </FormSection>
-          </div>
-
-          </div>{/* fin tarjeta */}
-
-          {/* Botones navegación */}
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-4">
-            <button type="button" onClick={() => setStep(1)} className="w-full md:w-auto px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest text-gray-400 hover:bg-gray-100 transition-all">← Anterior</button>
-            <div className="flex gap-4 w-full md:w-auto">
-              <button type="button" onClick={() => setView('history')} className="flex-1 md:flex-none px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest text-gray-400 hover:bg-gray-100 transition-all">Cancelar</button>
-              <button type="button" onClick={handleSubmit} disabled={uploading}
-                className="flex-1 md:flex-none px-12 py-3 rounded-2xl text-xs font-black uppercase tracking-widest bg-vividRed text-white shadow-xl shadow-red-500/30 hover:scale-105 active:scale-95 transition-all btn-3d disabled:opacity-50 flex items-center justify-center gap-3">
-                {uploading ? <><Icon name="RefreshCw" size={16} className="animate-spin"/> Guardando...</> : <><Icon name="Check" size={16}/> Enviar Solicitud</>}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <AlertModal show={showValidationAlert} title="Faltan Datos" items={missingFields} onClose={() => setShowValidationAlert(false)}/>
-    </div>
-  );
-};
-
-// ─── CARGA MASIVA ─────────────────────────────────────────────────────────
-const BulkUpload = ({ userContext, setView, onReload }) => {
-  const [selectedClient, setSelectedClient] = useState('');
-  const [downloading, setDownloading]       = useState(false);
-  const [uploading, setUploading]           = useState(false);
-  const [file, setFile]                     = useState(null);
-  const [uploadResult, setUploadResult]     = useState(null);
-  const [showValidationAlert, setShowValidationAlert] = useState(false);
-  const [validationErrors, setValidationErrors]       = useState([]);
-
-  const clients = useMemo(() => userContext?.creationClientIds || [], [userContext]);
-  useEffect(() => { if (clients.length > 0 && !selectedClient) setSelectedClient(clients[0]); }, [clients]);
-
-  const handleDownloadTemplate = async () => {
-    if (!selectedClient) { alert("Por favor seleccione un cliente primero."); return; }
-    setDownloading(true);
-    try {
-      const response = await runServer('getTemplateName', { clientId: selectedClient });
-      if (!response.success) throw new Error(response.message || "Error al obtener plantilla.");
-      const filename = response.filename;
-      try {
-        const fileRes = await runServer('getFileBase64', { filename });
-        if (fileRes && fileRes.success && fileRes.base64) {
-          const mime = fileRes.mimeType || 'text/csv';
-          const byteCharacters = atob(fileRes.base64);
-          const byteNumbers = new Array(byteCharacters.length);
-          for (let i = 0; i < byteCharacters.length; i++) {
-            byteNumbers[i] = byteCharacters.charCodeAt(i);
-          }
-          const byteArray = new Uint8Array(byteNumbers);
-          const blob = new Blob([byteArray], { type: mime });
-          const blobUrl = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = blobUrl;
-          link.download = filename;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
-          setDownloading(false);
-          return;
-        }
-      } catch (e) {
-        console.warn("Fallo descarga directa de plantilla, usando iframe proxy...", e);
-      }
-      const iframe = document.createElement('iframe');
-      iframe.style.display = "none";
-      iframe.src = `${PROXY_URL}?filename=${encodeURIComponent(filename)}&token=${PROXY_TOKEN}`;
-      document.body.appendChild(iframe);
-      setTimeout(() => { setDownloading(false); setTimeout(() => { if(document.body.contains(iframe)) document.body.removeChild(iframe); }, 60000); }, 3000);
-    } catch (e) { alert("Error: " + e.message); setDownloading(false); }
-  };
-
-  const handleUpload = async () => {
-    if (!selectedClient) return alert("Seleccione un cliente.");
-    if (!file) return alert("Seleccione un archivo CSV para cargar.");
-    setUploading(true);
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const csvContent = e.target.result;
-        const base64Content = csvContent.split(',')[1];
-        const decodedText = atob(base64Content);
-        const rows = decodedText.split(/\r\n|\n|\r/);
-        if (rows.length < 2) throw new Error("El archivo está vacío o sin datos.");
-        const delimiter = rows[0].includes(';') ? ';' : ',';
-        const headers = rows[0].split(delimiter).map(h => h.trim().replace(/^"|"$/g, '').toUpperCase());
-        const correoIdx  = headers.findIndex(h => h.includes("CORREO") || h.includes("EMAIL"));
-        const celularIdx = headers.findIndex(h => h.includes("CELULAR") || h.includes("MOVIL") || h.includes("TELEFONO"));
-        const frontErrors = [];
-        for (let i = 1; i < rows.length; i++) {
-          const line = rows[i].trim(); if (!line) continue;
-          const cols = line.split(delimiter); const rowNum = i + 1;
-          if (correoIdx !== -1 && cols[correoIdx]) {
-            const val = cols[correoIdx].trim().replace(/^"|"$/g, '');
-            if (val && !isValidEmail(val)) frontErrors.push(`Fila ${rowNum}: Correo inválido (${val})`);
-          }
-          if (celularIdx !== -1 && cols[celularIdx]) {
-            const val = cols[celularIdx].trim().replace(/^"|"$/g, '');
-            if (val && !isValidPhone(val)) frontErrors.push(`Fila ${rowNum}: Celular inválido (${val})`);
-          }
-        }
-        if (frontErrors.length > 0) { setValidationErrors(frontErrors); setShowValidationAlert(true); setUploading(false); return; }
-        const response = await runServer('processBulkUpload', { csvContent: base64Content, clientId: selectedClient });
-        if (response.success) { setUploadResult(response); if (onReload) onReload(); }
-        else {
-          setValidationErrors(response.errorList || [response.message]);
-          setShowValidationAlert(true);
-        }
-      } catch (err) { alert("Error en carga masiva: " + err.message); }
-      finally { setUploading(false); }
-    };
-    reader.readAsDataURL(file);
-  };
-
-  if (uploadResult) return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/30 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white p-10 rounded-3xl shadow-2xl text-center max-w-md w-full border border-gray-100 animate-scale-in">
-        <div className="w-24 h-24 bg-vividGreen/10 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-inner transform rotate-12">
-          <Icon name="CheckCircle" size={48} className="text-vividGreen -rotate-12"/>
-        </div>
-        <h2 className="text-3xl font-black text-gray-800 mb-2 tracking-tight">¡Carga Finalizada!</h2>
-        <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-8 text-center">Resultados del procesamiento masivo</p>
-        <div className="bg-gray-50/50 p-6 rounded-3xl border border-gray-100 text-left mb-6 space-y-4">
-          <div className="flex justify-between items-center">
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Exitosos</span>
-            <span className="font-mono font-black text-vividGreen bg-white px-3 py-1 rounded-xl shadow-sm border border-gray-100">{uploadResult.loaded}</span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Fallidos</span>
-            <span className={`font-mono font-black px-3 py-1 rounded-xl shadow-sm border border-gray-100 ${uploadResult.failed > 0 ? 'text-vividRed bg-vividRed/5' : 'text-gray-400 bg-white'}`}>{uploadResult.failed}</span>
-          </div>
-        </div>
-        {uploadResult.technicalErrors?.length > 0 && (
-          <div className="bg-vividRed/[0.03] border border-vividRed/10 rounded-2xl p-4 mb-8 text-left max-h-36 overflow-y-auto">
-            <p className="text-[9px] font-black text-vividRed uppercase tracking-widest mb-2">Errores Técnicos Detectados:</p>
-            <ul className="text-[10px] text-gray-600 space-y-1.5 list-disc list-inside font-medium">
-              {uploadResult.technicalErrors.map((e,i) => <li key={i} className="leading-tight">{e}</li>)}
-            </ul>
-          </div>
-        )}
-        <div className="grid grid-cols-1 gap-4">
-          <button onClick={() => { setFile(null); setUploadResult(null); }} className="btn-3d-blue py-4 rounded-2xl flex items-center justify-center gap-3">
-            <Icon name="Upload" size={18}/> <span className="text-xs font-black uppercase tracking-widest">Subir Otro</span>
-          </button>
-          <button onClick={() => setView('history')} className="btn-3d-gray py-4 rounded-2xl flex items-center justify-center gap-3">
-            <Icon name="History" size={18}/> <span className="text-xs font-black uppercase tracking-widest text-gray-600">Ver Historial</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="p-6 md:p-8 max-w-4xl mx-auto animate-fade-in">
-      <h2 className="text-2xl font-bold text-gray-800 mb-6">Carga Masiva</h2>
-      <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200">
-        <div className="mb-8 max-w-sm">
-          <SearchableSelect
-            label="Cliente"
-            required
-            value={selectedClient}
-            onChange={val => setSelectedClient(val)}
-            options={clients.map(id => ({ value: id, label: userContext?.clientNames?.[id] || id }))}
-          />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="border-r border-gray-100 pr-6">
-            <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4"><Icon name="Download" size={32}/></div>
-            <h3 className="text-lg font-bold text-gray-700 text-center mb-2">Paso 1: Descargar Plantilla</h3>
-            <p className="text-sm text-gray-500 text-center mb-5">Obtenga el formato CSV para este cliente.</p>
-            <button onClick={handleDownloadTemplate} disabled={downloading || !selectedClient}
-              className="flex items-center justify-center gap-2 mx-auto text-blue-600 font-bold hover:underline text-sm btn-action disabled:opacity-50">
-              {downloading ? <><Icon name="RefreshCw" size={15} className="animate-spin"/> Buscando...</> : <><Icon name="Download" size={15}/> Descargar Plantilla</>}
-            </button>
-          </div>
-          <div className="pl-0 md:pl-4">
-            <div className="w-16 h-16 bg-green-50 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4"><Icon name="Upload" size={32}/></div>
-            <h3 className="text-lg font-bold text-gray-700 text-center mb-2">Paso 2: Subir Datos</h3>
-            <p className="text-sm text-gray-500 text-center mb-4">Suba el CSV diligenciado.</p>
-            <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 hover:bg-gray-50 cursor-pointer transition relative mb-4">
-              <input type="file" accept=".csv" onChange={e => e.target.files?.[0] && setFile(e.target.files[0])} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"/>
-              <div className="text-center text-xs text-gray-400">
-                {file ? <span className="text-green-600 font-bold">{file.name}</span> : "Arrastre o haga clic aquí"}
-              </div>
-            </div>
-            <button onClick={handleUpload} disabled={uploading || !file}
-              className="w-full btn-3d-red px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 flex items-center justify-center gap-3">
-              {uploading ? <><Icon name="RefreshCw" size={16} className="animate-spin"/> Procesando...</> : <><Icon name="Upload" size={16}/> Procesar Archivo</>}
-            </button>
-          </div>
-        </div>
-      </div>
-      <AlertModal show={showValidationAlert} title="Errores en Plantilla"
-        message="Se encontraron errores en el archivo. La carga fue rechazada."
-        items={validationErrors} onClose={() => { setShowValidationAlert(false); setValidationErrors([]); }}/>
-    </div>
-  );
-};
-
-// ─── CONFIGURACIÓN ────────────────────────────────────────────────────────
-const AdminClientModal = ({ clientId, clientName, onClose, showToast }) => {
-  const [users, setUsers]     = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState(null);
-  const [search, setSearch]   = useState('');
-
-  const filteredUsers = useMemo(() => {
-    if (!search) return users;
-    const q = search.toLowerCase();
-    return users.filter(u => u.Email.toLowerCase().includes(q) || u.Rol_Asignado.toLowerCase().includes(q));
-  }, [users, search]);
-
-  useEffect(() => {
-    runServer('getClientUsers', { clientId })
-      .then(res => { setUsers(res || []); setLoading(false); })
-      .catch(e => { showToast(e.message, "error"); setLoading(false); });
-  }, [clientId]);
-
-  const handleUpdate = async (targetEmail, role, userForced) => {
-    setUpdating(targetEmail);
-    try {
-      await runServer('updateUserConfig', { targetEmail, clientId, role, userForced });
-      setUsers(prev => prev.map(u => u.Email === targetEmail ? {
-        ...u,
-        Rol_Asignado: role || u.Rol_Asignado,
-        userForced: userForced !== undefined ? (userForced ? 'SI' : 'NO') : u.userForced
-      } : u));
-      showToast("Usuario actualizado.", "success");
-    } catch (e) {
-      showToast(e.message, "error");
-    } finally {
-      setUpdating(null);
-    }
-  };
-
-  const ROLES_INFO = [
-    { id: 'Cliente Consulta', title: 'Consulta', desc: 'Solo visualiza el historial de solicitudes.' },
-    { id: 'Cliente Creación', title: 'Creación', desc: 'Registra nuevas solicitudes (manual/masiva) y ve el dashboard de inicio.' },
-    { id: 'Cliente Completo', title: 'Completo', desc: 'Acceso total y visibilidad de todas las solicitudes del cliente.' },
-    { id: 'Cliente Perfilado', title: 'Perfilado', desc: 'Acceso total, pero solo visualiza sus propias solicitudes.' },
-    { id: 'Coordinador General', title: 'Coordinador', desc: 'Visualiza todos los clientes y todas las solicitudes sin restricciones.' },
-    { id: 'Coordinador EP', title: 'Coord. EP', desc: 'Crea solicitudes para todos los clientes, pero solo visualiza solicitudes de sus clientes asignados.' },
-    { id: 'Coordinador ECP', title: 'Coord. ECP', desc: 'Crea solicitudes para todos los clientes, pero solo visualiza solicitudes de sus clientes asignados.' },
-  ];
-
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col transform animate-scale-in">
-        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-          <div className="flex-1">
-            <h3 className="text-xl font-bold text-gray-800">{clientName || 'Cliente'}</h3>
-            <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">Gestión de Permisos / {clientId}</p>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="relative hidden md:block">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><Icon name="Search" size={14}/></div>
-              <input type="text" placeholder="Filtrar usuarios..." value={search} onChange={e => setSearch(e.target.value)}
-                className="pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-appBlue/20 outline-none w-64"/>
-            </div>
-            <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors"><Icon name="X" size={24}/></button>
-          </div>
-        </div>
-        <div className="flex-1 overflow-y-auto p-6 bg-gray-50/30">
-          {loading ? (
-            <div className="flex flex-col items-center py-20 gap-4">
-              <div className="w-10 h-10 border-4 border-appBlue border-t-transparent rounded-full animate-spin"></div>
-              <p className="text-gray-400 text-sm">Cargando usuarios...</p>
-            </div>
-          ) : filteredUsers.length === 0 ? (
-            <div className="text-center py-20 text-gray-400 italic">No se encontraron usuarios.</div>
-          ) : (
-            <div className="space-y-6">
-              {filteredUsers.map(u => (
-                <div key={u.Email} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm transition-all overflow-hidden relative">
-                  {updating === u.Email && (
-                    <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex items-center justify-center">
-                      <div className="w-8 h-8 border-4 border-appBlue border-t-transparent rounded-full animate-spin"></div>
-                    </div>
-                  )}
-                  <div className="flex flex-col gap-4">
-                    <div className="flex items-center gap-3 border-b border-gray-100 pb-3">
-                      <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl"><Icon name="User" size={20}/></div>
-                      <div>
-                        <div className="font-bold text-gray-800">{u.Email}</div>
-                        <div className="text-[10px] uppercase font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded inline-block mt-0.5">Perfil Actual: {u.Rol_Asignado}</div>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                      {ROLES_INFO.map(role => (
-                        <div key={role.id} onClick={() => !updating && handleUpdate(u.Email, role.id)}
-                          className={`cursor-pointer p-3 rounded-xl border-2 transition-all flex flex-col gap-1 ${u.Rol_Asignado === role.id ? 'border-appBlue bg-blue-50/50' : 'border-gray-100 hover:border-gray-300 bg-white'}`}>
-                          <div className="flex items-center justify-between">
-                            <span className={`text-[11px] font-black uppercase ${u.Rol_Asignado === role.id ? 'text-appBlue' : 'text-gray-500'}`}>{role.title}</span>
-                            {u.Rol_Asignado === role.id && <Icon name="CheckCircle" size={14} className="text-appBlue"/>}
-                          </div>
-                          <p className="text-[10px] text-gray-400 leading-tight">{role.desc}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-        <div className="p-4 border-t bg-white text-center">
-          <button onClick={onClose} className="px-12 py-2.5 bg-gray-900 text-white font-bold rounded-xl hover:bg-black transition shadow-lg btn-action">Finalizar Gestión</button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const ConfigurationView = ({ userContext, onForceSync, syncStatus, lastSync, onRefreshClients, showToast }) => {
-  const [clientSearch, setClientSearch]           = useState('');
-  const [selectedAdminClient, setSelectedAdminClient] = useState(null);
-
-  const filteredClientIds = useMemo(() => {
-    const ids = userContext?.adminClientIds || [];
-    if (!clientSearch) return ids;
-    const q = clientSearch.toLowerCase();
-    return ids.filter(id => {
-      const name = (userContext.clientNames?.[id] || '').toLowerCase();
-      return name.includes(q) || id.toLowerCase().includes(q);
-    });
-  }, [userContext, clientSearch]);
-
   return (
     <div className="p-6 md:p-8 max-w-4xl mx-auto animate-fade-in pb-20">
       <div className="flex justify-between items-center mb-6">
@@ -2221,80 +1895,6 @@ const ConfigurationView = ({ userContext, onForceSync, syncStatus, lastSync, onR
           <Icon name="RefreshCw" size={16} className={syncStatus !== 'idle' ? "animate-spin" : ""}/>
           {syncStatus !== 'idle' ? 'Sincronizando...' : 'Forzar Sincronización'}
         </button>
-      </div>
-      {userContext.isAdmin && (
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 mb-8 animate-fade-in">
-          <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-            <div className="flex items-center gap-3">
-              <div className="bg-appRed p-2 rounded-lg text-white shadow-sm"><Icon name="ShieldCheck" size={20}/></div>
-              <div>
-                <h3 className="font-bold text-gray-800">Panel de Administración de Clientes</h3>
-                <p className="text-xs text-gray-500">Configure restricciones por cliente.</p>
-              </div>
-            </div>
-            <div className="relative w-full md:w-64">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><Icon name="Search" size={14}/></div>
-              <input type="text" placeholder="Buscar cliente..." value={clientSearch} onChange={e => setClientSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-appRed/20 focus:border-appRed outline-none transition-all"/>
-            </div>
-          </div>
-          <div className="max-h-96 overflow-y-auto border border-gray-100 rounded-xl shadow-inner bg-gray-50/30">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-gray-50 text-gray-400 font-bold uppercase tracking-wider border-b border-gray-100">
-                <tr><th className="px-4 py-3">Cliente</th></tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {filteredClientIds.length === 0 ? (
-                  <tr><td className="px-4 py-8 text-center text-gray-400 italic">No se encontraron clientes.</td></tr>
-                ) : filteredClientIds.map(id => (
-                  <tr key={id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 cursor-pointer" onClick={() => setSelectedAdminClient(id)}>
-                      <div className="font-bold text-gray-700 hover:text-appBlue transition-colors flex items-center justify-between">
-                        <div className="flex flex-col">
-                          <span className="text-sm">{userContext?.clientNames?.[id] || id}</span>
-                          <span className="text-[10px] text-gray-400 font-mono">{id}</span>
-                        </div>
-                        <Icon name="ChevronRight" size={16} className="text-gray-300"/>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-6">
-        <h3 className="font-bold text-gray-700 mb-4">Estado de Datos</h3>
-        <div className="space-y-3">
-          {[
-            { label:'Solicitudes (Período Activo)', sub:'Carga filtrada por fecha.', syncing: syncStatus==='requests' },
-            { label:'Tablas Maestras (Ciudades, Líneas CC...)', sub:'Datos de referencia para formularios.', syncing: syncStatus==='master' },
-          ].map((item, i) => (
-            <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
-              <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-full ${item.syncing ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'}`}>
-                  {item.syncing ? <Icon name="RefreshCw" size={17} className="animate-spin"/> : <Icon name="CheckCircle" size={17}/>}
-                </div>
-                <div>
-                  <div className="font-bold text-gray-700 text-sm">{item.label}</div>
-                  <div className="text-xs text-gray-500">{item.sub}</div>
-                </div>
-              </div>
-              <span className="text-xs font-bold text-gray-400">{lastSync ? 'Actualizado' : 'Pendiente'}</span>
-            </div>
-          ))}
-          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-full bg-gray-100 text-gray-600"><Icon name="User" size={17}/></div>
-              <div>
-                <div className="font-bold text-gray-700 text-sm">Clientes Asignados</div>
-                <div className="text-xs text-gray-500">Actualiza tu lista sin recargar la página.</div>
-              </div>
-            </div>
-            <button onClick={onRefreshClients} className="px-3 py-1.5 bg-white border rounded-lg text-xs font-bold text-gray-600 hover:bg-gray-100 transition btn-action">Actualizar</button>
-          </div>
-        </div>
       </div>
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
         <div className="flex items-center gap-4">
@@ -2308,10 +1908,6 @@ const ConfigurationView = ({ userContext, onForceSync, syncStatus, lastSync, onR
           </div>
         </div>
       </div>
-      {selectedAdminClient && (
-        <AdminClientModal clientId={selectedAdminClient} clientName={userContext.clientNames[selectedAdminClient]}
-          onClose={() => setSelectedAdminClient(null)} showToast={showToast}/>
-      )}
     </div>
   );
 };
@@ -2348,18 +1944,6 @@ const App = () => {
     }
   }, [period, syncStatus]);
 
-  const loadMasterData = useCallback(async () => {
-    setSyncStatus('master');
-    try {
-      const master = await runServer('getMasterData', {});
-      setMasterData(master);
-    } catch (e) {
-      console.warn("Error cargando datos maestros:", e.message);
-    } finally {
-      setSyncStatus('idle');
-    }
-  }, []);
-
   const refreshAll = async (manual = false, periodKey = period) => {
     if (syncStatus !== 'idle' && !manual) return;
     try {
@@ -2383,18 +1967,6 @@ const App = () => {
     loadRequests(newPeriod);
   };
 
-  const handleRefreshClients = async () => {
-    showToast("Actualizando clientes...", 'info');
-    try {
-      const updatedCtx = await runServer('refreshUserContext', {});
-      setUserCtx(updatedCtx);
-      await refreshAll(true, period);
-      showToast("Clientes y datos actualizados.", 'success');
-    } catch (e) {
-      showToast("Error al actualizar: " + e.message, 'error');
-    }
-  };
-
   const handleLogin = async () => {
     setIsLoading(true);
     try {
@@ -2406,8 +1978,8 @@ const App = () => {
         setPeriod(defaultPeriod);
         setView(ctx.role === 'Cliente Consulta' ? 'history' : 'home');
         Promise.all([
-          runServer('getRequests', { period: defaultPeriod }).then(r => { setInitialData(r); }),
-          runServer('getMasterData', {}).then(m => { setMasterData(m); })
+          runServer('getRequests', { period: defaultPeriod }).then(r => setInitialData(r)),
+          runServer('getMasterData', {}).then(m => setMasterData(m))
         ]).then(() => setLastSync(Date.now())).catch(console.warn);
       } else {
         setView('unauthorized');
@@ -2422,19 +1994,6 @@ const App = () => {
   const handleLogout = useCallback(() => {
     setUserCtx(null); setInitError(null); setIsLoading(false); setView('loading');
   }, []);
-
-  useEffect(() => {
-    if (!userCtx) return;
-    let timer;
-    const resetTimer = () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => { showToast("Sesión cerrada por inactividad.", "warning"); handleLogout(); }, 600000);
-    };
-    const events = ['mousedown', 'keydown', 'touchstart', 'scroll'];
-    events.forEach(e => window.addEventListener(e, resetTimer));
-    resetTimer();
-    return () => { events.forEach(e => window.removeEventListener(e, resetTimer)); clearTimeout(timer); };
-  }, [userCtx, handleLogout]);
 
   useEffect(() => { handleLogin(); }, []);
 
@@ -2481,9 +2040,8 @@ const App = () => {
         if (role === 'Cliente Consulta') return <RequestList setView={setView} setSelectedRequest={setSelectedRequest} initialData={initialData} onRefresh={() => refreshAll(true)} onChangePeriod={handleChangePeriod} currentPeriod={period} refreshing={syncStatus !== 'idle'} userContext={userCtx} masterData={masterData}/>;
         return <BulkUpload userContext={userCtx} setView={setView} onReload={() => loadRequests()}/>;
       case 'config':
-        return <ConfigurationView userContext={userCtx} onForceSync={() => refreshAll(true)} syncStatus={syncStatus} lastSync={lastSync} onRefreshClients={handleRefreshClients} showToast={showToast}/>;
+        return <ConfigurationView userContext={userCtx} onForceSync={() => refreshAll(true)} syncStatus={syncStatus} lastSync={lastSync} onRefreshClients={() => {}} showToast={showToast}/>;
       default:
-        if (role === 'Cliente Consulta') return <RequestList setView={setView} setSelectedRequest={setSelectedRequest} initialData={initialData} onRefresh={() => refreshAll(true)} onChangePeriod={handleChangePeriod} currentPeriod={period} refreshing={syncStatus !== 'idle'} userContext={userCtx} masterData={masterData}/>;
         return <HomeDashboard userContext={userCtx} requests={initialData?.data||[]} setView={setView} syncStatus={syncStatus}/>;
     }
   };
